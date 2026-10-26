@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
-import 'meal_nutrition_review_placeholder_screen.dart';
+import 'meal_nutrition_review_screen.dart';
 import 'models/detected_food_item.dart';
 
 /// Screen 2 of the Log Meal flow: Meal Analysis & Portion Review.
@@ -477,7 +477,7 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
   void _onReviewNutrition() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => MealNutritionReviewPlaceholderScreen(
+        builder: (context) => MealNutritionReviewScreen(
           mealName: _mealName,
           imageBytes: widget.imageBytes,
           imageFile: widget.imageFile,

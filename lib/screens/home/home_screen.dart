@@ -13,10 +13,14 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     const recommendation = MockDataRepository.recommendation;
     const wellness = MockDataRepository.wellness;
-    const nutrition = MockDataRepository.nutrition;
-    const meals = MockDataRepository.meals;
 
-    return Scaffold(
+    return ListenableBuilder(
+      listenable: MockDataRepository.notifier,
+      builder: (context, _) {
+        final nutrition = MockDataRepository.nutrition;
+        final meals = MockDataRepository.meals;
+
+        return Scaffold(
       backgroundColor: Colors.transparent,
       body: SafeArea(
         bottom: false,
@@ -110,6 +114,8 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+      },
     );
   }
 }

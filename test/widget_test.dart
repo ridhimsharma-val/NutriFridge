@@ -4,12 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nutrifridge/main.dart';
 import 'package:nutrifridge/screens/fridge/models/category_item.dart';
+import 'package:nutrifridge/models/nutrition_data.dart';
 import 'package:nutrifridge/screens/log_meal/meal_analysis_screen.dart';
-import 'package:nutrifridge/screens/log_meal/meal_nutrition_review_placeholder_screen.dart';
+import 'package:nutrifridge/screens/log_meal/meal_nutrition_review_screen.dart';
+import 'package:nutrifridge/screens/log_meal/models/detected_food_item.dart';
 
 void main() {
   setUp(() {
     FridgeCategoryRepository.reset();
+    MockDataRepository.reset();
   });
 
   testWidgets('NutriFridge dashboard smoke test', (WidgetTester tester) async {
@@ -749,5 +752,116 @@ void main() {
     expect(find.byType(MealNutritionReviewPlaceholderScreen), findsOneWidget);
     expect(find.text('Nutrition Review'), findsOneWidget);
     expect(find.text('Roasted Paneer & Rice'), findsOneWidget);
+  });
+
+  testWidgets('Log Meal Screen 3 - Nutrition Review and Fridge Update Flow', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    // 1. Initial Fridge and Dashboard state check
+    expect(MockDataRepository.nutrition.consumedCalories, 1620);
+    expect(FridgeCategoryRepository.getCategoryData('Dairy Products').items.firstWhere((it) => it.name == 'Paneer').quantity, '250 g');
+
+    // 2. Pump MealNutritionReviewScreen directly inside MaterialApp
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MealNutritionReviewScreen(
+          mealName: 'Paneer Rice Bowl',
+          detectedFoods: DetectedFoodItem.initialSampleDetection,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 3. Header verification
+    expect(find.text('Your meal breakdown'), findsOneWidget);
+    expect(find.text("Here's the estimated nutrition for your meal."), findsOneWidget);
+
+    // 4. Meal Summary: rename meal
+    expect(find.text('Paneer Rice Bowl'), findsOneWidget);
+    await tester.tap(find.text('Paneer Rice Bowl'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit Meal Name'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'Delicious Paneer Rice Bowl');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delicious Paneer Rice Bowl'), findsOneWidget);
+
+    // 5. Meal Type Selector: select Dinner
+    expect(find.text('Meal type'), findsOneWidget);
+    expect(find.text('Dinner'), findsOneWidget);
+    await tester.tap(find.text('Dinner'));
+    await tester.pumpAndSettle();
+
+    // 6. Calories & Macronutrients verification
+    expect(find.text('Estimated Calories'), findsOneWidget);
+    expect(find.text('520'), findsOneWidget);
+    expect(find.text('kcal'), findsOneWidget);
+    expect(find.text('Protein'), findsOneWidget);
+    expect(find.text('24 g'), findsOneWidget);
+    expect(find.text('Carbohydrates'), findsOneWidget);
+    expect(find.text('62 g'), findsOneWidget);
+    expect(find.text('Fat'), findsOneWidget);
+    expect(find.text('18 g'), findsOneWidget);
+
+    // 7. Ingredients detected verification
+    expect(find.text('Ingredients detected'), findsOneWidget);
+    expect(find.text('Paneer'), findsOneWidget);
+    expect(find.text('100 g'), findsOneWidget);
+    expect(find.text('Rice'), findsOneWidget);
+    expect(find.text('150 g'), findsOneWidget);
+    expect(find.text('Vegetables'), findsOneWidget);
+    expect(find.text('80 g'), findsOneWidget);
+    expect(find.text('Edit ingredients'), findsOneWidget);
+
+    // 8. Expandable More nutrition details
+    await tester.ensureVisible(find.text('More nutrition details'));
+    await tester.tap(find.text('More nutrition details'));
+    await tester.pumpAndSettle();
+    expect(find.text('Dietary Fiber'), findsOneWidget);
+    expect(find.text('6.2 g'), findsOneWidget);
+    expect(find.text('Sodium'), findsOneWidget);
+    expect(find.text('380 mg'), findsOneWidget);
+
+    // 9. Update your fridge section verification
+    await tester.ensureVisible(find.text('Update your fridge'));
+    expect(find.text('Update your fridge'), findsOneWidget);
+    expect(find.text('Select ingredients that came from your tracked inventory.'), findsOneWidget);
+
+    // Paneer should be matched in Dairy Products and checked by default
+    expect(find.textContaining('Deducting 100 g (150 g remaining)'), findsOneWidget);
+
+    // Rice & Vegetables are not tracked in fridge
+    expect(find.text('Not tracked in fridge inventory'), findsNWidgets(2));
+
+    // 10. Tap "Confirm & Log Meal"
+    expect(find.text('Confirm & Log Meal'), findsOneWidget);
+    await tester.tap(find.text('Confirm & Log Meal'));
+    await tester.pumpAndSettle();
+
+    // 11. Verify Nutrition Totals Updated in MockDataRepository
+    // 1620 + 520 = 2140 kcal
+    expect(MockDataRepository.nutrition.consumedCalories, 2140);
+    // Protein: 72 + 24 = 96 g
+    expect(MockDataRepository.nutrition.protein.amountGrams, 96);
+    // Carbs: 210 + 62 = 272 g
+    expect(MockDataRepository.nutrition.carbs.amountGrams, 272);
+    // Fat: 62 + 18 = 80 g
+    expect(MockDataRepository.nutrition.fat.amountGrams, 80);
+
+    // 12. Verify Dinner was marked completed in meals list
+    final dinnerMeal = MockDataRepository.meals.firstWhere((m) => m.name == 'Dinner');
+    expect(dinnerMeal.isCompleted, isTrue);
+
+    // 13. Verify Paneer deducted in FridgeCategoryRepository
+    // 250 g - 100 g = 150 g
+    final paneerItem = FridgeCategoryRepository.getCategoryData('Dairy Products').items.firstWhere((it) => it.name == 'Paneer');
+    expect(paneerItem.quantity, '150 g');
   });
 }
