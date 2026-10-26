@@ -134,23 +134,44 @@ class FridgeInventoryService {
   }
 
   /// Deducts only the selected, matching inventory items from [FridgeCategoryRepository].
+  /// Prevents duplicate deductions and strictly enforces non-negative stock.
   /// Returns a summary list of successful deductions.
   static List<String> deductSelected(List<IngredientInventoryStatus> statuses) {
     final List<String> deductionSummaries = [];
+    final Set<String> processedItemIds = {};
 
     for (final status in statuses) {
       if (!status.isSelected || !status.canDeduct) continue;
       if (status.matchingItem == null || status.categoryName == null) continue;
 
-      final remaining = (status.availableAmount - status.ingredient.amount).round();
+      final itemId = status.matchingItem!.id;
+      if (processedItemIds.contains(itemId)) {
+        // Prevent deducting the same inventory item multiple times in a single meal log
+        continue;
+      }
+      processedItemIds.add(itemId);
 
+      // Fetch the latest fresh item from the repository to prevent stale stock calculation
+      final currentCategory = FridgeCategoryRepository.getCategoryData(status.categoryName!);
+      final currentItem = currentCategory.items.where((it) => it.id == itemId).firstOrNull;
+      if (currentItem == null) continue;
+
+      final currentAmount = currentItem.numericAmount.toDouble();
+      final deductAmount = status.ingredient.amount;
+
+      // Prevent negative stock
+      if (currentAmount < deductAmount) {
+        continue;
+      }
+
+      final remaining = (currentAmount - deductAmount).round();
       if (remaining <= 0) {
         // Entire stock consumed
-        FridgeCategoryRepository.removeItem(status.categoryName!, status.matchingItem!.id);
-        deductionSummaries.add('${status.ingredient.name}: all ${status.matchingItem!.quantity} consumed');
+        FridgeCategoryRepository.removeItem(status.categoryName!, itemId);
+        deductionSummaries.add('${status.ingredient.name}: all ${currentItem.quantity} consumed');
       } else {
         // Partial stock deducted
-        final updated = status.matchingItem!.copyWith(
+        final updated = currentItem.copyWith(
           quantity: '$remaining ${status.availableUnit}',
         );
         FridgeCategoryRepository.updateItem(status.categoryName!, updated);

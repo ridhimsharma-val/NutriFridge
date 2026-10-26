@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../core/services/app_image_picker.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../fridge/models/category_item.dart';
@@ -15,21 +18,65 @@ class SingleFoodScanPage extends StatefulWidget {
 
 class _SingleFoodScanPageState extends State<SingleFoodScanPage> {
   String? _previewImage;
+  Uint8List? _previewImageBytes;
   bool _isAnalyzing = false;
   bool _analysisComplete = false;
 
-  void _onTakePhoto() {
-    setState(() {
-      _previewImage = 'assets/images/categories/dairy_paneer.png';
-      _analysisComplete = false;
-    });
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final file = await AppImagePicker.pickImage(
+        source: source,
+        preferredCameraDevice: CameraDevice.rear,
+      );
+
+      if (file == null) {
+        // User cancelled camera or gallery picker, preserve existing preview
+        return;
+      }
+
+      final bytes = await file.readAsBytes();
+
+      if (mounted) {
+        setState(() {
+          _previewImageBytes = bytes;
+          _previewImage = 'assets/images/categories/dairy_paneer.png';
+          _analysisComplete = false;
+        });
+      }
+    } on PlatformException catch (e) {
+      if (mounted) {
+        if (e.code == 'camera_access_denied') {
+          _showFeedback('Camera permission was denied. You can enable it in Settings or choose from Gallery.');
+        } else if (e.code == 'photo_access_denied') {
+          _showFeedback('Photo gallery permission was denied. You can enable it in Settings.');
+        } else {
+          _showFeedback('Permission needed to access ${source == ImageSource.camera ? 'camera' : 'photos'}.');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _showFeedback('Could not select photo. Please try again.');
+      }
+    }
   }
 
-  void _onChooseGallery() {
-    setState(() {
-      _previewImage = 'assets/images/categories/dairy_paneer.png';
-      _analysisComplete = false;
-    });
+  void _onTakePhoto() => _pickImage(ImageSource.camera);
+
+  void _onChooseGallery() => _pickImage(ImageSource.gallery);
+
+  void _showFeedback(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(fontWeight: FontWeight.w500),
+        ),
+        backgroundColor: AppColors.textPrimary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _analyzeFood() async {
@@ -136,6 +183,7 @@ class _SingleFoodScanPageState extends State<SingleFoodScanPage> {
                 )
               : FoodScanPreview(
                   previewImageAsset: _previewImage,
+                  previewImageBytes: _previewImageBytes,
                   modeTitle: 'Single Food',
                   promptText: 'Position one food item in the frame',
                   isAnalyzing: _isAnalyzing,

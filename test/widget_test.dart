@@ -1,3 +1,5 @@
+import 'package:image_picker/image_picker.dart';
+import 'package:nutrifridge/core/services/app_image_picker.dart';
 import 'package:nutrifridge/screens/splash/magic_fridge_splash.dart';
 import 'package:nutrifridge/screens/home/widgets/dashboard_header.dart';
 import 'package:flutter/material.dart';
@@ -7,12 +9,17 @@ import 'package:nutrifridge/screens/fridge/models/category_item.dart';
 import 'package:nutrifridge/models/nutrition_data.dart';
 import 'package:nutrifridge/screens/log_meal/meal_analysis_screen.dart';
 import 'package:nutrifridge/screens/log_meal/meal_nutrition_review_screen.dart';
+import 'package:nutrifridge/screens/log_meal/log_meal_screen.dart';
+import 'package:nutrifridge/screens/add_food/single_food_scan_page.dart';
 import 'package:nutrifridge/screens/log_meal/models/detected_food_item.dart';
 
 void main() {
   setUp(() {
     FridgeCategoryRepository.reset();
     MockDataRepository.reset();
+    AppImagePicker.mockHandler = (source) async {
+      return XFile.fromData(AppImagePicker.sampleMockBytes, name: 'test_photo.png');
+    };
   });
 
   testWidgets('NutriFridge dashboard smoke test', (WidgetTester tester) async {
@@ -863,5 +870,209 @@ void main() {
     // 250 g - 100 g = 150 g
     final paneerItem = FridgeCategoryRepository.getCategoryData('Dairy Products').items.firstWhere((it) => it.name == 'Paneer');
     expect(paneerItem.quantity, '150 g');
+  });
+
+  testWidgets('Camera and Gallery Independent Source Selection Test', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    ImageSource? lastRequestedSource;
+
+    // Handler recording requested source
+    AppImagePicker.mockHandler = (source) async {
+      lastRequestedSource = source;
+      return XFile.fromData(AppImagePicker.sampleMockBytes, name: 'captured.png');
+    };
+
+    // --- A. Log Meal Screen Tests ---
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: LogMealScreen(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 1. Test "Take Photo" opens device camera
+    await tester.tap(find.text('Take Photo'));
+    await tester.pumpAndSettle();
+    expect(lastRequestedSource, ImageSource.camera);
+    // Captured photo appears in preview
+    expect(find.byType(Image), findsOneWidget);
+
+    // 2. Test "Choose from Gallery" opens gallery picker
+    await tester.tap(find.text('Choose from Gallery'));
+    await tester.pumpAndSettle();
+    expect(lastRequestedSource, ImageSource.gallery);
+    expect(find.byType(Image), findsOneWidget);
+
+    // 3. Test cancellation: returns null, preview remains intact
+    AppImagePicker.mockHandler = (source) async {
+      lastRequestedSource = source;
+      return null; // User cancelled
+    };
+    await tester.tap(find.text('Take Photo'));
+    await tester.pumpAndSettle();
+    expect(lastRequestedSource, ImageSource.camera);
+    // Preview is NOT erased on cancellation
+    expect(find.byType(Image), findsOneWidget);
+
+    // --- B. Add Food — Single Food Scan Tests ---
+    AppImagePicker.mockHandler = (source) async {
+      lastRequestedSource = source;
+      return XFile.fromData(AppImagePicker.sampleMockBytes, name: 'food.png');
+    };
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: SingleFoodScanPage(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 4. Test "Take Photo" opens camera
+    await tester.tap(find.text('Take Photo'));
+    await tester.pumpAndSettle();
+    expect(lastRequestedSource, ImageSource.camera);
+    expect(find.text('Analyze Food'), findsOneWidget);
+
+    // 5. Test "Gallery" opens gallery picker
+    await tester.tap(find.text('Gallery'));
+    await tester.pumpAndSettle();
+    expect(lastRequestedSource, ImageSource.gallery);
+    expect(find.text('Analyze Food'), findsOneWidget);
+
+    // 6. Test cancellation in Single Food: preview remains intact
+    AppImagePicker.mockHandler = (source) async {
+      lastRequestedSource = source;
+      return null; // Cancelled
+    };
+    await tester.tap(find.text('Take Photo'));
+    await tester.pumpAndSettle();
+    expect(lastRequestedSource, ImageSource.camera);
+    expect(find.text('Analyze Food'), findsOneWidget);
+  });
+
+  testWidgets('Complete End-to-End Log Meal Flow with Dynamic Nutrition and Inventory Adjustment', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      AppImagePicker.mockHandler = null;
+    });
+
+    // Reset shared state
+    MockDataRepository.reset();
+    FridgeCategoryRepository.reset();
+
+    AppImagePicker.mockHandler = (source) async {
+      return XFile.fromData(AppImagePicker.sampleMockBytes, name: 'captured_meal.png');
+    };
+
+    // 1. Pump full Dashboard
+    await tester.pumpWidget(const NutriFridgeApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text("Today's Meals"), findsOneWidget);
+    expect(MockDataRepository.nutrition.consumedCalories, 1620);
+    expect(FridgeCategoryRepository.getCategoryData('Dairy Products').items.firstWhere((it) => it.name == 'Paneer').quantity, '250 g');
+
+    // 2. Open Quick Actions sheet
+    await tester.tap(find.byIcon(Icons.add_rounded));
+    await tester.pumpAndSettle();
+
+    // 3. Tap "Log Meal"
+    expect(find.text('Log Meal'), findsOneWidget);
+    await tester.tap(find.text('Log Meal'));
+    await tester.pumpAndSettle();
+
+    expect(find.text("Let's see what you had."), findsOneWidget);
+    expect(find.text('Analyze Meal'), findsOneWidget);
+
+    // 4. Capture meal photo
+    await tester.tap(find.text('Take Photo'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Image), findsOneWidget);
+
+    // 5. Tap "Analyze Meal" -> Screen 2 (Meal Analysis)
+    await tester.tap(find.text('Analyze Meal'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Review your meal'), findsOneWidget);
+    expect(find.text('Paneer Rice Bowl'), findsOneWidget);
+    expect(find.text('Paneer'), findsOneWidget);
+    expect(find.text('100 g'), findsOneWidget);
+
+    // 6. Edit Meal Name to "Chef Special Bowl"
+    await tester.tap(find.text('Paneer Rice Bowl'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Chef Special Bowl');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(find.text('Chef Special Bowl'), findsOneWidget);
+
+    // 7. Edit Paneer portion from 100 g to 200 g
+    await tester.tap(find.text('Paneer'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit Portion — Paneer'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), '200');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(find.text('200 g'), findsOneWidget);
+
+    // 8. Tap "Review Nutrition" -> Screen 3 (Nutrition Review)
+    await tester.tap(find.text('Review Nutrition'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Your meal breakdown'), findsOneWidget);
+    expect(find.text('Chef Special Bowl'), findsOneWidget);
+
+    // Dynamic nutrition should reflect 200g Paneer (530) + 150g Rice (195) + 80g Veg (60) = 785 kcal
+    expect(find.text('785'), findsOneWidget);
+    expect(find.text('42 g'), findsOneWidget); // Protein: 36 + 4 + 2 = 42 g
+    expect(find.text('66 g'), findsOneWidget); // Carbs: 8 + 45 + 13 = 66 g
+    expect(find.text('33 g'), findsOneWidget); // Fat: 30 + 0.5 + 2.5 = 33 g
+
+    // 9. Test Back Navigation from Screen 3 to Screen 2
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('Review your meal'), findsOneWidget);
+    expect(find.text('Chef Special Bowl'), findsOneWidget);
+    expect(find.text('200 g'), findsOneWidget);
+
+    // Re-advance to Screen 3
+    await tester.tap(find.text('Review Nutrition'));
+    await tester.pumpAndSettle();
+    expect(find.text('Your meal breakdown'), findsOneWidget);
+
+    // 10. Check "Update your fridge": Paneer 200 g matches Dairy Products (250 g available)
+    await tester.ensureVisible(find.text('Update your fridge'));
+    expect(find.textContaining('Deducting 200 g (50 g remaining)'), findsOneWidget);
+
+    // 11. Confirm & Log Meal
+    await tester.ensureVisible(find.text('Confirm & Log Meal'));
+    await tester.tap(find.text('Confirm & Log Meal'));
+    await tester.pumpAndSettle();
+
+    // 12. Returned to Dashboard
+    expect(find.text("Today's Meals"), findsOneWidget);
+
+    // Verify MockDataRepository updated: 1620 + 785 = 2405 kcal
+    expect(MockDataRepository.nutrition.consumedCalories, 2405);
+    expect(MockDataRepository.nutrition.protein.amountGrams, 72 + 42);
+    expect(MockDataRepository.nutrition.carbs.amountGrams, 210 + 66);
+    expect(MockDataRepository.nutrition.fat.amountGrams, 62 + 33);
+    expect(MockDataRepository.loggedMealsHistory.length, 1);
+    expect(MockDataRepository.loggedMealsHistory.first['mealName'], 'Chef Special Bowl');
+
+    // Verify FridgeCategoryRepository updated: Paneer reduced from 250 g to 50 g
+    final updatedPaneer = FridgeCategoryRepository.getCategoryData('Dairy Products').items.firstWhere((it) => it.name == 'Paneer');
+    expect(updatedPaneer.quantity, '50 g');
   });
 }

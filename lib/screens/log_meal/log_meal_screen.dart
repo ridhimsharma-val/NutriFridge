@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../core/services/app_image_picker.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import 'meal_analysis_screen.dart';
@@ -14,7 +15,6 @@ class LogMealScreen extends StatefulWidget {
 }
 
 class _LogMealScreenState extends State<LogMealScreen> {
-  final ImagePicker _picker = ImagePicker();
   XFile? _selectedImage;
   Uint8List? _imageBytes;
   bool _isLoading = false;
@@ -25,8 +25,9 @@ class _LogMealScreenState extends State<LogMealScreen> {
         _isLoading = true;
       });
 
-      final XFile? file = await _picker.pickImage(
+      final XFile? file = await AppImagePicker.pickImage(
         source: source,
+        preferredCameraDevice: CameraDevice.rear,
         maxWidth: 1600,
         maxHeight: 1600,
         imageQuality: 88,
@@ -51,12 +52,18 @@ class _LogMealScreenState extends State<LogMealScreen> {
           _isLoading = false;
         });
       }
-    } on PlatformException {
+    } on PlatformException catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
-        _showFeedback('Permission needed to access ${source == ImageSource.camera ? 'camera' : 'photos'}.');
+        if (e.code == 'camera_access_denied') {
+          _showFeedback('Camera permission was denied. You can enable it in Settings or choose from Gallery.');
+        } else if (e.code == 'photo_access_denied') {
+          _showFeedback('Photo gallery permission was denied. You can enable it in Settings.');
+        } else {
+          _showFeedback('Permission needed to access ${source == ImageSource.camera ? 'camera' : 'photos'}.');
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -66,6 +73,52 @@ class _LogMealScreenState extends State<LogMealScreen> {
         _showFeedback('Could not select photo. Please try again.');
       }
     }
+  }
+
+  void _showChangePhotoOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.cardWhite,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(22, 14, 22, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded, color: AppColors.tealPrimary),
+              title: const Text('Take Photo', style: TextStyle(fontWeight: FontWeight.w600)),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _pickImage(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded, color: AppColors.tealPrimary),
+              title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w600)),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _pickImage(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showFeedback(String message) {
@@ -278,7 +331,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            onTap: () => _pickImage(ImageSource.camera),
+                            onTap: _showChangePhotoOptions,
                             borderRadius: BorderRadius.circular(18),
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),

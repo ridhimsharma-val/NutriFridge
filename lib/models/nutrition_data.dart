@@ -232,6 +232,7 @@ class MockDataRepository {
     required int protein,
     required int carbs,
     required int fat,
+    List<String>? ingredients,
     DateTime? timestamp,
   }) {
     // 1. Add nutrition totals
@@ -282,6 +283,7 @@ class MockDataRepository {
       'protein': protein,
       'carbs': carbs,
       'fat': fat,
+      'ingredients': ingredients ?? const <String>[],
       'timestamp': timeNow,
     });
 

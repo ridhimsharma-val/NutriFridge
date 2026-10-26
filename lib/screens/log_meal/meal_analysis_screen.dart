@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import 'meal_nutrition_review_screen.dart';
 import 'models/detected_food_item.dart';
+import 'models/meal_nutrition_estimate.dart';
 
 /// Screen 2 of the Log Meal flow: Meal Analysis & Portion Review.
 /// Allows the user to inspect identified items, adjust portions, rename the meal,
@@ -474,17 +475,55 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
     });
   }
 
-  void _onReviewNutrition() {
-    Navigator.of(context).push(
+  Future<void> _onReviewNutrition() async {
+    if (_mealName.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a meal name.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (_detectedFoods.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please add at least one detected food item.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final hasInvalid = _detectedFoods.any((f) => f.amount <= 0);
+    if (hasInvalid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Food quantities must be greater than zero.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final updatedMealName = await Navigator.of(context).push<String>(
       MaterialPageRoute(
         builder: (context) => MealNutritionReviewScreen(
-          mealName: _mealName,
+          mealName: _mealName.trim(),
           imageBytes: widget.imageBytes,
           imageFile: widget.imageFile,
           detectedFoods: _detectedFoods,
+          nutritionEstimate: MealNutritionEstimate.fromIngredients(_detectedFoods),
         ),
       ),
     );
+
+    if (updatedMealName != null && updatedMealName.trim().isNotEmpty && mounted) {
+      setState(() {
+        _mealName = updatedMealName.trim();
+      });
+    }
   }
 
   @override
@@ -627,7 +666,9 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
                       width: double.infinity,
                       height: 54,
                       child: ElevatedButton(
-                        onPressed: _detectedFoods.isNotEmpty ? _onReviewNutrition : null,
+                        onPressed: (_detectedFoods.isNotEmpty && _mealName.trim().isNotEmpty)
+                            ? _onReviewNutrition
+                            : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.tealPrimary,
                           foregroundColor: Colors.white,

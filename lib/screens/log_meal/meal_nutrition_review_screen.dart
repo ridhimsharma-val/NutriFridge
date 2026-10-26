@@ -14,7 +14,7 @@ class MealNutritionReviewScreen extends StatefulWidget {
   final Uint8List? imageBytes;
   final XFile? imageFile;
   final List<DetectedFoodItem> detectedFoods;
-  final MealNutritionEstimate nutritionEstimate;
+  final MealNutritionEstimate? nutritionEstimate;
 
   const MealNutritionReviewScreen({
     super.key,
@@ -22,7 +22,7 @@ class MealNutritionReviewScreen extends StatefulWidget {
     this.imageBytes,
     this.imageFile,
     required this.detectedFoods,
-    this.nutritionEstimate = const MealNutritionEstimate(),
+    this.nutritionEstimate,
   });
 
   @override
@@ -33,6 +33,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
   late String _mealName;
   late String _selectedMealType;
   late List<IngredientInventoryStatus> _inventoryStatuses;
+  late MealNutritionEstimate _nutrition;
   bool _isMoreNutritionExpanded = false;
   bool _isLogging = false;
 
@@ -48,6 +49,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
     super.initState();
     _mealName = widget.mealName.trim().isEmpty ? 'Paneer Rice Bowl' : widget.mealName;
     _selectedMealType = _detectDefaultMealType();
+    _nutrition = widget.nutritionEstimate ?? MealNutritionEstimate.fromIngredients(widget.detectedFoods);
     _inventoryStatuses = FridgeInventoryService.inspectIngredients(widget.detectedFoods);
   }
 
@@ -177,11 +179,32 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
       return;
     }
 
+    if (widget.detectedFoods.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please add at least one food item before logging.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final hasInvalid = widget.detectedFoods.any((f) => f.amount <= 0);
+    if (hasInvalid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('All ingredient quantities must be greater than zero.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isLogging = true;
     });
 
-    final nutrition = widget.nutritionEstimate;
+    final nutrition = _nutrition;
 
     // 1. Update mock nutrition totals and meal history
     MockDataRepository.logMeal(
@@ -191,6 +214,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
       protein: nutrition.proteinGrams,
       carbs: nutrition.carbsGrams,
       fat: nutrition.fatGrams,
+      ingredients: widget.detectedFoods.map((f) => '${f.name} (${f.formattedQuantity})').toList(),
       timestamp: DateTime.now(),
     );
 
@@ -225,7 +249,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final nutrition = widget.nutritionEstimate;
+    final nutrition = _nutrition;
 
     return Container(
       decoration: const BoxDecoration(
@@ -251,7 +275,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
               color: AppColors.textPrimary,
             ),
             tooltip: 'Back to Meal Analysis',
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(context).pop(_mealName),
           ),
           centerTitle: true,
           title: Text(
@@ -647,7 +671,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
               ),
             ),
             InkWell(
-              onTap: () => Navigator.of(context).pop(),
+              onTap: () => Navigator.of(context).pop(_mealName),
               borderRadius: BorderRadius.circular(8),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),

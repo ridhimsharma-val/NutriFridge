@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -5,6 +6,7 @@ import '../../../core/theme/app_typography.dart';
 /// Reusable camera & photo selection preview component
 class FoodScanPreview extends StatelessWidget {
   final String? previewImageAsset;
+  final Uint8List? previewImageBytes;
   final String modeTitle;
   final String promptText;
   final bool isAnalyzing;
@@ -16,6 +18,7 @@ class FoodScanPreview extends StatelessWidget {
   const FoodScanPreview({
     super.key,
     required this.previewImageAsset,
+    this.previewImageBytes,
     this.modeTitle = 'Food Camera',
     this.promptText = 'Position food item in frame',
     this.isAnalyzing = false,
@@ -50,7 +53,12 @@ class FoodScanPreview extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 // Image or Camera Viewfinder Placeholder
-                if (previewImageAsset != null)
+                if (previewImageBytes != null)
+                  Image.memory(
+                    previewImageBytes!,
+                    fit: BoxFit.cover,
+                  )
+                else if (previewImageAsset != null)
                   Image.asset(
                     previewImageAsset!,
                     fit: BoxFit.cover,
@@ -126,7 +134,7 @@ class FoodScanPreview extends StatelessWidget {
                   padding: const EdgeInsets.all(24.0),
                   child: CustomPaint(
                     painter: _ViewfinderBracketPainter(
-                      color: previewImageAsset != null
+                      color: (previewImageBytes != null || previewImageAsset != null)
                           ? AppColors.tealAccent.withValues(alpha: 0.8)
                           : Colors.white.withValues(alpha: 0.4),
                     ),
@@ -264,7 +272,7 @@ class FoodScanPreview extends StatelessWidget {
                       icon: Icons.camera_alt_rounded,
                       label: 'Take Photo',
                       onTap: onTakePhoto,
-                      isPrimary: previewImageAsset == null,
+                      isPrimary: previewImageBytes == null && previewImageAsset == null,
                     ),
                   ),
                   const SizedBox(width: 12),
