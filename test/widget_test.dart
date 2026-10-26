@@ -1075,4 +1075,82 @@ void main() {
     final updatedPaneer = FridgeCategoryRepository.getCategoryData('Dairy Products').items.firstWhere((it) => it.name == 'Paneer');
     expect(updatedPaneer.quantity, '50 g');
   });
+
+  testWidgets('Progress Screen - Cinematic Data Visualization & Live Sync', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    MockDataRepository.reset();
+    FridgeCategoryRepository.reset();
+
+    // 1. Pump App and Settle
+    await tester.pumpWidget(const NutriFridgeApp());
+    await tester.pumpAndSettle();
+
+    // 2. Tap on "Progress" in Bottom Navigation
+    expect(find.text('Progress'), findsOneWidget);
+    await tester.tap(find.text('Progress'));
+    await tester.pumpAndSettle();
+
+    // 3. Verify Header and Subtitle
+    expect(find.text('Your nutrition, over time.'), findsOneWidget);
+    expect(find.text('Week'), findsOneWidget);
+    expect(find.text('Month'), findsOneWidget);
+
+    // 4. Verify Cinematic Wellness Hero
+    expect(find.text('WELLNESS SCORE'), findsOneWidget);
+    expect(find.text('out of 100'), findsOneWidget);
+    expect(find.text('NutriFridge wellness indicator • Not a medical assessment'), findsOneWidget);
+
+    // 5. Verify Macronutrient Donut Chart
+    expect(find.text('Calorie distribution by macro'), findsOneWidget);
+    expect(find.text('Protein'), findsWidgets);
+    expect(find.text('Carbs'), findsWidgets);
+    expect(find.text('Fat'), findsWidgets);
+
+    // 6. Verify Weekly Calories Bar Chart & Day Interactivity
+    await tester.ensureVisible(find.text('Calories through the week'));
+    expect(find.text('Calories through the week'), findsOneWidget);
+    expect(find.text('Target: 2200'), findsOneWidget);
+    expect(find.text('Mon'), findsOneWidget);
+    expect(find.text('Tue'), findsOneWidget);
+    expect(find.text('Sun'), findsOneWidget);
+
+    // Tap on Monday bar
+    await tester.tap(find.text('Mon'));
+    await tester.pumpAndSettle();
+    expect(find.text('Monday, Oct 20'), findsOneWidget);
+    expect(find.text('1980 kcal • 3 meals logged'), findsOneWidget);
+
+    // 7. Verify Consistency Heatmap
+    await tester.ensureVisible(find.text('Meal logging consistency'));
+    expect(find.text('Meal logging consistency'), findsOneWidget);
+    expect(find.text('Today is highlighted'), findsOneWidget);
+    expect(find.text('3+ meals'), findsOneWidget);
+
+    // 8. Verify Nutrition Trends
+    await tester.ensureVisible(find.text('Nutrition trends'));
+    expect(find.text('Nutrition trends'), findsOneWidget);
+    expect(find.text('Average daily calories'), findsOneWidget);
+    expect(find.text('Average protein intake'), findsOneWidget);
+    expect(find.text('Meal-logging consistency'), findsOneWidget);
+
+    // 9. Verify Your Week in Food Insights
+    await tester.ensureVisible(find.text('Your week in food'));
+    expect(find.text('Your week in food'), findsOneWidget);
+    expect(find.text('Observations from your meal recording pattern'), findsOneWidget);
+
+    // 10. Switch Period to "Month"
+    await tester.ensureVisible(find.text('Month'));
+    await tester.tap(find.text('Month'));
+    await tester.pumpAndSettle();
+    expect(find.text('Weekly averages this month'), findsOneWidget);
+    expect(find.text('W1'), findsOneWidget);
+    expect(find.text('W4'), findsOneWidget);
+  });
 }

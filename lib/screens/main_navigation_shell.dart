@@ -4,6 +4,7 @@ import '../widgets/custom_bottom_nav.dart';
 import 'fridge/fridge_page.dart';
 import 'home/home_screen.dart';
 import 'placeholder/placeholder_screen.dart';
+import 'progress/progress_screen.dart';
 import 'quick_actions/widgets/quick_action_sheet.dart';
 
 class MainNavigationShell extends StatefulWidget {
@@ -20,11 +21,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     HomeScreen(),
     FridgePage(),
     SizedBox.shrink(), // Placeholder for central log action
-    PlaceholderScreen(
-      title: 'Nutrition Progress',
-      icon: Icons.bar_chart_rounded,
-      description: 'View weekly intake trends, macro balance, and history.',
-    ),
+    ProgressScreen(),
     PlaceholderScreen(
       title: 'My Profile & Goals',
       icon: Icons.person_rounded,
