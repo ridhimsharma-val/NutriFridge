@@ -78,59 +78,43 @@ class NutritionCard extends StatelessWidget {
                 // Top Calories Row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Expanded(
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(6.5),
-                            decoration: const BoxDecoration(
-                              color: AppColors.peachLight,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.local_fire_department_rounded,
-                              size: 15,
-                              color: AppColors.peachPrimary,
+                          Text(
+                            'Calories',
+                            style: AppTypography.subtitle.copyWith(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                              letterSpacing: 0.2,
                             ),
                           ),
-                          const SizedBox(width: 9),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          const SizedBox(height: 2),
+                          RichText(
+                            overflow: TextOverflow.ellipsis,
+                            text: TextSpan(
                               children: [
-                                Text(
-                                  'Calories',
-                                  style: AppTypography.subtitle.copyWith(
-                                    color: AppColors.textSecondary,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 12,
+                                TextSpan(
+                                  text: _formatNumber(
+                                      nutritionData.consumedCalories),
+                                  style: AppTypography.cardTitle.copyWith(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textPrimary,
+                                    letterSpacing: -0.3,
                                   ),
                                 ),
-                                const SizedBox(height: 1),
-                                RichText(
-                                  overflow: TextOverflow.ellipsis,
-                                  text: TextSpan(
-                                    children: [
-                                      TextSpan(
-                                        text: _formatNumber(
-                                            nutritionData.consumedCalories),
-                                        style: AppTypography.cardTitle.copyWith(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w800,
-                                          color: AppColors.textPrimary,
-                                        ),
-                                      ),
-                                      TextSpan(
-                                        text:
-                                            ' / ${_formatNumber(nutritionData.targetCalories)} kcal',
-                                        style: AppTypography.subtitle.copyWith(
-                                          fontSize: 12,
-                                          color: AppColors.textTertiary,
-                                        ),
-                                      ),
-                                    ],
+                                TextSpan(
+                                  text:
+                                      ' / ${_formatNumber(nutritionData.targetCalories)} kcal',
+                                  style: AppTypography.subtitle.copyWith(
+                                    fontSize: 13,
+                                    color: AppColors.textTertiary,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ],
@@ -140,23 +124,13 @@ class NutritionCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Percentage Pill
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8.5,
-                        vertical: 3.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.tealLight,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '${(nutritionData.calorieProgress * 100).toInt()}%',
-                        style: AppTypography.badgeText.copyWith(
-                          color: AppColors.tealPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 10.5,
-                        ),
+                    // Percentage Label
+                    Text(
+                      '${(nutritionData.calorieProgress * 100).toInt()}%',
+                      style: AppTypography.badgeText.copyWith(
+                        color: AppColors.tealPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
                       ),
                     ),
                   ],
@@ -166,7 +140,7 @@ class NutritionCard extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: Container(
-                    height: 7,
+                    height: 6,
                     width: double.infinity,
                     color: const Color(0xFFF1F4F2),
                     child: FractionallySizedBox(
@@ -174,12 +148,7 @@ class NutritionCard extends StatelessWidget {
                       widthFactor: nutritionData.calorieProgress,
                       child: Container(
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [
-                              AppColors.tealAccent,
-                              Color(0xFF48B69A),
-                            ],
-                          ),
+                          color: AppColors.tealAccent,
                           borderRadius: BorderRadius.circular(6),
                         ),
                       ),
@@ -193,47 +162,44 @@ class NutritionCard extends StatelessWidget {
                   color: const Color(0xFFF2F5F3),
                 ),
                 const SizedBox(height: 12),
-                // Three Compact Nutrition Values: Protein, Carbs, Fat
+                // Three Clean Nutrition Values: Protein, Carbs, Fat (Typographic hierarchy)
                 Row(
                   children: [
                     Expanded(
                       child: _buildMacroItem(
                         label: nutritionData.protein.name,
                         value:
-                            '${nutritionData.protein.amountGrams}${nutritionData.protein.unit}',
-                        icon: Icons.fitness_center_rounded,
+                            '${nutritionData.protein.amountGrams} ${nutritionData.protein.unit}',
+                        progress: nutritionData.protein.progress,
                         accentColor: AppColors.peachPrimary,
-                        bgColor: AppColors.peachLight,
                       ),
                     ),
                     Container(
                       width: 1,
-                      height: 32,
+                      height: 34,
                       color: const Color(0xFFF0F3F1),
                     ),
                     Expanded(
                       child: _buildMacroItem(
                         label: nutritionData.carbs.name,
                         value:
-                            '${nutritionData.carbs.amountGrams}${nutritionData.carbs.unit}',
-                        icon: Icons.grain_rounded,
+                            '${nutritionData.carbs.amountGrams} ${nutritionData.carbs.unit}',
+                        progress: nutritionData.carbs.progress,
                         accentColor: AppColors.amberPrimary,
-                        bgColor: AppColors.amberLight,
                       ),
                     ),
                     Container(
                       width: 1,
-                      height: 32,
+                      height: 34,
                       color: const Color(0xFFF0F3F1),
                     ),
                     Expanded(
                       child: _buildMacroItem(
                         label: nutritionData.fat.name,
                         value:
-                            '${nutritionData.fat.amountGrams}${nutritionData.fat.unit}',
-                        icon: Icons.water_drop_rounded,
+                            '${nutritionData.fat.amountGrams} ${nutritionData.fat.unit}',
+                        progress: nutritionData.fat.progress,
                         accentColor: const Color(0xFF3B9EBA),
-                        bgColor: const Color(0xFFE8F6FA),
                       ),
                     ),
                   ],
@@ -249,43 +215,46 @@ class NutritionCard extends StatelessWidget {
   Widget _buildMacroItem({
     required String label,
     required String value,
-    required IconData icon,
+    required double progress,
     required Color accentColor,
-    required Color bgColor,
   }) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(3.5),
-              decoration: BoxDecoration(
-                color: bgColor,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                size: 10.5,
-                color: accentColor,
-              ),
-            ),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                label,
-                style: AppTypography.nutritionLabel.copyWith(fontSize: 11.5),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
+        Text(
+          label,
+          style: AppTypography.subtitle.copyWith(
+            color: AppColors.textSecondary,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w500,
+          ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         Text(
           value,
-          style: AppTypography.nutritionValue.copyWith(fontSize: 14.5),
+          style: AppTypography.cardTitle.copyWith(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        // Subtle restrained mini progress bar
+        ClipRRect(
+          borderRadius: BorderRadius.circular(2),
+          child: Container(
+            height: 3,
+            width: 42,
+            color: const Color(0xFFEFF2F0),
+            child: FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: progress.clamp(0.0, 1.0),
+              child: Container(
+                color: accentColor.withValues(alpha: 0.75),
+              ),
+            ),
+          ),
         ),
       ],
     );

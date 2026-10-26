@@ -24,11 +24,11 @@ class RecipeRecommendation {
     required this.calories,
     required this.proteinGrams,
     required this.fridgeItemsUsed,
-    this.tag = 'AI Fridge Pick ✨',
+    this.tag = 'Picked for your fridge',
     required this.imageUrl,
     this.matchReasons = const [
-      '🧊 Uses 4 items from your fridge',
-      "💪 Helps complete today's protein goal",
+      'Uses 4 items from your fridge',
+      "Helps complete today's protein goal",
     ],
   });
 }
@@ -113,7 +113,7 @@ class MockDataRepository {
     calories: 520,
     proteinGrams: 24,
     fridgeItemsUsed: 4,
-    tag: 'AI Fridge Pick ✨',
+    tag: 'Picked for your fridge',
     imageUrl: 'assets/images/paneer_rice_bowl.jpg',
   );
 

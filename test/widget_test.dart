@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nutrifridge/main.dart';
 import 'package:nutrifridge/screens/fridge/models/category_item.dart';
+import 'package:nutrifridge/screens/log_meal/meal_analysis_screen.dart';
+import 'package:nutrifridge/screens/log_meal/meal_nutrition_review_placeholder_screen.dart';
 
 void main() {
   setUp(() {
@@ -28,10 +30,10 @@ void main() {
     expect(find.byIcon(Icons.notifications_outlined), findsOneWidget);
 
     // Verify Suggested for you
-    expect(find.text('Suggested for you ✨'), findsOneWidget);
+    expect(find.text('Suggested for you'), findsOneWidget);
     expect(find.text('Paneer Rice Bowl'), findsOneWidget);
-    expect(find.text('🧊 Uses 4 items from your fridge'), findsOneWidget);
-    expect(find.text("💪 Helps complete today's protein goal"), findsOneWidget);
+    expect(find.text('Uses 4 items from your fridge'), findsOneWidget);
+    expect(find.text("Helps complete today's protein goal"), findsOneWidget);
 
     // Verify Today's Wellness
     expect(find.text("Today's Wellness"), findsOneWidget);
@@ -336,15 +338,22 @@ void main() {
     await tester.tap(find.byIcon(Icons.add_rounded));
     await tester.pumpAndSettle();
 
-    // Tap Log Meal
+    // Tap Log Meal -> Opens LogMealScreen
     await tester.tap(find.text('Log Meal'));
     await tester.pumpAndSettle();
 
-    expect(find.text('This feature is coming soon! Stay tuned for upcoming updates.'), findsOneWidget);
-    await tester.tap(find.text('Got it'));
+    expect(find.text('Log Meal'), findsOneWidget);
+    expect(find.text("Let's see what you had."), findsOneWidget);
+    expect(find.text('Capture your meal'), findsOneWidget);
+    expect(find.text('Take Photo'), findsOneWidget);
+    expect(find.text('Choose from Gallery'), findsOneWidget);
+    expect(find.text('Analyze Meal'), findsOneWidget);
+
+    // Return back
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
     await tester.pumpAndSettle();
 
-    // Reopen Quick Actions and test AI Assistant
+    // Reopen Quick Actions and test AI Assistant placeholder
     await tester.tap(find.byIcon(Icons.add_rounded));
     await tester.pumpAndSettle();
 
@@ -653,5 +662,92 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(DashboardHeader), findsOneWidget);
     expect(find.byType(MagicFridgeSplashScreen), findsNothing);
+  });
+
+  testWidgets('Log Meal Screen 2 - Meal Analysis and portion adjustments', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    // 1. Pump MealAnalysisScreen directly inside a MaterialApp
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: MealAnalysisScreen(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 2. Verify Header elements
+    expect(find.text('Review your meal'), findsOneWidget);
+    expect(find.text('Check what we found and adjust the portions.'), findsOneWidget);
+
+    // 3. Verify Default Meal Name and edit it
+    expect(find.text('Paneer Rice Bowl'), findsOneWidget);
+    await tester.tap(find.text('Paneer Rice Bowl'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit Meal Name'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'Roasted Paneer & Rice');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(find.text('Roasted Paneer & Rice'), findsOneWidget);
+
+    // 4. Verify initial detected food items
+    expect(find.text('Detected foods'), findsOneWidget);
+    expect(find.text('Paneer'), findsOneWidget);
+    expect(find.text('100 g'), findsOneWidget);
+    expect(find.text('Rice'), findsOneWidget);
+    expect(find.text('150 g'), findsOneWidget);
+    expect(find.text('Vegetables'), findsOneWidget);
+    expect(find.text('80 g'), findsOneWidget);
+
+    // 5. Verify portion estimation disclaimer note
+    expect(find.text('Portions are estimates. Review them before continuing.'), findsOneWidget);
+
+    // 6. Edit portion of Paneer (tap edit on Paneer)
+    await tester.tap(find.text('Paneer'));
+    await tester.pumpAndSettle();
+
+    // Bottom sheet for editing portion appears
+    expect(find.text('Edit Portion — Paneer'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), '125');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    // Verify updated portion
+    expect(find.text('125 g'), findsOneWidget);
+
+    // 7. Remove an item (tap remove icon for Vegetables, which is the 3rd item)
+    expect(find.text('Vegetables'), findsOneWidget);
+    await tester.tap(find.byTooltip('Remove').at(2));
+    await tester.pumpAndSettle();
+    expect(find.text('Vegetables'), findsNothing);
+
+    // 8. Add food item manually (Add food item button)
+    await tester.tap(find.text('Add food item'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add Food Item'), findsOneWidget);
+    final textFields = find.byType(TextField);
+    await tester.enterText(textFields.at(0), 'Curd');
+    await tester.enterText(textFields.at(1), '60');
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Curd'), findsOneWidget);
+    expect(find.text('60 g'), findsOneWidget);
+
+    // 9. Tap "Review Nutrition" button navigating to Screen 3 placeholder
+    expect(find.text('Review Nutrition'), findsOneWidget);
+    await tester.tap(find.text('Review Nutrition'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(MealNutritionReviewPlaceholderScreen), findsOneWidget);
+    expect(find.text('Nutrition Review'), findsOneWidget);
+    expect(find.text('Roasted Paneer & Rice'), findsOneWidget);
   });
 }

@@ -21,7 +21,7 @@ class RecommendationCard extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
           child: Text(
-            'Suggested for you ✨',
+            'Suggested for you',
             style: AppTypography.sectionTitle,
           ),
         ),
@@ -59,43 +59,34 @@ class RecommendationCard extends StatelessWidget {
                           child: _buildFoodImage(),
                         ),
                       ),
-                      // AI Badge overlay
+                      // Restrained Category/Origin Label overlay
                       Positioned(
                         top: 12,
                         left: 12,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 4.5,
+                            horizontal: 10,
+                            vertical: 5,
                           ),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.94),
-                            borderRadius: BorderRadius.circular(18),
+                            borderRadius: BorderRadius.circular(14),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.08),
+                                color: Colors.black.withValues(alpha: 0.06),
                                 blurRadius: 6,
                                 offset: const Offset(0, 2),
                               ),
                             ],
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.auto_awesome,
-                                size: 12.5,
-                                color: AppColors.peachPrimary,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                recommendation.tag,
-                                style: AppTypography.badgeText.copyWith(
-                                  color: AppColors.peachPrimary,
-                                  fontSize: 10.5,
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            recommendation.tag,
+                            style: AppTypography.badgeText.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                              letterSpacing: 0.2,
+                            ),
                           ),
                         ),
                       ),
@@ -121,33 +112,21 @@ class RecommendationCard extends StatelessWidget {
                               ),
                               const SizedBox(height: 3),
                               // Nutrition summary
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.local_fire_department_rounded,
-                                    size: 14.5,
-                                    color: AppColors.peachPrimary,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Flexible(
-                                    child: Text(
-                                      '${recommendation.calories} kcal • ${recommendation.proteinGrams}g protein',
-                                      style: AppTypography.subtitle.copyWith(
-                                        color: AppColors.textPrimary,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 12.5,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
+                              Text(
+                                '${recommendation.calories} kcal • ${recommendation.proteinGrams}g protein',
+                                style: AppTypography.subtitle.copyWith(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12.5,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 6),
-                              // AI Match Reasons (Explaining why meal was recommended)
+                              // Explanatory Match Reasons
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 8.5,
-                                  vertical: 4.5,
+                                  horizontal: 10,
+                                  vertical: 5,
                                 ),
                                 decoration: BoxDecoration(
                                   color: AppColors.tealLight.withValues(alpha: 0.65),
@@ -158,21 +137,21 @@ class RecommendationCard extends StatelessWidget {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Text(
-                                      '🧊 Uses 4 items from your fridge',
+                                      'Uses 4 items from your fridge',
                                       style: AppTypography.badgeText.copyWith(
                                         color: AppColors.tealPrimary,
                                         fontWeight: FontWeight.w600,
-                                        fontSize: 10.5,
+                                        fontSize: 11,
                                       ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
-                                    const SizedBox(height: 2.5),
+                                    const SizedBox(height: 3),
                                     Text(
-                                      "💪 Helps complete today's protein goal",
+                                      "Helps complete today's protein goal",
                                       style: AppTypography.badgeText.copyWith(
                                         color: AppColors.tealPrimary,
                                         fontWeight: FontWeight.w600,
-                                        fontSize: 10.5,
+                                        fontSize: 11,
                                       ),
                                       overflow: TextOverflow.ellipsis,
                                     ),

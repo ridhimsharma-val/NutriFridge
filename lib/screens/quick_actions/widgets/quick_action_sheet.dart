@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../add_food/add_food_page.dart';
+import '../../log_meal/log_meal_screen.dart';
 
 /// Clean, premium Quick Actions bottom sheet triggered by the central '+' button
 class QuickActionSheet extends StatelessWidget {
@@ -152,8 +153,7 @@ class QuickActionSheet extends StatelessWidget {
             // 1. Add Food (Fully implemented)
             _buildActionTile(
               context: context,
-              icon: Icons.inventory_2_rounded,
-              emoji: '📦',
+              icon: Icons.kitchen_rounded,
               title: 'Add Food',
               subtitle: 'Add something to your fridge',
               accentColor: AppColors.tealPrimary,
@@ -169,27 +169,32 @@ class QuickActionSheet extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // 2. Log Meal (Placeholder)
+            // 2. Log Meal
             _buildActionTile(
               context: context,
-              icon: Icons.restaurant_rounded,
-              emoji: '🍽️',
+              icon: Icons.restaurant_outlined,
               title: 'Log Meal',
               subtitle: 'Record what you ate',
               accentColor: AppColors.peachPrimary,
               bgColor: AppColors.peachLight,
-              onTap: () => _showComingSoon(context, 'Log Meal'),
+              onTap: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const LogMealScreen(),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 12),
 
             // 3. AI Assistant (Placeholder)
             _buildActionTile(
               context: context,
-              icon: Icons.auto_awesome_rounded,
-              emoji: '✨',
+              icon: Icons.chat_bubble_outline_rounded,
               title: 'AI Assistant',
               subtitle: 'Ask NutriFridge anything',
-              accentColor: const Color(0xFF7C3AED),
+              accentColor: const Color(0xFF6D28D9),
               bgColor: const Color(0xFFF3E8FF),
               onTap: () => _showComingSoon(context, 'AI Assistant'),
             ),
@@ -202,7 +207,6 @@ class QuickActionSheet extends StatelessWidget {
   Widget _buildActionTile({
     required BuildContext context,
     required IconData icon,
-    required String emoji,
     required String title,
     required String subtitle,
     required Color accentColor,
@@ -227,7 +231,7 @@ class QuickActionSheet extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
-                // Icon / Emoji badge
+                // Clean functional icon container
                 Container(
                   width: 48,
                   height: 48,
@@ -236,9 +240,10 @@ class QuickActionSheet extends StatelessWidget {
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Center(
-                    child: Text(
-                      emoji,
-                      style: const TextStyle(fontSize: 22),
+                    child: Icon(
+                      icon,
+                      size: 23,
+                      color: accentColor,
                     ),
                   ),
                 ),

@@ -48,48 +48,30 @@ class WellnessScoreCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Header badge / title
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(4.5),
-                            decoration: BoxDecoration(
-                              color: AppColors.tealPrimary.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(7),
-                            ),
-                            child: const Icon(
-                              Icons.favorite_rounded,
-                              size: 13,
-                              color: AppColors.tealPrimary,
-                            ),
-                          ),
-                          const SizedBox(width: 7),
-                          Expanded(
-                            child: Text(
-                              "Today's Wellness",
-                              style: AppTypography.cardTitle.copyWith(
-                                fontSize: 15.5,
-                                color: AppColors.textPrimary,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
+                      // Header title (Editorial typography)
+                      Text(
+                        "Today's Wellness",
+                        style: AppTypography.cardTitle.copyWith(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
-                      const SizedBox(height: 8), // Reduced vertical spacing
+                      const SizedBox(height: 6),
                       // Subtitle / qualitative feedback
                       Text(
                         wellnessData.statusText,
                         style: AppTypography.scoreSubtitle.copyWith(
                           color: AppColors.tealPrimary,
                           fontSize: 14.5,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 8), // Reduced vertical spacing
+                      const SizedBox(height: 8),
                       // Upward score comparison pill
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 9,
+                          horizontal: 10,
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
@@ -100,27 +82,13 @@ class WellnessScoreCard extends StatelessWidget {
                             width: 1,
                           ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.arrow_upward_rounded,
-                              size: 12.5,
-                              color: AppColors.tealAccent,
-                            ),
-                            const SizedBox(width: 3),
-                            Flexible(
-                              child: Text(
-                                '↑ ${wellnessData.scoreDiff} points from yesterday',
-                                style: AppTypography.badgeText.copyWith(
-                                  color: AppColors.tealPrimary,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 11,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          '+${wellnessData.scoreDiff} points from yesterday',
+                          style: AppTypography.badgeText.copyWith(
+                            color: AppColors.tealPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                          ),
                         ),
                       ),
                     ],
