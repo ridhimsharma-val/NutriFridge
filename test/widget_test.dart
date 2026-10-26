@@ -1,3 +1,5 @@
+import 'package:nutrifridge/screens/splash/magic_fridge_splash.dart';
+import 'package:nutrifridge/screens/home/widgets/dashboard_header.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nutrifridge/main.dart';
@@ -22,8 +24,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify Header
-    expect(find.text('Good Evening, Ridhim 👋'), findsOneWidget);
-    expect(find.text('Ready for a healthier day?'), findsOneWidget);
+    expect(find.byType(DashboardHeader), findsOneWidget);
+    expect(find.byIcon(Icons.notifications_outlined), findsOneWidget);
 
     // Verify Suggested for you
     expect(find.text('Suggested for you ✨'), findsOneWidget);
@@ -614,5 +616,42 @@ void main() {
     final addedApple = updatedFruits.items.firstWhere((it) => it.id == 'test_apple');
     expect(addedApple.effectiveImageAsset, contains('apple'));
     expect(addedApple.effectiveImageAsset, isNot(contains('categories/fruits')));
+  });
+
+  testWidgets('Magic Fridge Splash Screen - Startup animation and dashboard navigation', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(const NutriFridgeApp());
+
+    // 1. Initial state: Splash Screen is present and Skip option is removed
+    expect(find.byType(MagicFridgeSplashScreen), findsOneWidget);
+    expect(find.text('Skip'), findsNothing);
+
+    // 2. Advance time through the 4400ms animation
+    await tester.pump(const Duration(milliseconds: 1000));
+    await tester.pump(const Duration(milliseconds: 2000));
+    await tester.pump(const Duration(milliseconds: 1500));
+    await tester.pumpAndSettle();
+
+    // 3. Splash has finished and navigated to Dashboard
+    expect(find.byType(DashboardHeader), findsOneWidget);
+    expect(find.byType(MagicFridgeSplashScreen), findsNothing);
+
+    // 4. Switching tabs (e.g. to Fridge and back to Home) does not restart splash
+    await tester.tap(find.text('Fridge'));
+    await tester.pumpAndSettle();
+    expect(find.text('My Fridge'), findsOneWidget);
+    expect(find.byType(MagicFridgeSplashScreen), findsNothing);
+
+    await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
+    expect(find.byType(DashboardHeader), findsOneWidget);
+    expect(find.byType(MagicFridgeSplashScreen), findsNothing);
   });
 }

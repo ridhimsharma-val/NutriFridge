@@ -11,7 +11,6 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const user = MockDataRepository.user;
     const recommendation = MockDataRepository.recommendation;
     const wellness = MockDataRepository.wellness;
     const nutrition = MockDataRepository.nutrition;
@@ -27,10 +26,8 @@ class HomeScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Header (Greeting & Notification Bell)
+              // 1. Header (Logo & Notification Bell)
               DashboardHeader(
-                greeting: user.greeting,
-                subtitle: user.subtitle,
                 onNotificationTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(

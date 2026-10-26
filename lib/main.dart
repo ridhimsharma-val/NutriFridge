@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'core/theme/app_colors.dart';
-import 'screens/main_navigation_shell.dart';
+import 'screens/splash/magic_fridge_splash.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,7 +55,7 @@ class NutriFridgeApp extends StatelessWidget {
           ),
         );
       },
-      home: const MainNavigationShell(),
+      home: const MagicFridgeSplashScreen(),
     );
   }
 }
