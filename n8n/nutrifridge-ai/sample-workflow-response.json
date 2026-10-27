@@ -1,0 +1,62 @@
+{
+  "ok": true,
+  "requestId": "req_demo_meal_img_002",
+  "action": "log_meal",
+  "assistantMessage": "Identified a Paneer Rice Bowl. Estimated 520 kcal with 24g protein. Would you like to log this meal and deduct 100g of paneer from your fridge?",
+  "requiresConfirmation": true,
+  "needsClarification": false,
+  "clarifyingQuestion": null,
+  "inventoryItems": [],
+  "meal": {
+    "name": "Paneer Rice Bowl",
+    "mealType": "lunch",
+    "ingredients": [
+      {
+        "name": "Paneer",
+        "quantity": 100,
+        "unit": "g",
+        "matchedInventoryItemId": "dairy_2",
+        "suggestedDeductionQuantity": 100,
+        "deductionNeedsUserConfirmation": true
+      },
+      {
+        "name": "Cooked Basmati Rice",
+        "quantity": 150,
+        "unit": "g",
+        "matchedInventoryItemId": null,
+        "suggestedDeductionQuantity": null,
+        "deductionNeedsUserConfirmation": true
+      },
+      {
+        "name": "Bell Pepper & Onion",
+        "quantity": 60,
+        "unit": "g",
+        "matchedInventoryItemId": null,
+        "suggestedDeductionQuantity": null,
+        "deductionNeedsUserConfirmation": true
+      }
+    ],
+    "nutrition": {
+      "calories": 520,
+      "proteinG": 24,
+      "carbsG": 62,
+      "fatG": 18,
+      "isEstimate": true,
+      "estimateNote": "Approximate estimates derived from visual portion sizing. Not medical or clinical advice."
+    }
+  },
+  "inventoryQueryResults": [],
+  "suggestedInventoryDeductions": [
+    {
+      "inventoryItemId": "dairy_2",
+      "itemName": "Paneer",
+      "currentQuantity": "250 g",
+      "deductionAmount": 100,
+      "unit": "g",
+      "remainingEstimatedQuantity": "150 g"
+    }
+  ],
+  "warnings": [
+    "Nutrition values are estimates based on standard preparation methods."
+  ]
+}

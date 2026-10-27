@@ -1,0 +1,45 @@
+{
+  "requestId": "req_demo_meal_img_002",
+  "source": "image",
+  "actionHint": "log_meal",
+  "message": "I had this paneer rice bowl for lunch with a glass of water.",
+  "_comment_imageBase64": "NOTE: For a live request, replace the placeholder below with genuine Base64-encoded image bytes (e.g. from Flutter's base64Encode(await xFile.readAsBytes())). The workflow accepts raw base64 or data URLs (data:image/jpeg;base64,...). Max size ~7.5MB.",
+  "imageBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "mimeType": "image/jpeg",
+  "conversationHistory": [],
+  "inventoryContext": [
+    {
+      "id": "dairy_2",
+      "name": "Paneer",
+      "quantity": "250 g",
+      "category": "Dairy Products",
+      "expiryDays": 3
+    },
+    {
+      "id": "veg_1",
+      "name": "Tomato",
+      "quantity": "500 g",
+      "category": "Vegetables",
+      "expiryDays": 4
+    },
+    {
+      "id": "ml_2",
+      "name": "Dal Rice",
+      "quantity": "400 g",
+      "category": "Meals & Leftovers",
+      "expiryDays": 1
+    }
+  ],
+  "userPreferences": {
+    "dietaryPreference": "Vegetarian",
+    "dailyCalorieTarget": 2200
+  },
+  "todayNutrition": {
+    "consumedCalories": 850,
+    "targetCalories": 2200,
+    "proteinGrams": 35,
+    "carbsGrams": 110,
+    "fatGrams": 28
+  },
+  "locale": "en-IN"
+}

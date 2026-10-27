@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../add_food/add_food_page.dart';
+import '../../ai_assistant/ai_assistant_screen.dart';
 import '../../log_meal/log_meal_screen.dart';
 
 /// Clean, premium Quick Actions bottom sheet triggered by the central '+' button
@@ -14,83 +15,6 @@ class QuickActionSheet extends StatelessWidget {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) => const QuickActionSheet(),
-    );
-  }
-
-  void _showComingSoon(BuildContext context, String featureTitle) {
-    Navigator.of(context).pop();
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.cardWhite,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: AppColors.tealLight,
-                shape: BoxShape.circle,
-              ),
-              child: const Center(
-                child: Icon(
-                  Icons.construction_rounded,
-                  color: AppColors.tealPrimary,
-                  size: 28,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              featureTitle,
-              style: AppTypography.cardTitle.copyWith(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'This feature is coming soon! Stay tuned for upcoming updates.',
-              textAlign: TextAlign.center,
-              style: AppTypography.bodyMedium.copyWith(
-                color: AppColors.textSecondary,
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.tealPrimary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.w600)),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -188,15 +112,22 @@ class QuickActionSheet extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // 3. AI Assistant (Placeholder)
+            // 3. AI Assistant (Live Connected)
             _buildActionTile(
               context: context,
-              icon: Icons.chat_bubble_outline_rounded,
+              icon: Icons.auto_awesome_rounded,
               title: 'AI Assistant',
               subtitle: 'Ask NutriFridge anything',
               accentColor: const Color(0xFF6D28D9),
               bgColor: const Color(0xFFF3E8FF),
-              onTap: () => _showComingSoon(context, 'AI Assistant'),
+              onTap: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const AiAssistantScreen(),
+                  ),
+                );
+              },
             ),
           ],
         ),

@@ -1,0 +1,46 @@
+{
+  "requestId": "req_demo_text_001",
+  "source": "text",
+  "actionHint": "auto",
+  "message": "Add 2 apples and 1 litre of milk to my fridge",
+  "imageBase64": null,
+  "mimeType": null,
+  "conversationHistory": [
+    {
+      "role": "user",
+      "text": "Hi NutriFridge, I just got back from the grocery store."
+    },
+    {
+      "role": "model",
+      "text": "Welcome back! What did you pick up today?"
+    }
+  ],
+  "inventoryContext": [
+    {
+      "id": "dairy_2",
+      "name": "Paneer",
+      "quantity": "250 g",
+      "category": "Dairy Products",
+      "expiryDays": 3
+    },
+    {
+      "id": "veg_1",
+      "name": "Tomato",
+      "quantity": "500 g",
+      "category": "Vegetables",
+      "expiryDays": 4
+    }
+  ],
+  "userPreferences": {
+    "dietaryPreference": "Vegetarian",
+    "dailyCalorieTarget": 2200
+  },
+  "todayNutrition": {
+    "consumedCalories": 1620,
+    "targetCalories": 2200,
+    "proteinGrams": 72,
+    "carbsGrams": 210,
+    "fatGrams": 62
+  },
+  "locale": "en-IN"
+}

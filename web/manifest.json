@@ -1,11 +1,11 @@
 {
-    "name": "nutrifridge",
-    "short_name": "nutrifridge",
+    "name": "NutriFridge",
+    "short_name": "NutriFridge",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#FAFAFA",
+    "theme_color": "#00796B",
+    "description": "NutriFridge - Smart Fridge & AI Nutrition Assistant",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -16,6 +16,8 @@ import 'package:nutrifridge/screens/profile/widgets/edit_profile_dialog.dart';
 import 'package:nutrifridge/models/notification_data.dart';
 import 'package:nutrifridge/screens/home/widgets/recommendation_card.dart';
 import 'package:nutrifridge/screens/fridge/models/fridge_preferences.dart';
+import 'package:nutrifridge/screens/ai_assistant/ai_assistant_screen.dart';
+import 'package:nutrifridge/screens/ai_assistant/services/ai_assistant_service.dart';
 
 void main() {
   setUp(() {
@@ -369,15 +371,18 @@ void main() {
     await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
     await tester.pumpAndSettle();
 
-    // Reopen Quick Actions and test AI Assistant placeholder
+    // Reopen Quick Actions and test AI Assistant navigation
     await tester.tap(find.byIcon(Icons.add_rounded));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('AI Assistant'));
     await tester.pumpAndSettle();
 
-    expect(find.text('This feature is coming soon! Stay tuned for upcoming updates.'), findsOneWidget);
-    await tester.tap(find.text('Got it'));
+    expect(find.text('NutriFridge AI'), findsOneWidget);
+    expect(find.text('Ask anything, add food, or log meal...'), findsOneWidget);
+
+    // Return back to dashboard
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
     await tester.pumpAndSettle();
   });
 
@@ -1821,5 +1826,132 @@ void main() {
 
     expect(FridgePreferencesRepository.current.exteriorColor, FridgeColorFinish.pearlWhite);
     expect(FridgePreferencesRepository.current.freezerPosition, FreezerPosition.top);
+  });
+
+  testWidgets('AI Assistant Screen - Live Chat, Add Food Confirmation & Meal Log flows', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      AiAssistantService.mockHandler = null;
+    });
+
+    // Mock AI Assistant Service responses
+    AiAssistantService.mockHandler = (request) async {
+      final msg = (request['message'] as String? ?? '').toLowerCase();
+      if (msg.contains('apple') && msg.contains('milk')) {
+        return {
+          'ok': true,
+          'action': 'add_inventory_items',
+          'assistantMessage': 'I have prepared to add 2 apples and 1 litre of milk to your fridge. Please confirm to proceed.',
+          'requiresConfirmation': true,
+          'inventoryItems': [
+            {
+              'name': 'Apple',
+              'category': 'Fruits',
+              'quantity': 2,
+              'unit': 'pieces',
+              'expiryDaysEstimate': 7,
+            },
+            {
+              'name': 'Milk',
+              'category': 'Dairy Products',
+              'quantity': 1,
+              'unit': 'L',
+              'expiryDaysEstimate': 4,
+            }
+          ],
+        };
+      } else if (msg.contains('paneer') && msg.contains('bowl')) {
+        return {
+          'ok': true,
+          'action': 'log_meal',
+          'assistantMessage': 'Logged your Paneer Rice Bowl for lunch. Estimated 450 kcal with 22g protein.',
+          'requiresConfirmation': true,
+          'meal': {
+            'name': 'Paneer Rice Bowl',
+            'mealType': 'lunch',
+            'ingredients': [
+              {'name': 'Paneer', 'quantity': 100, 'unit': 'g'},
+              {'name': 'Rice', 'quantity': 150, 'unit': 'g'},
+            ],
+            'nutrition': {
+              'calories': 450,
+              'proteinG': 22,
+              'carbsG': 45,
+              'fatG': 20,
+            }
+          }
+        };
+      }
+      return {
+        'ok': true,
+        'action': 'assistant_reply',
+        'assistantMessage': 'Here is helpful advice about your fridge.',
+      };
+    };
+
+    await tester.pumpWidget(const MaterialApp(home: AiAssistantScreen()));
+    await tester.pumpAndSettle();
+
+    // 1. Verify Header and Welcome message
+    expect(find.text('NutriFridge AI'), findsOneWidget);
+    expect(find.textContaining('I am your NutriFridge AI assistant'), findsOneWidget);
+
+    // 2. Test Quick Prompts
+    expect(find.text('Add 2 apples and 1 litre of milk to my fridge'), findsOneWidget);
+
+    // 3. Test Add Food flow via prompt
+    final initialFridgeTotal = FridgeCategoryRepository.totalFridgeItems;
+    await tester.tap(find.text('Add 2 apples and 1 litre of milk to my fridge'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Proposed Fridge Additions'), findsOneWidget);
+    await tester.ensureVisible(find.text('Add to Fridge'));
+    expect(find.text('Add to Fridge'), findsOneWidget);
+
+    // Confirm adding to fridge
+    await tester.tap(find.text('Add to Fridge'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Added to Fridge ✓'), findsOneWidget);
+    expect(FridgeCategoryRepository.totalFridgeItems, initialFridgeTotal + 2);
+
+    // Wait for SnackBar to dismiss so it doesn't obscure the input bar
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+
+    // 4. Test Log Meal flow
+    final initialCalories = MockDataRepository.nutrition.consumedCalories;
+    await tester.enterText(find.byType(TextField), 'I ate a paneer rice bowl for lunch');
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Paneer Rice Bowl'), findsOneWidget);
+    expect(find.text('450 kcal'), findsOneWidget);
+    expect(find.text('22g'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Confirm & Log Meal'));
+    expect(find.text('Confirm & Log Meal'), findsOneWidget);
+
+    // Confirm meal logging
+    await tester.tap(find.text('Confirm & Log Meal'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Logged to Today\'s Meals ✓'), findsOneWidget);
+    expect(MockDataRepository.nutrition.consumedCalories, initialCalories + 450);
+
+    // Wait for SnackBar to dismiss
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+
+    // 5. Test manual text input
+    await tester.enterText(find.byType(TextField), 'Hello AI');
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Here is helpful advice about your fridge.'), findsOneWidget);
   });
 }
