@@ -14,11 +14,17 @@ import 'widgets/video_card.dart';
 /// and YouTube recipe inspiration.
 class MealDetailScreen extends StatelessWidget {
   final RecipeRecommendation recommendation;
+  final String? heroTag;
 
   const MealDetailScreen({
     super.key,
     required this.recommendation,
+    this.heroTag,
   });
+
+  String get _heroTag =>
+      heroTag ??
+      'meal-hero-image-${recommendation.title.toLowerCase().replaceAll(RegExp(r'\s+'), '-')}';
 
   @override
   Widget build(BuildContext context) {
@@ -88,23 +94,26 @@ class MealDetailScreen extends StatelessWidget {
 
     return Stack(
       children: [
-        // Food Photograph
-        SizedBox(
-          height: 340,
-          width: double.infinity,
-          child: meal.imageUrl.startsWith('assets/')
-              ? Image.asset(
-                  meal.imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      _buildFallbackHeroImage(),
-                )
-              : Image.network(
-                  meal.imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      _buildFallbackHeroImage(),
-                ),
+        // Food Photograph (Hero shared-element from Design 01)
+        Hero(
+          tag: _heroTag,
+          child: SizedBox(
+            height: 340,
+            width: double.infinity,
+            child: meal.imageUrl.startsWith('assets/')
+                ? Image.asset(
+                    meal.imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        _buildFallbackHeroImage(),
+                  )
+                : Image.network(
+                    meal.imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        _buildFallbackHeroImage(),
+                  ),
+          ),
         ),
 
         // Gradient scrim overlays for readable text & back button

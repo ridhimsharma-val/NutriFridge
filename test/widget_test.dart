@@ -15,10 +15,12 @@ import 'package:nutrifridge/screens/log_meal/models/detected_food_item.dart';
 import 'package:nutrifridge/screens/profile/widgets/edit_profile_dialog.dart';
 import 'package:nutrifridge/models/notification_data.dart';
 import 'package:nutrifridge/screens/home/widgets/recommendation_card.dart';
+import 'package:nutrifridge/screens/fridge/models/fridge_preferences.dart';
 
 void main() {
   setUp(() {
     FridgeCategoryRepository.reset();
+    FridgePreferencesRepository.reset();
     MockDataRepository.reset();
     AppImagePicker.mockHandler = (source) async {
       return XFile.fromData(AppImagePicker.sampleMockBytes, name: 'test_photo.png');
@@ -66,14 +68,15 @@ void main() {
     expect(find.text('Snack'), findsOneWidget);
     expect(find.text('Dinner'), findsOneWidget);
 
-    // Verify Navigation Bar items
-    expect(find.text('Home'), findsOneWidget);
-    expect(find.text('Fridge'), findsOneWidget);
-    expect(find.text('Progress'), findsOneWidget);
-    expect(find.text('Profile'), findsOneWidget);
+    // Verify Navigation Bar items (Design 06: Float - Icons only, no text labels)
+    expect(find.byIcon(Icons.home_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.kitchen_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.add_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.bar_chart_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.person_rounded), findsOneWidget);
 
     // Navigate to Fridge screen
-    await tester.tap(find.text('Fridge'));
+    await tester.tap(find.byIcon(Icons.kitchen_rounded));
     await tester.pumpAndSettle();
 
     // Verify Fridge screen elements in closed state (dynamic total items and expiring count)
@@ -490,7 +493,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Navigate to Fridge
-    await tester.tap(find.text('Fridge'));
+    await tester.tap(find.byIcon(Icons.kitchen_rounded));
     await tester.pumpAndSettle();
 
     expect(find.text('35 items'), findsOneWidget);
@@ -666,12 +669,12 @@ void main() {
     expect(find.byType(MagicFridgeSplashScreen), findsNothing);
 
     // 4. Switching tabs (e.g. to Fridge and back to Home) does not restart splash
-    await tester.tap(find.text('Fridge'));
+    await tester.tap(find.byIcon(Icons.kitchen_rounded));
     await tester.pumpAndSettle();
     expect(find.text('My Fridge'), findsOneWidget);
     expect(find.byType(MagicFridgeSplashScreen), findsNothing);
 
-    await tester.tap(find.text('Home'));
+    await tester.tap(find.byIcon(Icons.home_rounded));
     await tester.pumpAndSettle();
     expect(find.byType(DashboardHeader), findsOneWidget);
     expect(find.byType(MagicFridgeSplashScreen), findsNothing);
@@ -1096,8 +1099,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // 2. Tap on "Progress" in Bottom Navigation
-    expect(find.text('Progress'), findsOneWidget);
-    await tester.tap(find.text('Progress'));
+    expect(find.byIcon(Icons.bar_chart_rounded), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.bar_chart_rounded));
     await tester.pumpAndSettle();
 
     // 3. Verify Header and Subtitle
@@ -1170,8 +1173,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // 2. Tap on "Profile" in Bottom Navigation
-    expect(find.text('Profile'), findsOneWidget);
-    await tester.tap(find.text('Profile'));
+    expect(find.byIcon(Icons.person_rounded), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.person_rounded));
     await tester.pumpAndSettle();
 
     // 3. Verify Header Title and Subtitle
@@ -1324,12 +1327,12 @@ void main() {
 
     // 9. Session Persistence Across Screen Navigation
     // Switch to Home screen
-    await tester.tap(find.text('Home'));
+    await tester.tap(find.byIcon(Icons.home_rounded));
     await tester.pumpAndSettle();
     expect(find.text('Today\'s Meals'), findsOneWidget);
 
     // Return to Profile screen
-    await tester.tap(find.text('Profile'));
+    await tester.tap(find.byIcon(Icons.person_rounded));
     await tester.pumpAndSettle();
 
     // Confirm all settings were retained!
@@ -1473,11 +1476,18 @@ void main() {
     expect(find.text('Suggested for you'), findsOneWidget);
     expect(find.text('Paneer Rice Bowl'), findsWidgets);
 
+    // Verify Hero widget with matching tag exists on recommendation card
+    final heroFinder = find.byWidgetPredicate(
+      (w) => w is Hero && w.tag == 'meal-hero-image-paneer-rice-bowl',
+    );
+    expect(heroFinder, findsOneWidget);
+
     // 2. Tap on the Recommendation Card -> Navigate to MealDetailScreen
-    await tester.tap(find.text('Suggested for you'));
-    // Tap the recommendation container
     await tester.tap(find.byType(RecommendationCard));
     await tester.pumpAndSettle();
+
+    // Verify Hero widget on destination has matching tag
+    expect(heroFinder, findsOneWidget);
 
     // 3. Verify Hero Section
     expect(find.text('Picked for your fridge'), findsOneWidget);
@@ -1559,5 +1569,257 @@ void main() {
     expect(find.text('Suggested for you'), findsOneWidget);
     expect(find.text("Today's Wellness"), findsOneWidget);
     expect(find.text('Nutrition Today'), findsOneWidget);
+  });
+
+  testWidgets('Design 06 Float Bottom Navigation - icon-only wave animation, active circle, and Quick Actions', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    MockDataRepository.reset();
+    FridgeCategoryRepository.reset();
+
+    await tester.pumpWidget(const NutriFridgeApp());
+    await tester.pumpAndSettle();
+
+    // 1. Verify 5 destinations exist in exact order without text labels in navigation
+    expect(find.byKey(const ValueKey('nav_tab_home')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nav_tab_fridge')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nav_tab_quick_actions')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nav_tab_progress')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nav_tab_profile')), findsOneWidget);
+
+    // 2. Verify raised floating circle starts at Home (index 0)
+    final raisedCircle = find.byKey(const ValueKey('liquid_float_raised_circle'));
+    expect(raisedCircle, findsOneWidget);
+
+    // 3. Navigate to Fridge tab
+    await tester.tap(find.byKey(const ValueKey('nav_tab_fridge')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('My Fridge'), findsOneWidget);
+
+    // 4. Tap central '+' Quick Actions button - should open modal without changing active tab
+    await tester.tap(find.byKey(const ValueKey('nav_tab_quick_actions')));
+    await tester.pumpAndSettle();
+
+    // Quick Actions sheet is shown
+    expect(find.text('Quick Actions'), findsOneWidget);
+    expect(find.text('Log Meal'), findsOneWidget);
+    expect(find.text('Add Food'), findsOneWidget);
+
+    // Close the Quick Action sheet by tapping top barrier / handle
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pumpAndSettle();
+    expect(find.text('Log Meal'), findsNothing);
+
+    // Still on Fridge screen
+    expect(find.text('My Fridge'), findsOneWidget);
+
+    // 5. Navigate to Progress tab
+    await tester.tap(find.byKey(const ValueKey('nav_tab_progress')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Your nutrition, over time.'), findsOneWidget);
+
+    // 6. Navigate to Profile tab
+    await tester.tap(find.byKey(const ValueKey('nav_tab_profile')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Your food preferences and personal settings.'), findsOneWidget);
+
+    // 7. Navigate back to Home tab
+    await tester.tap(find.byKey(const ValueKey('nav_tab_home')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Suggested for you'), findsOneWidget);
+  });
+
+  testWidgets('Design 1 — Hero Transition: Suggested for you arrow trigger, shared element matching tag & return', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    MockDataRepository.reset();
+    FridgeCategoryRepository.reset();
+
+    await tester.pumpWidget(const NutriFridgeApp());
+    await tester.pumpAndSettle();
+
+    // 1. Verify card and arrow button exist
+    expect(find.byKey(const ValueKey('recommendation_card_arrow')), findsOneWidget);
+
+    // Verify source Hero element on recommendation card
+    final sourceHero = find.byWidgetPredicate(
+      (w) => w is Hero && w.tag == 'meal-hero-image-paneer-rice-bowl',
+    );
+    expect(sourceHero, findsOneWidget);
+
+    // 2. Tap arrow specifically to trigger the Hero transition
+    await tester.tap(find.byKey(const ValueKey('recommendation_card_arrow')));
+    await tester.pumpAndSettle();
+
+    // 3. Confirm we are on Meal Detail screen with destination Hero element
+    expect(find.text('Picked for your fridge'), findsOneWidget);
+    expect(find.text('Nutrition & prep'), findsOneWidget);
+
+    final destHero = find.byWidgetPredicate(
+      (w) => w is Hero && w.tag == 'meal-hero-image-paneer-rice-bowl',
+    );
+    expect(destHero, findsOneWidget);
+
+    // 4. Tap back button to test reverse Hero transition
+    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+    await tester.pumpAndSettle();
+
+    // 5. Back on Dashboard, source Hero exists again, no splash screen
+    expect(find.text('Suggested for you'), findsOneWidget);
+    expect(find.byType(MagicFridgeSplashScreen), findsNothing);
+    expect(sourceHero, findsOneWidget);
+  });
+
+  testWidgets('Fridge Personalization - Preferences sheet, 4 color finishes, freezer position & live layout update', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    MockDataRepository.reset();
+    FridgeCategoryRepository.reset();
+    FridgePreferencesRepository.reset();
+
+    await tester.pumpWidget(const NutriFridgeApp());
+    await tester.pumpAndSettle();
+
+    // 1. Navigate to Fridge page via bottom nav
+    await tester.tap(find.byIcon(Icons.kitchen_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('My Fridge'), findsOneWidget);
+    expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
+
+    // 2. Tap settings/preferences icon to open Fridge Preferences bottom sheet
+    await tester.tap(find.byIcon(Icons.tune_rounded));
+    await tester.pumpAndSettle();
+
+    // Verify bottom sheet contents
+    expect(find.text('Fridge Preferences'), findsOneWidget);
+    expect(find.text('Make your fridge feel like yours.'), findsOneWidget);
+
+    // Verify Fridge Colour section
+    expect(find.text('Fridge Colour'), findsOneWidget);
+    expect(find.text('Choose the finish for your refrigerator.'), findsOneWidget);
+    expect(find.text('Midnight Navy'), findsOneWidget);
+    expect(find.text('Matte Black'), findsOneWidget);
+    expect(find.text('Pearl White'), findsOneWidget);
+    expect(find.text('Sage Green'), findsOneWidget);
+
+    // Verify Freezer Position section
+    expect(find.text('Freezer Position'), findsOneWidget);
+    expect(find.text('Choose your refrigerator layout.'), findsOneWidget);
+    expect(find.text('Freezer on Top'), findsOneWidget);
+    expect(find.text('Freezer on Bottom'), findsOneWidget);
+    expect(find.text('Apply Changes'), findsOneWidget);
+
+    // 3. Test cancel/close without applying
+    await tester.tap(find.byKey(const ValueKey('swatch_matteBlack')));
+    await tester.pumpAndSettle();
+
+    // Close via close icon
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+
+    // Bottom sheet closed, preferences should NOT have changed (remains Midnight Navy & Top)
+    expect(find.text('Fridge Preferences'), findsNothing);
+    expect(FridgePreferencesRepository.current.exteriorColor, FridgeColorFinish.midnightNavy);
+    expect(FridgePreferencesRepository.current.freezerPosition, FreezerPosition.top);
+
+    // 4. Re-open sheet and apply Matte Black + Freezer on Bottom
+    await tester.tap(find.byIcon(Icons.tune_rounded));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('swatch_matteBlack')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('layout_option_bottom')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Apply Changes'));
+    await tester.pumpAndSettle();
+
+    // Confirm sheet closed and preferences updated
+    expect(find.text('Fridge Preferences'), findsNothing);
+    expect(FridgePreferencesRepository.current.exteriorColor, FridgeColorFinish.matteBlack);
+    expect(FridgePreferencesRepository.current.freezerPosition, FreezerPosition.bottom);
+
+    // 5. Verify Freezer on Bottom layout interaction
+    // Touch targets for both doors exist
+    expect(find.byKey(const ValueKey('fridge_door_touch_target')), findsOneWidget);
+    expect(find.byKey(const ValueKey('freezer_door_touch_target')), findsOneWidget);
+
+    // Open main refrigerator (now on top)
+    await tester.tap(find.byKey(const ValueKey('fridge_door_touch_target')));
+    await tester.pumpAndSettle();
+
+    // Verify main refrigerator categories are accessible
+    expect(find.text('DAIRY PRODUCTS'), findsOneWidget);
+    expect(find.text('VEGETABLES'), findsOneWidget);
+    expect(find.text('FRUITS'), findsOneWidget);
+
+    // Tap Vegetables category to verify category sheet still works in this arrangement
+    await tester.tap(find.text('VEGETABLES'));
+    await tester.pumpAndSettle();
+    expect(find.text('🥦 Vegetables'), findsOneWidget);
+    expect(find.text('4 items'), findsOneWidget);
+
+    // Close category sheet
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+
+    // Open freezer door (now at bottom)
+    await tester.tap(find.byKey(const ValueKey('freezer_door_touch_target')));
+    await tester.pumpAndSettle();
+    expect(find.text('ICE CREAM'), findsOneWidget);
+    expect(find.text('FROZEN FOOD'), findsOneWidget);
+    expect(find.text('DRY FRUITS'), findsOneWidget);
+
+    // 6. Test session persistence across tab switches
+    await tester.tap(find.byIcon(Icons.home_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text("Today's Meals"), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.kitchen_rounded));
+    await tester.pumpAndSettle();
+
+    // Settings retained!
+    expect(FridgePreferencesRepository.current.exteriorColor, FridgeColorFinish.matteBlack);
+    expect(FridgePreferencesRepository.current.freezerPosition, FreezerPosition.bottom);
+
+    // 7. Test switching to Pearl White and Freezer on Top
+    await tester.tap(find.byIcon(Icons.tune_rounded));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('swatch_pearlWhite')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('layout_option_top')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Apply Changes'));
+    await tester.pumpAndSettle();
+
+    expect(FridgePreferencesRepository.current.exteriorColor, FridgeColorFinish.pearlWhite);
+    expect(FridgePreferencesRepository.current.freezerPosition, FreezerPosition.top);
   });
 }

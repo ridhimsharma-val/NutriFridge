@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/transitions/hero_transition_route.dart';
 import '../../models/notification_data.dart';
 import '../../models/nutrition_data.dart';
 import '../meal_detail/meal_detail_screen.dart';
@@ -58,8 +59,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     recommendation: recommendation,
                     onTap: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => MealDetailScreen(
+                        HeroTransitionRoute(
+                          page: MealDetailScreen(
                             recommendation: recommendation,
                           ),
                         ),

@@ -1,24 +1,27 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../models/fridge_preferences.dart';
 import 'freezer_interior.dart';
 import 'refrigerator_interior.dart';
 
-/// Top-Freezer Refrigerator with Refined Fade-Reveal Interaction
+/// Interactive Refrigerator with Refined Fade-Reveal Interaction and Personalized Finish & Layout.
 ///
 /// Features:
-/// - Closed State: Realistic deep navy / midnight-blue appliance finish with pocket handle seam.
+/// - Selectable Exterior Color Finishes (Midnight Navy, Matte Black, Pearl White, Sage Green).
+/// - Dynamic Compartment Positions (Freezer on Top or Freezer on Bottom).
+/// - Closed State: Realistic appliance finish with pocket handle seam and leveling feet.
 /// - Tap to Open: Door softly blurs and fades away (1.0 -> 0.0, ~500ms), revealing the fixed interior cavity
 ///   as the cool interior lighting smoothly brightens.
-/// - Tap to Close: Tapping the open interior reverses the transition, softly focusing and fading the door
-///   back in while interior lighting dims.
-/// - Two Independent Sections: Top Freezer and Lower Refrigerator operate independently.
-/// - Zero translation / zero rotation: Polished, intentional, mobile-native fade reveal.
+/// - Tap to Close: Tapping the open interior reverses the transition, softly focusing and fading the door back in.
+/// - Two Independent Sections: Freezer and Refrigerator compartments operate independently.
+/// - Interior Cavity: Always stays clean porcelain white with cool lighting, preserving all 11 food categories.
 class TopFreezerRefrigerator extends StatefulWidget {
   final bool isFreezerOpen;
   final bool isFridgeOpen;
   final VoidCallback onFreezerToggle;
   final VoidCallback onFridgeToggle;
   final ValueChanged<String>? onCategoryTap;
+  final FridgePreferences? preferences;
 
   const TopFreezerRefrigerator({
     super.key,
@@ -27,6 +30,7 @@ class TopFreezerRefrigerator extends StatefulWidget {
     required this.onFreezerToggle,
     required this.onFridgeToggle,
     this.onCategoryTap,
+    this.preferences,
   });
 
   @override
@@ -45,7 +49,7 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
   void initState() {
     super.initState();
 
-    // 1. Top Freezer Controller (~500ms smooth cubic easing)
+    // 1. Freezer Controller (~500ms smooth cubic easing)
     _freezerController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
@@ -97,6 +101,10 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
 
   @override
   Widget build(BuildContext context) {
+    final prefs = widget.preferences ?? FridgePreferencesRepository.current;
+    final finish = prefs.exteriorColor;
+    final isFreezerOnTop = prefs.freezerPosition == FreezerPosition.top;
+
     // Refrigerator Dimensions
     const double cabinetWidth = 272.0;
     const double freezerHeight = 164.0;
@@ -104,6 +112,11 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
     const double fridgeHeight = 376.0;
     const double totalCabinetHeight =
         freezerHeight + pocketGapHeight + fridgeHeight;
+
+    final double topCompartmentHeight =
+        isFreezerOnTop ? freezerHeight : fridgeHeight;
+    final double bottomCompartmentHeight =
+        isFreezerOnTop ? fridgeHeight : freezerHeight;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -121,31 +134,27 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
               bottomLeft: Radius.circular(10),
               bottomRight: Radius.circular(10),
             ),
-            // Premium Deep Navy / Midnight Blue Enamel
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF263448), // Top-left specular sheen
-                Color(0xFF1D2737), // Midnight body
-                Color(0xFF141C28), // Deep shadow navy
-              ],
+              colors: finish.bodyGradient,
             ),
             border: Border.all(
-              color: const Color(0xFF384A62),
+              color: finish.borderColor,
               width: 1.6,
             ),
             boxShadow: [
               // Broad physical appliance shadow
               BoxShadow(
-                color: const Color(0xFF090E17).withValues(alpha: 0.38),
+                color: finish.shadowColor.withValues(alpha: 0.38),
                 blurRadius: 36,
                 spreadRadius: 4,
                 offset: const Offset(0, 20),
               ),
-              // Subtle top specular highlight on metal casing
+              // Top specular highlight on metal casing
               BoxShadow(
-                color: Colors.white.withValues(alpha: 0.16),
+                color: Colors.white
+                    .withValues(alpha: finish.sheenOpacity * 1.6),
                 blurRadius: 3,
                 offset: const Offset(-1, -1),
               ),
@@ -165,7 +174,8 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          Colors.white.withValues(alpha: 0.10),
+                          Colors.white
+                              .withValues(alpha: finish.sheenOpacity),
                           Colors.white.withValues(alpha: 0.0),
                         ],
                       ),
@@ -176,37 +186,58 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
               ),
 
               // ============================================================
-              // 2. TOP FREEZER SECTION (INTERIOR CAVITY + FADE DOOR)
+              // 2. UPPER COMPARTMENT (Freezer if top, Refrigerator if bottom)
               // ============================================================
               Positioned(
                 top: 4,
                 left: 4,
                 right: 4,
-                height: freezerHeight,
-                child: _buildFreezerSection(cabinetWidth - 8, freezerHeight),
+                height: topCompartmentHeight,
+                child: isFreezerOnTop
+                    ? _buildFreezerSection(
+                        cabinetWidth - 8,
+                        topCompartmentHeight,
+                        isTopPosition: true,
+                        finish: finish,
+                      )
+                    : _buildFridgeSection(
+                        cabinetWidth - 8,
+                        topCompartmentHeight,
+                        isTopPosition: true,
+                        finish: finish,
+                      ),
               ),
 
               // Horizontal Recessed Pocket Handle Seam between Compartments
               Positioned(
-                top: freezerHeight + 4,
+                top: topCompartmentHeight + 4,
                 left: 0,
                 right: 0,
                 height: pocketGapHeight,
-                child: _buildPocketHandleSeam(),
+                child: _buildPocketHandleSeam(finish),
               ),
 
               // ============================================================
-              // 3. MAIN REFRIGERATOR SECTION (INTERIOR CAVITY + FADE DOOR)
+              // 3. LOWER COMPARTMENT (Refrigerator if top, Freezer if bottom)
               // ============================================================
               Positioned(
-                top: freezerHeight + pocketGapHeight + 4,
+                top: topCompartmentHeight + pocketGapHeight + 4,
                 left: 4,
                 right: 4,
                 bottom: 4,
-                child: _buildFridgeSection(
-                  cabinetWidth - 8,
-                  totalCabinetHeight - (freezerHeight + pocketGapHeight + 8),
-                ),
+                child: isFreezerOnTop
+                    ? _buildFridgeSection(
+                        cabinetWidth - 8,
+                        bottomCompartmentHeight,
+                        isTopPosition: false,
+                        finish: finish,
+                      )
+                    : _buildFreezerSection(
+                        cabinetWidth - 8,
+                        bottomCompartmentHeight,
+                        isTopPosition: false,
+                        finish: finish,
+                      ),
               ),
             ],
           ),
@@ -214,15 +245,15 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
 
         const SizedBox(height: 6),
 
-        // Heavy-Duty Appliance Leveling Base Feet (Graphite + Chrome)
+        // Heavy-Duty Appliance Leveling Base Feet
         SizedBox(
           width: cabinetWidth - 36,
           height: 10,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildLevelingFoot(),
-              _buildLevelingFoot(),
+              _buildLevelingFoot(finish),
+              _buildLevelingFoot(finish),
             ],
           ),
         ),
@@ -237,13 +268,13 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
             borderRadius: BorderRadius.circular(100),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF090F18).withValues(alpha: 0.35),
+                color: finish.shadowColor.withValues(alpha: 0.35),
                 blurRadius: 20,
                 spreadRadius: 3,
                 offset: const Offset(0, 5),
               ),
               BoxShadow(
-                color: const Color(0xFF090F18).withValues(alpha: 0.20),
+                color: finish.shadowColor.withValues(alpha: 0.20),
                 blurRadius: 38,
                 spreadRadius: 8,
                 offset: const Offset(0, 10),
@@ -256,9 +287,28 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
   }
 
   // --------------------------------------------------------------------------
-  // TOP FREEZER SECTION: Cavity + Smooth Soft-Blur Fade Door
+  // FREEZER SECTION: Cavity + Smooth Soft-Blur Fade Door
   // --------------------------------------------------------------------------
-  Widget _buildFreezerSection(double width, double height) {
+  Widget _buildFreezerSection(
+    double width,
+    double height, {
+    required bool isTopPosition,
+    required FridgeColorFinish finish,
+  }) {
+    final BorderRadius borderRadius = isTopPosition
+        ? const BorderRadius.only(
+            topLeft: Radius.circular(12),
+            topRight: Radius.circular(12),
+            bottomLeft: Radius.circular(4),
+            bottomRight: Radius.circular(4),
+          )
+        : const BorderRadius.only(
+            topLeft: Radius.circular(4),
+            topRight: Radius.circular(4),
+            bottomLeft: Radius.circular(10),
+            bottomRight: Radius.circular(10),
+          );
+
     return GestureDetector(
       key: const ValueKey('freezer_door_touch_target'),
       onTap: widget.onFreezerToggle,
@@ -271,12 +321,7 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
           final double blurSigma = t * 3.5;
 
           return ClipRRect(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(12),
-              topRight: Radius.circular(12),
-              bottomLeft: Radius.circular(4),
-              bottomRight: Radius.circular(4),
-            ),
+            borderRadius: borderRadius,
             child: Stack(
               children: [
                 // Fixed Freezer Interior Cavity (Illuminates softly as door fades)
@@ -301,9 +346,21 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
                                   sigmaY: blurSigma,
                                   tileMode: TileMode.decal,
                                 ),
-                                child: _buildClosedFreezerDoor(width, height),
+                                child: _buildClosedFreezerDoor(
+                                  width,
+                                  height,
+                                  borderRadius: borderRadius,
+                                  isTopPosition: isTopPosition,
+                                  finish: finish,
+                                ),
                               )
-                            : _buildClosedFreezerDoor(width, height),
+                            : _buildClosedFreezerDoor(
+                                width,
+                                height,
+                                borderRadius: borderRadius,
+                                isTopPosition: isTopPosition,
+                                finish: finish,
+                              ),
                       ),
                     ),
                   ),
@@ -316,28 +373,25 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
   }
 
   // Closed Freezer Door Face
-  Widget _buildClosedFreezerDoor(double width, double height) {
+  Widget _buildClosedFreezerDoor(
+    double width,
+    double height, {
+    required BorderRadius borderRadius,
+    required bool isTopPosition,
+    required FridgeColorFinish finish,
+  }) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(12),
-          topRight: Radius.circular(12),
-          bottomLeft: Radius.circular(4),
-          bottomRight: Radius.circular(4),
-        ),
-        gradient: const LinearGradient(
+        borderRadius: borderRadius,
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF263348),
-            Color(0xFF1D2737),
-            Color(0xFF141C28),
-          ],
+          colors: finish.bodyGradient,
         ),
-        border: Border.all(color: const Color(0xFF384A62), width: 1.2),
+        border: Border.all(color: finish.borderColor, width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.24),
+            color: finish.shadowColor.withValues(alpha: 0.24),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -346,27 +400,33 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: Stack(
         children: [
-          // Top edge specular sheen
-          Positioned(
-            left: 6,
-            right: 6,
-            top: 4,
-            height: 1,
-            child: Container(
-              color: Colors.white.withValues(alpha: 0.16),
+          // Top edge specular sheen (for upper door)
+          if (isTopPosition)
+            Positioned(
+              left: 6,
+              right: 6,
+              top: 4,
+              height: 1,
+              child: Container(
+                color: Colors.white
+                    .withValues(alpha: finish.sheenOpacity * 1.6),
+              ),
             ),
-          ),
-          // Bottom pocket handle grip indentation
+          // Pocket handle grip indentation (facing towards middle seam)
           Positioned(
-            bottom: 2,
+            top: isTopPosition ? null : 2,
+            bottom: isTopPosition ? 2 : null,
             left: 24,
             right: 24,
             height: 4,
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF0F1520),
+                color: finish.gripIndentationColor,
                 borderRadius: BorderRadius.circular(2),
-                border: Border.all(color: const Color(0xFF35465C), width: 0.6),
+                border: Border.all(
+                  color: finish.gripIndentationBorder,
+                  width: 0.6,
+                ),
               ),
             ),
           ),
@@ -378,7 +438,26 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
   // --------------------------------------------------------------------------
   // MAIN REFRIGERATOR SECTION: Cavity + Smooth Soft-Blur Fade Door
   // --------------------------------------------------------------------------
-  Widget _buildFridgeSection(double width, double height) {
+  Widget _buildFridgeSection(
+    double width,
+    double height, {
+    required bool isTopPosition,
+    required FridgeColorFinish finish,
+  }) {
+    final BorderRadius borderRadius = isTopPosition
+        ? const BorderRadius.only(
+            topLeft: Radius.circular(12),
+            topRight: Radius.circular(12),
+            bottomLeft: Radius.circular(4),
+            bottomRight: Radius.circular(4),
+          )
+        : const BorderRadius.only(
+            topLeft: Radius.circular(4),
+            topRight: Radius.circular(4),
+            bottomLeft: Radius.circular(10),
+            bottomRight: Radius.circular(10),
+          );
+
     return GestureDetector(
       key: const ValueKey('fridge_door_touch_target'),
       onTap: widget.onFridgeToggle,
@@ -391,12 +470,7 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
           final double blurSigma = t * 3.5;
 
           return ClipRRect(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(4),
-              topRight: Radius.circular(4),
-              bottomLeft: Radius.circular(10),
-              bottomRight: Radius.circular(10),
-            ),
+            borderRadius: borderRadius,
             clipBehavior: Clip.antiAlias,
             child: Stack(
               clipBehavior: Clip.hardEdge,
@@ -423,9 +497,21 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
                                   sigmaY: blurSigma,
                                   tileMode: TileMode.decal,
                                 ),
-                                child: _buildClosedFridgeDoor(width, height),
+                                child: _buildClosedFridgeDoor(
+                                  width,
+                                  height,
+                                  borderRadius: borderRadius,
+                                  isTopPosition: isTopPosition,
+                                  finish: finish,
+                                ),
                               )
-                            : _buildClosedFridgeDoor(width, height),
+                            : _buildClosedFridgeDoor(
+                                width,
+                                height,
+                                borderRadius: borderRadius,
+                                isTopPosition: isTopPosition,
+                                finish: finish,
+                              ),
                       ),
                     ),
                   ),
@@ -438,28 +524,25 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
   }
 
   // Closed Main Refrigerator Door Face
-  Widget _buildClosedFridgeDoor(double width, double height) {
+  Widget _buildClosedFridgeDoor(
+    double width,
+    double height, {
+    required BorderRadius borderRadius,
+    required bool isTopPosition,
+    required FridgeColorFinish finish,
+  }) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(4),
-          topRight: Radius.circular(4),
-          bottomLeft: Radius.circular(10),
-          bottomRight: Radius.circular(10),
-        ),
-        gradient: const LinearGradient(
+        borderRadius: borderRadius,
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF263348),
-            Color(0xFF1D2737),
-            Color(0xFF141C28),
-          ],
+          colors: finish.bodyGradient,
         ),
-        border: Border.all(color: const Color(0xFF384A62), width: 1.2),
+        border: Border.all(color: finish.borderColor, width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.26),
+            color: finish.shadowColor.withValues(alpha: 0.26),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -468,17 +551,33 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Stack(
         children: [
-          // Top pocket handle grip indentation
+          // Top edge specular sheen (for upper door)
+          if (isTopPosition)
+            Positioned(
+              left: 6,
+              right: 6,
+              top: 4,
+              height: 1,
+              child: Container(
+                color: Colors.white
+                    .withValues(alpha: finish.sheenOpacity * 1.6),
+              ),
+            ),
+          // Pocket handle grip indentation (facing towards middle seam)
           Positioned(
-            top: 2,
+            top: isTopPosition ? null : 2,
+            bottom: isTopPosition ? 2 : null,
             left: 24,
             right: 24,
             height: 4,
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF0F1520),
+                color: finish.gripIndentationColor,
                 borderRadius: BorderRadius.circular(2),
-                border: Border.all(color: const Color(0xFF35465C), width: 0.6),
+                border: Border.all(
+                  color: finish.gripIndentationBorder,
+                  width: 0.6,
+                ),
               ),
             ),
           ),
@@ -492,7 +591,8 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    Colors.white.withValues(alpha: 0.08),
+                    Colors.white
+                        .withValues(alpha: finish.sheenOpacity * 0.8),
                     Colors.white.withValues(alpha: 0.0),
                   ],
                 ),
@@ -505,17 +605,17 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
   }
 
   // Horizontal Recessed Pocket Handle Seam between Compartments
-  Widget _buildPocketHandleSeam() {
+  Widget _buildPocketHandleSeam(FridgeColorFinish finish) {
     return IgnorePointer(
       child: Container(
-        color: const Color(0xFF0F1520),
+        color: finish.handleSeamColor,
         child: Stack(
           children: [
             // Center recessed cavity groove
             Center(
               child: Container(
                 height: 3,
-                color: const Color(0xFF080C12),
+                color: finish.handleSeamGroove,
               ),
             ),
             // Brushed silver accent line in pocket handle
@@ -545,9 +645,9 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
               width: 10,
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2B384B),
+                  color: finish.hingeColor,
                   borderRadius: BorderRadius.circular(2),
-                  border: Border.all(color: const Color(0xFF485C76), width: 0.8),
+                  border: Border.all(color: finish.hingeBorder, width: 0.8),
                 ),
               ),
             ),
@@ -557,14 +657,14 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
     );
   }
 
-  Widget _buildLevelingFoot() {
+  Widget _buildLevelingFoot(FridgeColorFinish finish) {
     return Container(
       width: 22,
       height: 8,
       decoration: BoxDecoration(
-        color: const Color(0xFF141C28),
+        color: finish.levelingFootColor,
         borderRadius: BorderRadius.circular(2),
-        border: Border.all(color: const Color(0xFF4D6076), width: 1),
+        border: Border.all(color: finish.levelingFootBorder, width: 1),
       ),
     );
   }

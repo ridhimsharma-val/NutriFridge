@@ -6,12 +6,18 @@ import '../../../models/nutrition_data.dart';
 class RecommendationCard extends StatelessWidget {
   final RecipeRecommendation recommendation;
   final VoidCallback? onTap;
+  final String? heroTag;
 
   const RecommendationCard({
     super.key,
     required this.recommendation,
     this.onTap,
+    this.heroTag,
   });
+
+  String get _heroTag =>
+      heroTag ??
+      'meal-hero-image-${recommendation.title.toLowerCase().replaceAll(RegExp(r'\s+'), '-')}';
 
   @override
   Widget build(BuildContext context) {
@@ -47,16 +53,19 @@ class RecommendationCard extends StatelessWidget {
                   // Food Image with Badge Overlay (Refined compact height)
                   Stack(
                     children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(21),
-                          topRight: Radius.circular(21),
-                        ),
-                        child: Container(
-                          height: 138, // Optimized: ~15% more compact, food still prominent
-                          width: double.infinity,
-                          color: const Color(0xFFFFECE2),
-                          child: _buildFoodImage(),
+                      Hero(
+                        tag: _heroTag,
+                        child: ClipRRect(
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(21),
+                            topRight: Radius.circular(21),
+                          ),
+                          child: Container(
+                            height: 138, // Optimized: ~15% more compact, food still prominent
+                            width: double.infinity,
+                            color: const Color(0xFFFFECE2),
+                            child: _buildFoodImage(),
+                          ),
                         ),
                       ),
                       // Restrained Category/Origin Label overlay
@@ -164,6 +173,7 @@ class RecommendationCard extends StatelessWidget {
                         const SizedBox(width: 10),
                         // Action arrow button
                         Container(
+                          key: const ValueKey('recommendation_card_arrow'),
                           width: 38,
                           height: 38,
                           decoration: BoxDecoration(

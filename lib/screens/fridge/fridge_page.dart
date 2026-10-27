@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'models/category_item.dart';
+import 'models/fridge_preferences.dart';
 import 'widgets/category_bottom_sheet.dart';
 import 'widgets/fridge_header.dart';
+import 'widgets/fridge_preferences_sheet.dart';
 import 'widgets/top_freezer_refrigerator.dart';
 
 class FridgePage extends StatefulWidget {
@@ -53,7 +55,10 @@ class _FridgePageState extends State<FridgePage> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: FridgeCategoryRepository.notifier,
+      listenable: Listenable.merge([
+        FridgeCategoryRepository.notifier,
+        FridgePreferencesRepository.notifier,
+      ]),
       builder: (context, _) {
         return Scaffold(
           backgroundColor: Colors.transparent,
@@ -65,14 +70,11 @@ class _FridgePageState extends State<FridgePage> {
                   title: 'My Fridge',
                   itemCount: FridgeCategoryRepository.totalFridgeItems,
                   expiringCount: FridgeCategoryRepository.expiringSoonCount,
-                  onActionTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Fridge settings & preferences'),
-                        behavior: SnackBarBehavior.floating,
-                        duration: Duration(seconds: 1),
-                      ),
-                    );
+                  onActionTap: () async {
+                    await FridgePreferencesSheet.show(context);
+                    if (mounted) {
+                      setState(() {});
+                    }
                   },
                 ),
 
@@ -89,6 +91,7 @@ class _FridgePageState extends State<FridgePage> {
                       onFreezerToggle: _toggleFreezer,
                       onFridgeToggle: _toggleFridge,
                       onCategoryTap: _onCategoryTap,
+                      preferences: FridgePreferencesRepository.current,
                     ),
                   ),
                 ),
