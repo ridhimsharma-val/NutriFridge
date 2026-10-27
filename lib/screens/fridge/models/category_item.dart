@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../models/notification_data.dart';
 
 /// Expiry urgency level with calm, subtle pastel status colors
 enum ExpiryStatus {
@@ -660,6 +661,11 @@ class FridgeCategoryRepository {
         : item.copyWith(imageAsset: resolvedImage);
     final list = _categoryStore.putIfAbsent(canonicalName, () => []);
     list.add(resolvedItem);
+    NotificationRepository.addNotification(
+      title: 'Inventory update',
+      description: '${resolvedItem.name} was added to your fridge.',
+      type: NotificationType.inventoryUpdate,
+    );
     _notify();
   }
 

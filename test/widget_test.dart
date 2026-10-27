@@ -13,6 +13,7 @@ import 'package:nutrifridge/screens/log_meal/log_meal_screen.dart';
 import 'package:nutrifridge/screens/add_food/single_food_scan_page.dart';
 import 'package:nutrifridge/screens/log_meal/models/detected_food_item.dart';
 import 'package:nutrifridge/screens/profile/widgets/edit_profile_dialog.dart';
+import 'package:nutrifridge/models/notification_data.dart';
 
 void main() {
   setUp(() {
@@ -1337,5 +1338,116 @@ void main() {
     expect(MockDataRepository.profile.nutritionGoal, 'Increase protein intake');
     expect(MockDataRepository.profile.dailyCalorieTarget, 2400);
     expect(MockDataRepository.profile.mealRemindersEnabled, isFalse);
+  });
+
+  testWidgets('Home Screen - Notification Popover, Expandable Wellness & Expandable Nutrition Breakdown', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    FridgeCategoryRepository.reset();
+    MockDataRepository.reset();
+    NotificationRepository.reset();
+
+    // 1. Pump App and Settle on Home Screen
+    await tester.pumpWidget(const NutriFridgeApp());
+    await tester.pumpAndSettle();
+
+    // 2. Notification Bell Interaction → Popover Card
+    expect(find.byIcon(Icons.notifications_outlined), findsOneWidget);
+    expect(NotificationRepository.unreadCount, greaterThan(0));
+
+    // Tap notification bell
+    await tester.tap(find.byIcon(Icons.notifications_outlined));
+    await tester.pumpAndSettle();
+
+    // Verify Notification Popover is visible
+    expect(find.text('Notifications'), findsOneWidget);
+    expect(find.text('Food expiring soon'), findsOneWidget);
+    expect(find.text('Meal logged'), findsOneWidget);
+    expect(find.text('Mark all read'), findsOneWidget);
+
+    // Tap "Mark all read"
+    await tester.tap(find.text('Mark all read'));
+    await tester.pumpAndSettle();
+    expect(NotificationRepository.unreadCount, 0);
+
+    // Close Popover
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('Notifications'), findsNothing);
+
+    // 3. Today's Wellness Expandable Card Interaction
+    expect(find.text("Today's Wellness"), findsOneWidget);
+    expect(find.text('7-day wellness trend'), findsNothing);
+
+    // Tap to expand Today's Wellness
+    await tester.tap(find.text("Today's Wellness"));
+    await tester.pumpAndSettle();
+
+    // Verify Expanded Wellness Content
+    expect(find.text('7-day wellness trend'), findsOneWidget);
+    expect(find.text("Today's contributing factors"), findsOneWidget);
+    expect(find.text('Protein intake'), findsOneWidget);
+    expect(find.text('Food variety'), findsOneWidget);
+    expect(find.text('Meal consistency'), findsOneWidget);
+    expect(find.text('NutriFridge wellness indicator · Not a medical assessment'), findsOneWidget);
+
+    // Tap on Friday in the 7-day trend
+    await tester.tap(find.text('Fri'));
+    await tester.pumpAndSettle();
+    expect(find.text('Fri: 85 pts'), findsOneWidget);
+
+    // Tap to collapse Today's Wellness
+    await tester.tap(find.text("Today's Wellness"));
+    await tester.pumpAndSettle();
+    expect(find.text('7-day wellness trend'), findsNothing);
+
+    // 4. Nutrition Today Expandable Breakdown Interaction
+    expect(find.text('Nutrition Today'), findsOneWidget);
+    expect(find.text("Today's meals"), findsNothing);
+
+    // Tap "See" to expand Nutrition Today
+    await tester.tap(find.text('See'));
+    await tester.pumpAndSettle();
+
+    // Verify Expanded Nutrition Content
+    expect(find.text('Daily calorie summary'), findsOneWidget);
+    expect(find.text("Today's meals"), findsOneWidget);
+    expect(find.text('Oats & Banana'), findsOneWidget);
+    expect(find.text('Paneer Rice Bowl'), findsNWidgets(2));
+    expect(find.text('Target progress & remaining'), findsOneWidget);
+    expect(find.text('Collapse'), findsOneWidget);
+
+    // Tap "Collapse" to collapse Nutrition Today
+    await tester.tap(find.text('Collapse'));
+    await tester.pumpAndSettle();
+    expect(find.text("Today's meals"), findsNothing);
+
+    // 5. Dual Independent Expansion
+    // Expand Wellness
+    await tester.tap(find.text("Today's Wellness"));
+    await tester.pumpAndSettle();
+
+    // Expand Nutrition
+    await tester.ensureVisible(find.text('Nutrition Today'));
+    await tester.tap(find.text('Nutrition Today'));
+    await tester.pumpAndSettle();
+
+    // Both are expanded simultaneously without conflict
+    expect(find.text('7-day wellness trend'), findsOneWidget);
+    expect(find.text("Today's meals"), findsOneWidget);
+
+    // Collapse Wellness, Nutrition remains expanded
+    await tester.ensureVisible(find.text("Today's Wellness"));
+    await tester.tap(find.text("Today's Wellness"));
+    await tester.pumpAndSettle();
+
+    expect(find.text('7-day wellness trend'), findsNothing);
+    expect(find.text("Today's meals"), findsOneWidget);
   });
 }

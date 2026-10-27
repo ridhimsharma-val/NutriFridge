@@ -3,10 +3,12 @@ import '../../../core/theme/app_colors.dart';
 
 class DashboardHeader extends StatelessWidget {
   final VoidCallback? onNotificationTap;
+  final bool hasUnread;
 
   const DashboardHeader({
     super.key,
     this.onNotificationTap,
+    this.hasUnread = true,
     String? greeting,
     String? subtitle,
   });
@@ -102,19 +104,20 @@ class DashboardHeader extends StatelessWidget {
                       size: 22,
                       color: AppColors.textPrimary,
                     ),
-                    // Small subtle notification badge dot
-                    Positioned(
-                      top: 10,
-                      right: 11,
-                      child: Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
-                          color: AppColors.peachPrimary,
-                          shape: BoxShape.circle,
+                    // Small subtle notification badge dot (visible when unread notifications exist)
+                    if (hasUnread)
+                      Positioned(
+                        top: 10,
+                        right: 11,
+                        child: Container(
+                          width: 7,
+                          height: 7,
+                          decoration: const BoxDecoration(
+                            color: AppColors.peachPrimary,
+                            shape: BoxShape.circle,
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),

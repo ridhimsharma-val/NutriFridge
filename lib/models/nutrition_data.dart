@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../screens/profile/models/user_profile_data.dart';
+import 'notification_data.dart';
 
 class UserProfile {
   final String name;
@@ -313,6 +314,13 @@ class MockDataRepository {
       'timestamp': timeNow,
     });
 
+    // 5. Post synchronized in-app notification
+    NotificationRepository.addNotification(
+      title: 'Meal logged',
+      description: 'Your $mealType ($mealName) has been added to today\'s nutrition.',
+      type: NotificationType.mealLogged,
+    );
+
     _notify();
   }
 
@@ -332,6 +340,7 @@ class MockDataRepository {
       mealRemindersEnabled: true,
       expiryAlertsEnabled: true,
     );
+    NotificationRepository.reset();
     _notify();
   }
 }
