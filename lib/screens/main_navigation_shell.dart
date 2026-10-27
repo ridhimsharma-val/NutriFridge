@@ -3,7 +3,7 @@ import '../core/theme/app_colors.dart';
 import '../widgets/custom_bottom_nav.dart';
 import 'fridge/fridge_page.dart';
 import 'home/home_screen.dart';
-import 'placeholder/placeholder_screen.dart';
+import 'profile/profile_screen.dart';
 import 'progress/progress_screen.dart';
 import 'quick_actions/widgets/quick_action_sheet.dart';
 
@@ -22,11 +22,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     FridgePage(),
     SizedBox.shrink(), // Placeholder for central log action
     ProgressScreen(),
-    PlaceholderScreen(
-      title: 'My Profile & Goals',
-      icon: Icons.person_rounded,
-      description: 'Manage personal nutrition goals, preferences, and dietary needs.',
-    ),
+    ProfileScreen(),
   ];
 
   void _onNavItemSelected(int index) {

@@ -12,6 +12,7 @@ import 'package:nutrifridge/screens/log_meal/meal_nutrition_review_screen.dart';
 import 'package:nutrifridge/screens/log_meal/log_meal_screen.dart';
 import 'package:nutrifridge/screens/add_food/single_food_scan_page.dart';
 import 'package:nutrifridge/screens/log_meal/models/detected_food_item.dart';
+import 'package:nutrifridge/screens/profile/widgets/edit_profile_dialog.dart';
 
 void main() {
   setUp(() {
@@ -1148,5 +1149,193 @@ void main() {
     expect(find.text('Weekly averages this month'), findsOneWidget);
     expect(find.text('W1'), findsOneWidget);
     expect(find.text('W4'), findsOneWidget);
+  });
+
+  testWidgets('NutriFridge Profile Screen - Preferences, Restrictions, Toggles & Session Persistence', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    MockDataRepository.reset();
+    FridgeCategoryRepository.reset();
+
+    // 1. Pump App and Settle
+    await tester.pumpWidget(const NutriFridgeApp());
+    await tester.pumpAndSettle();
+
+    // 2. Tap on "Profile" in Bottom Navigation
+    expect(find.text('Profile'), findsOneWidget);
+    await tester.tap(find.text('Profile'));
+    await tester.pumpAndSettle();
+
+    // 3. Verify Header Title and Subtitle
+    expect(find.text('Your food preferences and personal settings.'), findsOneWidget);
+
+    // 4. Verify Profile Header Card
+    expect(find.text('Ridhim'), findsOneWidget);
+    expect(find.text('R'), findsOneWidget);
+    expect(find.text('Edit'), findsOneWidget);
+
+    // Test Edit Profile Dialog
+    await tester.tap(find.text('Edit'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit Profile'), findsOneWidget);
+
+    // Enter new name "Alex Morgan"
+    final nameField = find.descendant(
+      of: find.byType(EditProfileDialog),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(nameField, 'Alex Morgan');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Alex Morgan'), findsOneWidget);
+    expect(find.text('AM'), findsOneWidget);
+
+    // 5. Verify Compact Nutrition Preferences Card & Popup
+    await tester.ensureVisible(find.text('Nutrition preferences'));
+    expect(find.text('Nutrition preferences'), findsOneWidget);
+    // Initial summary
+    expect(find.text('Vegetarian · Balanced eating'), findsOneWidget);
+    expect(find.text('Daily target: 2,200 kcal'), findsOneWidget);
+
+    // Tap to open Nutrition Preferences Popup
+    await tester.tap(find.text('Nutrition preferences'));
+    await tester.pumpAndSettle();
+
+    // Verify popup controls are visible
+    expect(find.text('Dietary preference'), findsOneWidget);
+    expect(find.text('Vegan'), findsOneWidget);
+
+    // Select "Vegan"
+    await tester.tap(find.text('Vegan'));
+    await tester.pumpAndSettle();
+
+    // Select Nutrition Goal: "Increase protein intake"
+    await tester.tap(find.text('Increase protein intake'));
+    await tester.pumpAndSettle();
+
+    // Edit Calorie Target
+    final calorieFinder = find.widgetWithText(TextField, '2200');
+    expect(calorieFinder, findsOneWidget);
+    await tester.enterText(calorieFinder, '2400');
+    await tester.pumpAndSettle();
+
+    // Save and verify popup closes
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    // Verify summary card immediately updated on main page
+    expect(find.text('Vegan · Increase protein intake'), findsOneWidget);
+    expect(find.text('Daily target: 2,400 kcal'), findsOneWidget);
+    expect(MockDataRepository.profile.dietaryPreference, 'Vegan');
+    expect(MockDataRepository.profile.nutritionGoal, 'Increase protein intake');
+    expect(MockDataRepository.profile.dailyCalorieTarget, 2400);
+
+    // Test Cancel on Nutrition Preferences popup preserves saved state
+    await tester.tap(find.text('Nutrition preferences'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Non-vegetarian'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(MockDataRepository.profile.dietaryPreference, 'Vegan');
+    expect(find.text('Vegan · Increase protein intake'), findsOneWidget);
+
+    // 6. Verify Compact Dietary Restrictions Card & Popup
+    await tester.ensureVisible(find.text('Dietary restrictions'));
+    expect(find.text('Dietary restrictions'), findsOneWidget);
+    // Initial summary
+    expect(find.text('No restrictions selected'), findsOneWidget);
+
+    // Tap to open Dietary Restrictions Popup
+    await tester.tap(find.text('Dietary restrictions'));
+    await tester.pumpAndSettle();
+
+    // Verify popup controls are visible
+    expect(find.text('Food allergies'), findsOneWidget);
+    expect(find.text('Foods you avoid'), findsOneWidget);
+
+    // Toggle Allergy: "Peanuts"
+    await tester.tap(find.text('Peanuts'));
+    await tester.pumpAndSettle();
+
+    // Toggle Avoided Food: "Refined sugar"
+    await tester.tap(find.text('Refined sugar'));
+    await tester.pumpAndSettle();
+
+    // Add Custom Restriction: "Cilantro"
+    final customField = find.widgetWithText(TextField, 'e.g. Cilantro, Bell peppers');
+    await tester.ensureVisible(customField);
+    await tester.enterText(customField, 'Cilantro');
+    await tester.ensureVisible(find.text('Add'));
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+    expect(find.text('Cilantro'), findsOneWidget);
+
+    // Remove Custom Restriction: "Cilantro"
+    await tester.ensureVisible(find.byIcon(Icons.close_rounded).last);
+    await tester.tap(find.byIcon(Icons.close_rounded).last);
+    await tester.pumpAndSettle();
+
+    // Tap Save and close popup
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    // Verify summary card updated on main page
+    expect(find.text('1 allergy · 1 food avoided'), findsOneWidget);
+    expect(MockDataRepository.profile.allergies.contains('Peanuts'), isTrue);
+    expect(MockDataRepository.profile.avoidedFoods.contains('Refined sugar'), isTrue);
+    expect(MockDataRepository.profile.customRestrictions.contains('Cilantro'), isFalse);
+
+    // Test Cancel on Dietary Restrictions popup preserves saved state
+    await tester.tap(find.text('Dietary restrictions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Shellfish'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(MockDataRepository.profile.allergies.contains('Shellfish'), isFalse);
+    expect(find.text('1 allergy · 1 food avoided'), findsOneWidget);
+
+    // 7. Verify App Preferences (Switches)
+    await tester.ensureVisible(find.text('App preferences'));
+    expect(find.text('Meal reminders'), findsOneWidget);
+    expect(find.text('Remind me to log meals.'), findsOneWidget);
+    expect(find.text('Expiry alerts'), findsOneWidget);
+    expect(find.text('Notify me when tracked food is nearing expiry.'), findsOneWidget);
+
+    // Toggle Meal reminders switch
+    final mealSwitchFinder = find.byType(Switch).first;
+    await tester.tap(mealSwitchFinder);
+    await tester.pumpAndSettle();
+    expect(MockDataRepository.profile.mealRemindersEnabled, isFalse);
+
+    // 8. Verify Removed About & Privacy Section
+    expect(find.text('About NutriFridge'), findsNothing);
+    expect(find.text('Privacy & data'), findsNothing);
+
+    // 9. Session Persistence Across Screen Navigation
+    // Switch to Home screen
+    await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
+    expect(find.text('Today\'s Meals'), findsOneWidget);
+
+    // Return to Profile screen
+    await tester.tap(find.text('Profile'));
+    await tester.pumpAndSettle();
+
+    // Confirm all settings were retained!
+    expect(find.text('Alex Morgan'), findsOneWidget);
+    expect(find.text('AM'), findsOneWidget);
+    expect(MockDataRepository.profile.dietaryPreference, 'Vegan');
+    expect(MockDataRepository.profile.nutritionGoal, 'Increase protein intake');
+    expect(MockDataRepository.profile.dailyCalorieTarget, 2400);
+    expect(MockDataRepository.profile.mealRemindersEnabled, isFalse);
   });
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../screens/profile/models/user_profile_data.dart';
 
 class UserProfile {
   final String name;
@@ -214,6 +215,31 @@ class MockDataRepository {
   static DailyNutritionData _currentNutrition = _initialNutrition;
   static List<MealItem> _currentMeals = List<MealItem>.from(_initialMeals);
   static final List<Map<String, dynamic>> _loggedMealsHistory = [];
+  static UserProfileData _currentProfile = const UserProfileData(
+    displayName: 'Ridhim',
+    dietaryPreference: 'Vegetarian',
+    nutritionGoal: 'Balanced eating',
+    dailyCalorieTarget: 2200,
+    allergies: {},
+    avoidedFoods: {},
+    customRestrictions: [],
+    mealRemindersEnabled: true,
+    expiryAlertsEnabled: true,
+  );
+
+  /// Current user profile settings
+  static UserProfileData get profile => _currentProfile;
+
+  /// Updates user profile settings and syncs calorie target if modified
+  static void updateProfile(UserProfileData updated) {
+    _currentProfile = updated;
+    if (updated.dailyCalorieTarget != null) {
+      _currentNutrition = _currentNutrition.copyWith(
+        targetCalories: updated.dailyCalorieTarget!,
+      );
+    }
+    _notify();
+  }
 
   /// Current daily nutrition totals
   static DailyNutritionData get nutrition => _currentNutrition;
@@ -295,6 +321,17 @@ class MockDataRepository {
     _currentNutrition = _initialNutrition;
     _currentMeals = List<MealItem>.from(_initialMeals);
     _loggedMealsHistory.clear();
+    _currentProfile = const UserProfileData(
+      displayName: 'Ridhim',
+      dietaryPreference: 'Vegetarian',
+      nutritionGoal: 'Balanced eating',
+      dailyCalorieTarget: 2200,
+      allergies: {},
+      avoidedFoods: {},
+      customRestrictions: [],
+      mealRemindersEnabled: true,
+      expiryAlertsEnabled: true,
+    );
     _notify();
   }
 }
