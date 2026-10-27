@@ -43,15 +43,17 @@ class HeatmapCellData {
   final DateTime date;
   final int mealCount; // 0, 1, 2, 3+
   final bool isCurrentDay;
+  final bool isPadding;
 
   const HeatmapCellData({
     required this.date,
     required this.mealCount,
     this.isCurrentDay = false,
+    this.isPadding = false,
   });
 
   int get level {
-    if (mealCount <= 0) return 0;
+    if (isPadding || mealCount <= 0) return 0;
     if (mealCount == 1) return 1;
     if (mealCount == 2) return 2;
     return 3;
@@ -72,6 +74,7 @@ class ProgressAnalyticsData {
   final String calorieTrendComparison;
   final String proteinTrendComparison;
   final String consistencyTrendComparison;
+  final String factualConsistencySummary;
   final List<String> editorialInsights;
 
   const ProgressAnalyticsData({
@@ -87,6 +90,7 @@ class ProgressAnalyticsData {
     required this.calorieTrendComparison,
     required this.proteinTrendComparison,
     required this.consistencyTrendComparison,
+    required this.factualConsistencySummary,
     required this.editorialInsights,
   });
 
@@ -239,35 +243,118 @@ class ProgressDataService {
 
     final displayedSummaries = period == 'Week' ? weekDays : monthWeeks;
 
-    // 3. Consistency Heatmap (28 days: 4 weeks x 7 days)
+    // 3. Consistency Heatmap Data
     final List<HeatmapCellData> heatmap = [];
-    final startDate = now.subtract(const Duration(days: 27));
+    final todayMidnight = DateTime(now.year, now.month, now.day);
 
-    // Seed baseline meal counts for past 27 days
+    // Seed realistic baseline meal counts
     final List<int> baselineCounts = [
       3, 3, 2, 4, 3, 3, 2,
       3, 4, 3, 3, 2, 4, 3,
       3, 3, 4, 2, 3, 3, 3,
-      4, 3, 3, 4, 3, 3
+      4, 3, 3, 4, 3, 3, 4,
+      3, 2, 4
     ];
 
-    for (int i = 0; i < 27; i++) {
-      heatmap.add(
-        HeatmapCellData(
-          date: startDate.add(Duration(days: i)),
-          mealCount: baselineCounts[i],
-          isCurrentDay: false,
-        ),
-      );
+    if (period == 'Week') {
+      // 28 days: 4 weeks x 7 days (Mon to Sun)
+      // Row 3 ends on this week's Sunday
+      final currentWeekMonday = todayMidnight.subtract(Duration(days: todayMidnight.weekday - 1));
+      final startMonday = currentWeekMonday.subtract(const Duration(days: 21));
+
+      for (int i = 0; i < 28; i++) {
+        final cellDate = startMonday.add(Duration(days: i));
+        final bool isToday = cellDate.year == now.year &&
+            cellDate.month == now.month &&
+            cellDate.day == now.day;
+        final bool isFuture = cellDate.isAfter(todayMidnight);
+
+        int count = 0;
+        if (isToday) {
+          count = todayMealsCompleted;
+        } else if (isFuture) {
+          count = 0;
+        } else {
+          count = baselineCounts[i % baselineCounts.length];
+        }
+
+        heatmap.add(
+          HeatmapCellData(
+            date: cellDate,
+            mealCount: count,
+            isCurrentDay: isToday,
+            isPadding: false,
+          ),
+        );
+      }
+    } else {
+      // Month view: Calendar month grid with 7 weekday columns (Mon..Sun)
+      final firstDayOfMonth = DateTime(now.year, now.month, 1);
+      final int startOffset = firstDayOfMonth.weekday - 1; // 0 for Mon, 6 for Sun
+      final int daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+      final int totalCells = ((startOffset + daysInMonth + 6) ~/ 7) * 7;
+
+      for (int i = 0; i < totalCells; i++) {
+        if (i < startOffset) {
+          // Leading padding before 1st of month
+          final date = firstDayOfMonth.subtract(Duration(days: startOffset - i));
+          heatmap.add(
+            HeatmapCellData(
+              date: date,
+              mealCount: 0,
+              isCurrentDay: false,
+              isPadding: true,
+            ),
+          );
+        } else if (i - startOffset < daysInMonth) {
+          final int dayNum = (i - startOffset) + 1;
+          final date = DateTime(now.year, now.month, dayNum);
+          final bool isToday = dayNum == now.day;
+          final bool isFuture = dayNum > now.day;
+
+          int count = 0;
+          if (isToday) {
+            count = todayMealsCompleted;
+          } else if (isFuture) {
+            count = 0;
+          } else {
+            count = baselineCounts[(dayNum - 1) % baselineCounts.length];
+          }
+
+          heatmap.add(
+            HeatmapCellData(
+              date: date,
+              mealCount: count,
+              isCurrentDay: isToday,
+              isPadding: false,
+            ),
+          );
+        } else {
+          // Trailing padding after end of month
+          final int daysAfter = (i - startOffset) - daysInMonth + 1;
+          final date = DateTime(now.year, now.month + 1, daysAfter);
+          heatmap.add(
+            HeatmapCellData(
+              date: date,
+              mealCount: 0,
+              isCurrentDay: false,
+              isPadding: true,
+            ),
+          );
+        }
+      }
     }
-    // 28th day is today, dynamically using live completed meals count
-    heatmap.add(
-      HeatmapCellData(
-        date: now,
-        mealCount: todayMealsCompleted,
-        isCurrentDay: true,
-      ),
-    );
+
+    // Factual consistency summary calculated from actual last 7 recorded days
+    final pastAndTodayCells = heatmap
+        .where((c) => !c.isPadding && !c.date.isAfter(todayMidnight))
+        .toList();
+    final recent7 = pastAndTodayCells.length >= 7
+        ? pastAndTodayCells.sublist(pastAndTodayCells.length - 7)
+        : pastAndTodayCells;
+    final int mealsLoggedLast7 = recent7.where((c) => c.mealCount > 0).length;
+    final String factualSummary =
+        'Meals logged on $mealsLoggedLast7 of the last 7 days';
 
     // 4. Calculations
     final int avgCalories = (displayedSummaries.fold(0, (sum, d) => sum + d.calories) / displayedSummaries.length).round();
@@ -306,6 +393,7 @@ class ProgressDataService {
       calorieTrendComparison: '+2.4% vs previous $period',
       proteinTrendComparison: '+4.1 g/day vs previous $period',
       consistencyTrendComparison: '26 of 28 days recorded',
+      factualConsistencySummary: factualSummary,
       editorialInsights: [
         'Your daily protein intake averaged $avgProtein g, providing consistent support for your wellness goals.',
         'Logging was recorded for ${period == 'Week' ? 'all 7 days' : '26 days this month'}, establishing steady nutritional awareness.',

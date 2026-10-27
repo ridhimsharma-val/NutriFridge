@@ -1127,25 +1127,21 @@ void main() {
     expect(find.text('Monday, Oct 20'), findsOneWidget);
     expect(find.text('1980 kcal • 3 meals logged'), findsOneWidget);
 
-    // 7. Verify Consistency Heatmap
+    // 7. Verify LeetCode-style Consistency Heatmap
     await tester.ensureVisible(find.text('Meal logging consistency'));
     expect(find.text('Meal logging consistency'), findsOneWidget);
-    expect(find.text('Today is highlighted'), findsOneWidget);
-    expect(find.text('3+ meals'), findsOneWidget);
+    expect(find.text('Your meal activity'), findsOneWidget);
+    expect(find.text('0'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
+    expect(find.text('3+'), findsOneWidget);
+    expect(find.textContaining('Meals logged on'), findsOneWidget);
 
-    // 8. Verify Nutrition Trends
-    await tester.ensureVisible(find.text('Nutrition trends'));
-    expect(find.text('Nutrition trends'), findsOneWidget);
-    expect(find.text('Average daily calories'), findsOneWidget);
-    expect(find.text('Average protein intake'), findsOneWidget);
-    expect(find.text('Meal-logging consistency'), findsOneWidget);
+    // 8. Verify Removed Sections are NOT present
+    expect(find.text('Nutrition trends'), findsNothing);
+    expect(find.text('Your week in food'), findsNothing);
 
-    // 9. Verify Your Week in Food Insights
-    await tester.ensureVisible(find.text('Your week in food'));
-    expect(find.text('Your week in food'), findsOneWidget);
-    expect(find.text('Observations from your meal recording pattern'), findsOneWidget);
-
-    // 10. Switch Period to "Month"
+    // 9. Switch Period to "Month"
     await tester.ensureVisible(find.text('Month'));
     await tester.tap(find.text('Month'));
     await tester.pumpAndSettle();

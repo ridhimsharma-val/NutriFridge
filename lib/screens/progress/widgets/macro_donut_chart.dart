@@ -81,15 +81,20 @@ class _MacroDonutChartState extends State<MacroDonutChart>
     final double fatPct =
         totalMacroKcal > 0 ? (fatKcal / totalMacroKcal) * 100 : 0.0;
 
+    // Display rounded percentages that sum to 100%
+    final int displayProteinPct = totalMacroKcal > 0 ? proteinPct.round() : 0;
+    final int displayCarbsPct = totalMacroKcal > 0 ? carbsPct.round() : 0;
+    final int displayFatPct = totalMacroKcal > 0 ? (100 - displayProteinPct - displayCarbsPct) : 0;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         color: AppColors.cardWhite,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: AppColors.cardBorder, width: 1.2),
         boxShadow: const [AppColors.softShadow],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -97,25 +102,25 @@ class _MacroDonutChartState extends State<MacroDonutChart>
           Text(
             'Calorie distribution by macro',
             style: AppTypography.cardTitle.copyWith(
-              fontSize: 16,
+              fontSize: 15.5,
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             'Calculated from 4 kcal/g (protein, carbs) and 9 kcal/g (fat)',
             style: AppTypography.subtitle.copyWith(
-              fontSize: 12,
+              fontSize: 11.5,
               color: AppColors.textTertiary,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 14),
 
           // Centered Donut Visualization
           Center(
             child: SizedBox(
-              width: 190,
-              height: 190,
+              width: 135,
+              height: 135,
               child: AnimatedBuilder(
                 animation: _animation,
                 builder: (context, child) {
@@ -136,27 +141,27 @@ class _MacroDonutChartState extends State<MacroDonutChart>
                           Text(
                             '${widget.centerCalories}',
                             style: AppTypography.cardTitle.copyWith(
-                              fontSize: 28,
+                              fontSize: 22,
                               fontWeight: FontWeight.w800,
                               letterSpacing: -0.8,
                               color: AppColors.textPrimary,
                               height: 1.0,
                             ),
                           ),
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 2),
                           Text(
                             'kcal',
                             style: AppTypography.subtitle.copyWith(
-                              fontSize: 12,
+                              fontSize: 11,
                               fontWeight: FontWeight.w600,
                               color: AppColors.textSecondary,
                             ),
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 1),
                           Text(
                             widget.centerLabel,
                             style: AppTypography.subtitle.copyWith(
-                              fontSize: 10.5,
+                              fontSize: 10,
                               color: AppColors.textTertiary,
                             ),
                           ),
@@ -169,7 +174,7 @@ class _MacroDonutChartState extends State<MacroDonutChart>
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 14),
 
           // Compact Macro Legend (with grams & calorie percentages)
           Row(
@@ -178,19 +183,19 @@ class _MacroDonutChartState extends State<MacroDonutChart>
               _buildMacroLegendItem(
                 label: 'Protein',
                 color: proteinColor,
-                percentage: proteinPct.round(),
+                percentage: displayProteinPct,
                 grams: widget.proteinGrams,
               ),
               _buildMacroLegendItem(
                 label: 'Carbs',
                 color: carbsColor,
-                percentage: carbsPct.round(),
+                percentage: displayCarbsPct,
                 grams: widget.carbsGrams,
               ),
               _buildMacroLegendItem(
                 label: 'Fat',
                 color: fatColor,
-                percentage: fatPct.round(),
+                percentage: displayFatPct,
                 grams: widget.fatGrams,
               ),
             ],
@@ -212,29 +217,29 @@ class _MacroDonutChartState extends State<MacroDonutChart>
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 8,
-              height: 8,
+              width: 7,
+              height: 7,
               decoration: BoxDecoration(
                 color: color,
                 shape: BoxShape.circle,
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 5),
             Text(
               label,
               style: const TextStyle(
-                fontSize: 13,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         Text(
           '$percentage%',
           style: TextStyle(
-            fontSize: 16,
+            fontSize: 14.5,
             fontWeight: FontWeight.w800,
             color: color,
           ),
@@ -242,7 +247,7 @@ class _MacroDonutChartState extends State<MacroDonutChart>
         Text(
           '$grams g',
           style: const TextStyle(
-            fontSize: 11.5,
+            fontSize: 11,
             fontWeight: FontWeight.w500,
             color: AppColors.textSecondary,
           ),
@@ -275,8 +280,8 @@ class _MacroDonutPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - 24) / 2;
-    const strokeWidth = 14.0;
+    final radius = (size.width - 16) / 2;
+    const strokeWidth = 10.0;
 
     // Background track if empty
     final bgPaint = Paint()

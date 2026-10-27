@@ -5,8 +5,6 @@ import '../../models/nutrition_data.dart';
 import 'models/progress_data.dart';
 import 'widgets/consistency_heatmap.dart';
 import 'widgets/macro_donut_chart.dart';
-import 'widgets/nutrition_trends_section.dart';
-import 'widgets/week_in_food_insights.dart';
 import 'widgets/weekly_calories_chart.dart';
 import 'widgets/wellness_score_hero.dart';
 
@@ -89,23 +87,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
                     const SizedBox(height: 20),
 
-                    // 5. Nutrition Consistency Heatmap
+                    // 5. Minimal LeetCode-style Consistency Heatmap
                     ConsistencyHeatmap(
                       cells: analytics.heatmapCells,
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // 6. Nutrition Trends
-                    NutritionTrendsSection(
-                      data: analytics,
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // 7. Your Week in Food Insights
-                    WeekInFoodInsights(
-                      insights: analytics.editorialInsights,
+                      factualSummary: analytics.factualConsistencySummary,
+                      period: _selectedPeriod,
                     ),
 
                     // Bottom navigation clearance

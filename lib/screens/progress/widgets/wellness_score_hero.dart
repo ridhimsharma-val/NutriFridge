@@ -83,7 +83,7 @@ class _WellnessScoreHeroState extends State<WellnessScoreHero>
           ),
         ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 26),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -92,12 +92,12 @@ class _WellnessScoreHeroState extends State<WellnessScoreHero>
             'WELLNESS SCORE',
             style: AppTypography.subtitle.copyWith(
               color: const Color(0xFF7FA899),
-              fontSize: 11.5,
+              fontSize: 11,
               fontWeight: FontWeight.w700,
-              letterSpacing: 2.2,
+              letterSpacing: 2.0,
             ),
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 12),
 
           // Cinematic Animated Circular Score Ring
           AnimatedBuilder(
@@ -107,8 +107,8 @@ class _WellnessScoreHeroState extends State<WellnessScoreHero>
               final int currentDisplayScore = (widget.score * _scoreAnimation.value).round();
 
               return SizedBox(
-                width: 170,
-                height: 170,
+                width: 124,
+                height: 124,
                 child: CustomPaint(
                   painter: _WellnessRingPainter(
                     progress: progress,
@@ -122,9 +122,9 @@ class _WellnessScoreHeroState extends State<WellnessScoreHero>
                         Text(
                           '$currentDisplayScore',
                           style: AppTypography.scoreLarge.copyWith(
-                            fontSize: 48,
+                            fontSize: 36,
                             fontWeight: FontWeight.w800,
-                            letterSpacing: -1.5,
+                            letterSpacing: -1.0,
                             color: Colors.white,
                             height: 1.0,
                           ),
@@ -133,7 +133,7 @@ class _WellnessScoreHeroState extends State<WellnessScoreHero>
                         Text(
                           'out of 100',
                           style: AppTypography.subtitle.copyWith(
-                            fontSize: 12,
+                            fontSize: 11,
                             fontWeight: FontWeight.w500,
                             color: const Color(0xFF88AF9F),
                           ),
@@ -146,14 +146,14 @@ class _WellnessScoreHeroState extends State<WellnessScoreHero>
             },
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
 
           // Short human-readable interpretation
           Text(
             widget.interpretation,
             textAlign: TextAlign.center,
             style: AppTypography.greeting.copyWith(
-              fontSize: 17,
+              fontSize: 15,
               fontWeight: FontWeight.w700,
               color: Colors.white,
               letterSpacing: -0.2,
@@ -165,7 +165,7 @@ class _WellnessScoreHeroState extends State<WellnessScoreHero>
           // Comparison with previous period (only if historical baseline exists)
           if (hasDiff)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
@@ -177,21 +177,21 @@ class _WellnessScoreHeroState extends State<WellnessScoreHero>
               child: Text(
                 '${scoreDiff >= 0 ? "+" : ""}$scoreDiff vs previous period (demo baseline)',
                 style: const TextStyle(
-                  fontSize: 12,
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w500,
                   color: Color(0xFFA5D6C5),
                 ),
               ),
             ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: 8),
 
           // Honest editorial indicator disclaimer
           Text(
             'NutriFridge wellness indicator • Not a medical assessment',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 10.5,
               fontWeight: FontWeight.w400,
               color: Colors.white.withValues(alpha: 0.45),
             ),
@@ -217,8 +217,8 @@ class _WellnessRingPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - 16) / 2;
-    const strokeWidth = 11.0;
+    final radius = (size.width - 12) / 2;
+    const strokeWidth = 8.5;
 
     // 1. Background full track
     final trackPaint = Paint()
@@ -234,10 +234,10 @@ class _WellnessRingPainter extends CustomPainter {
     // 2. Subtle soft glow behind active arc
     final glowPaint = Paint()
       ..color = glowColor.withValues(alpha: 0.28)
-      ..strokeWidth = strokeWidth + 4.0
+      ..strokeWidth = strokeWidth + 3.0
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0);
 
     const startAngle = -math.pi / 2;
     final sweepAngle = 2 * math.pi * progress.clamp(0.0, 1.0);
