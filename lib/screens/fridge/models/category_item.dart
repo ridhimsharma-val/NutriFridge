@@ -625,6 +625,20 @@ class FridgeCategoryRepository {
     return total;
   }
 
+  /// Find a food item in the fridge inventory by name (case-insensitive substring or exact match)
+  static CategoryFoodItem? findItemByName(String name, {bool exact = false}) {
+    final lower = name.toLowerCase().trim();
+    for (final list in _categoryStore.values) {
+      for (final item in list) {
+        final itemLower = item.name.toLowerCase().trim();
+        if (itemLower == lower || (!exact && (itemLower.contains(lower) || lower.contains(itemLower)))) {
+          return item;
+        }
+      }
+    }
+    return null;
+  }
+
   /// Number of items expiring soon (expiryDays <= 3)
   static int get expiringSoonCount {
     int count = 0;

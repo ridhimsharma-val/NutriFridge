@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/notification_data.dart';
 import '../../models/nutrition_data.dart';
+import '../meal_detail/meal_detail_screen.dart';
 import 'widgets/dashboard_header.dart';
 import 'widgets/meal_status_card.dart';
 import 'widgets/notification_popover.dart';
@@ -52,16 +53,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   const SizedBox(height: 14),
 
-                  // 2. Suggested For You (Preserved unchanged)
+                  // 2. Suggested For You
                   RecommendationCard(
                     recommendation: recommendation,
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content:
-                              Text('Opening ${recommendation.title} recipe...'),
-                          behavior: SnackBarBehavior.floating,
-                          duration: const Duration(seconds: 1),
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => MealDetailScreen(
+                            recommendation: recommendation,
+                          ),
                         ),
                       );
                     },

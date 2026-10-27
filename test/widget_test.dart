@@ -14,6 +14,7 @@ import 'package:nutrifridge/screens/add_food/single_food_scan_page.dart';
 import 'package:nutrifridge/screens/log_meal/models/detected_food_item.dart';
 import 'package:nutrifridge/screens/profile/widgets/edit_profile_dialog.dart';
 import 'package:nutrifridge/models/notification_data.dart';
+import 'package:nutrifridge/screens/home/widgets/recommendation_card.dart';
 
 void main() {
   setUp(() {
@@ -1449,5 +1450,114 @@ void main() {
 
     expect(find.text('7-day wellness trend'), findsNothing);
     expect(find.text("Today's meals"), findsOneWidget);
+  });
+
+  testWidgets('Meal Detail Page - Cinematic Food Experience, Nutrition, Fridge Ingredients, AI Context & Video Inspiration', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    FridgeCategoryRepository.reset();
+    MockDataRepository.reset();
+    NotificationRepository.reset();
+
+    // 1. Pump App and Settle on Dashboard
+    await tester.pumpWidget(const NutriFridgeApp());
+    await tester.pumpAndSettle();
+
+    // Verify Suggested for You recommendation card is visible
+    expect(find.text('Suggested for you'), findsOneWidget);
+    expect(find.text('Paneer Rice Bowl'), findsWidgets);
+
+    // 2. Tap on the Recommendation Card -> Navigate to MealDetailScreen
+    await tester.tap(find.text('Suggested for you'));
+    // Tap the recommendation container
+    await tester.tap(find.byType(RecommendationCard));
+    await tester.pumpAndSettle();
+
+    // 3. Verify Hero Section
+    expect(find.text('Picked for your fridge'), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
+
+    // 4. Verify Meal Information & Nutrition Overview
+    expect(find.text('Nutrition & prep'), findsOneWidget);
+    expect(find.text('20 mins prep'), findsOneWidget);
+    expect(find.text('520'), findsOneWidget);
+    expect(find.text('kcal'), findsOneWidget);
+    expect(find.text('24'), findsOneWidget);
+    expect(find.text('Protein'), findsOneWidget);
+    expect(find.text('62'), findsOneWidget);
+    expect(find.text('Carbs'), findsOneWidget);
+    expect(find.text('18'), findsOneWidget);
+    expect(find.text('Fat'), findsOneWidget);
+
+    // 5. Verify "Why this meal?"
+    expect(find.text('Why this meal?'), findsOneWidget);
+    expect(find.text('Uses 4 ingredients from your fridge'), findsOneWidget);
+    expect(find.text("Helps support today's protein goal"), findsOneWidget);
+
+    // 6. Verify Ingredients & Real-time Shared Inventory
+    expect(find.text('Ingredients'), findsOneWidget);
+    expect(find.text('4 items'), findsOneWidget);
+    expect(find.text('Paneer'), findsOneWidget);
+    expect(find.text('In fridge · 250 g'), findsOneWidget);
+    expect(find.text('Rice'), findsOneWidget);
+    expect(find.text('Available in pantry'), findsOneWidget);
+    expect(find.text('Capsicum'), findsOneWidget);
+    expect(find.text('In fridge · 3 pieces'), findsOneWidget);
+    expect(find.text('Onion'), findsOneWidget);
+    expect(find.text('Not in fridge'), findsOneWidget);
+
+    // 7. Verify AI Cooking Section ("Cook it your way")
+    expect(find.text('Cook it your way'), findsOneWidget);
+    expect(find.text('Get a recipe tailored to your ingredients and preferences.'), findsOneWidget);
+    expect(find.text('Get AI Recipe'), findsOneWidget);
+    expect(find.text('Ask NutriFridge AI'), findsOneWidget);
+
+    // Tap "Get AI Recipe" -> Opens AI Assistant Modal Sheet
+    await tester.ensureVisible(find.text('Get AI Recipe'));
+    await tester.tap(find.text('Get AI Recipe'));
+    await tester.pumpAndSettle();
+
+    // Verify AI Assistant Modal Sheet & Context Handoff
+    expect(find.text('NutriFridge Assistant'), findsOneWidget);
+    expect(find.text('Recipe Request for Paneer Rice Bowl'), findsOneWidget);
+    expect(find.textContaining('Give me a recipe for Paneer Rice Bowl'), findsOneWidget);
+    expect(find.text('Send to Assistant'), findsOneWidget);
+
+    // Send to Assistant & dismiss
+    await tester.tap(find.text('Send to Assistant'));
+    await tester.pumpAndSettle(const Duration(seconds: 3));
+    expect(find.text('NutriFridge Assistant'), findsNothing);
+
+    // 8. Verify YouTube Video Carousel
+    await tester.drag(find.byType(SingleChildScrollView), const Offset(0, -320));
+    await tester.pumpAndSettle();
+    expect(find.text("Watch how it's made"), findsOneWidget);
+    expect(find.text('Cooking videos for this meal.'), findsOneWidget);
+    expect(find.text('Homestyle Paneer Rice Bowl in 15 Minutes'), findsOneWidget);
+    expect(find.text('Fresh Kitchen Tales'), findsOneWidget);
+    expect(find.text('8:24'), findsOneWidget);
+
+    // Tap video card -> honest sample notice
+    await tester.tap(find.text('Homestyle Paneer Rice Bowl in 15 Minutes'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Sample Video'), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    // 9. Back Navigation -> Returns to Dashboard in previous state
+    await tester.ensureVisible(find.byIcon(Icons.arrow_back_rounded));
+    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+    await tester.pumpAndSettle();
+
+    // Verify we are back on Dashboard
+    expect(find.text('Suggested for you'), findsOneWidget);
+    expect(find.text("Today's Wellness"), findsOneWidget);
+    expect(find.text('Nutrition Today'), findsOneWidget);
   });
 }
