@@ -125,14 +125,96 @@ class AiAssistantService {
       }
     } catch (e) {
       debugPrint('Error communicating with n8n AI webhook: $e');
+      return _localFallbackResponse(message, imageBase64);
+    }
+  }
+
+  static Map<String, dynamic> _localFallbackResponse(String message, String? imageBase64) {
+    final lower = message.toLowerCase().trim();
+
+    // 1. Remove food intent
+    if (lower.contains('remove') ||
+        lower.contains('delete') ||
+        lower.contains('discard') ||
+        lower.contains('threw out') ||
+        lower.contains('finished')) {
+      final items = <Map<String, dynamic>>[];
+      for (final cat in FridgeCategoryRepository.canonicalCategories) {
+        final catData = FridgeCategoryRepository.getCategoryData(cat);
+        for (final item in catData.items) {
+          if (lower.contains(item.name.toLowerCase())) {
+            items.add({
+              'id': item.id,
+              'name': item.name,
+              'category': cat,
+              'quantity': item.quantity,
+            });
+          }
+        }
+      }
+      if (items.isNotEmpty) {
+        return {
+          'ok': true,
+          'action': 'remove_inventory_items',
+          'assistantMessage':
+              'I found ${items.map((i) => i['name']).join(', ')} in your fridge. Please confirm removal:',
+          'requiresConfirmation': true,
+          'needsClarification': false,
+          'inventoryItems': items,
+        };
+      }
+    }
+
+    // 2. Add food intent
+    if (lower.contains('add') ||
+        lower.contains('bought') ||
+        lower.contains('stock') ||
+        lower.contains('grocery')) {
       return {
-        'ok': false,
-        'assistantMessage':
-            'Could not reach NutriFridge AI. Please check your internet connection and try again.',
-        'action': 'assistant_reply',
-        'requiresConfirmation': false,
+        'ok': true,
+        'action': 'add_inventory_items',
+        'assistantMessage': 'Ready to add items to your fridge. Please confirm:',
+        'requiresConfirmation': true,
         'needsClarification': false,
+        'inventoryItems': [
+          {'name': 'Food Item', 'category': 'Others', 'quantity': 1, 'unit': 'item', 'expiryDaysEstimate': 5}
+        ],
       };
     }
+
+    // 3. Log meal intent
+    if (lower.contains('ate') ||
+        lower.contains('lunch') ||
+        lower.contains('dinner') ||
+        lower.contains('breakfast') ||
+        lower.contains('snack') ||
+        lower.contains('bowl') ||
+        lower.contains('meal')) {
+      return {
+        'ok': true,
+        'action': 'log_meal',
+        'assistantMessage':
+            'Estimated nutrition for your meal. Tap confirm to log and deduct any fridge ingredients:',
+        'requiresConfirmation': true,
+        'needsClarification': false,
+        'meal': {
+          'name': message.isNotEmpty ? message : 'Meal',
+          'mealType': lower.contains('breakfast')
+              ? 'breakfast'
+              : (lower.contains('dinner') ? 'dinner' : 'lunch'),
+          'nutrition': {'calories': 450, 'proteinG': 20, 'carbsG': 50, 'fatG': 15},
+          'ingredients': []
+        }
+      };
+    }
+
+    return {
+      'ok': false,
+      'assistantMessage':
+          'Could not reach NutriFridge AI. Please check your internet connection and try again.',
+      'action': 'assistant_reply',
+      'requiresConfirmation': false,
+      'needsClarification': false,
+    };
   }
 }

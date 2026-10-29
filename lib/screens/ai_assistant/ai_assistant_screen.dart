@@ -35,6 +35,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   static const List<String> _quickPrompts = [
     'Add 2 apples and 1 litre of milk to my fridge',
+    'Remove milk and apples from my fridge',
     'I ate a paneer rice bowl for lunch',
     'What fruits do I have in my fridge?',
     'What can I cook using my available ingredients?',
@@ -240,6 +241,56 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     );
   }
 
+  void _confirmRemoveInventory(AiChatMessage message) {
+    if (message.inventoryItems.isEmpty) return;
+
+    int removedCount = 0;
+    for (final itemJson in message.inventoryItems) {
+      final name = itemJson['name'] as String? ?? '';
+      final category = itemJson['category'] as String?;
+      final id = itemJson['id'] as String? ?? itemJson['matchedInventoryItemId'] as String?;
+
+      if (id != null && id.isNotEmpty) {
+        FridgeCategoryRepository.removeItem(category ?? '', id);
+        removedCount++;
+      } else if (name.isNotEmpty) {
+        if (FridgeCategoryRepository.removeItemByName(name)) {
+          removedCount++;
+        }
+      }
+    }
+
+    final index = _messages.indexWhere((m) => m.id == message.id);
+    if (index != -1) {
+      setState(() {
+        _messages[index] = _messages[index].copyWith(isConfirmed: true);
+      });
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                removedCount > 0
+                    ? 'Removed $removedCount items from your fridge inventory!'
+                    : 'Removed requested items from your fridge.',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFFDC2626),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   void _confirmLogMeal(AiChatMessage message) {
     if (message.meal == null) return;
 
@@ -277,6 +328,29 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       ingredients: ingredients,
     );
 
+    // Also deduct/remove matching ingredients from fridge inventory
+    int deductedCount = 0;
+    if (message.suggestedDeductions.isNotEmpty) {
+      for (final deduction in message.suggestedDeductions) {
+        final deductionName = deduction['name'] as String? ?? '';
+        final deductionId = deduction['matchedInventoryItemId'] as String?;
+        if (deductionId != null && deductionId.isNotEmpty) {
+          FridgeCategoryRepository.removeItem('', deductionId);
+          deductedCount++;
+        } else if (deductionName.isNotEmpty) {
+          if (FridgeCategoryRepository.removeItemByName(deductionName)) {
+            deductedCount++;
+          }
+        }
+      }
+    } else {
+      for (final ing in ingredients) {
+        if (FridgeCategoryRepository.removeItemByName(ing)) {
+          deductedCount++;
+        }
+      }
+    }
+
     // Mark confirmed
     final index = _messages.indexWhere((m) => m.id == message.id);
     if (index != -1) {
@@ -293,7 +367,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Logged $name! +$calories kcal, +${protein}g protein.',
+                deductedCount > 0
+                    ? 'Logged $name! +$calories kcal, and deducted $deductedCount ingredients from fridge.'
+                    : 'Logged $name! +$calories kcal, +${protein}g protein.',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
@@ -559,6 +635,13 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                 _buildInventoryActionCard(message),
               ],
 
+              // Embedded Action: Remove Inventory Items
+              if ((message.action == 'remove_inventory_items' || message.action == 'remove_inventory_item') &&
+                  message.inventoryItems.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                _buildRemovalActionCard(message),
+              ],
+
               // Embedded Action: Log Meal
               if (message.action == 'log_meal' && message.meal != null) ...[
                 const SizedBox(height: 14),
@@ -662,6 +745,106 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: message.isConfirmed ? Colors.grey.shade400 : AppColors.tealPrimary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRemovalActionCard(AiChatMessage message) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFECACA), width: 1),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFFDC2626)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Proposed Fridge Removals',
+                  style: AppTypography.cardTitle.copyWith(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF991B1B),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...message.inventoryItems.map((item) {
+            final name = item['name'] ?? 'Item';
+            final cat = item['category'] ?? 'Others';
+            final qty = item['quantity'] != null ? '${item['quantity']} ${item['unit'] ?? ''}'.trim() : '';
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFDC2626),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      name,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                    ),
+                  ),
+                  if (qty.isNotEmpty)
+                    Text(
+                      qty,
+                      style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                    ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      cat,
+                      style: const TextStyle(fontSize: 10, color: Color(0xFFDC2626), fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 40,
+            child: ElevatedButton.icon(
+              onPressed: message.isConfirmed ? null : () => _confirmRemoveInventory(message),
+              icon: Icon(
+                message.isConfirmed ? Icons.check_circle_rounded : Icons.delete_sweep_rounded,
+                size: 18,
+              ),
+              label: Text(
+                message.isConfirmed ? 'Removed from Fridge ✓' : 'Remove from Fridge',
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: message.isConfirmed ? Colors.grey.shade400 : const Color(0xFFDC2626),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 elevation: 0,

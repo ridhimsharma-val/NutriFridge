@@ -728,6 +728,41 @@ class FridgeCategoryRepository {
     _notify();
   }
 
+  /// Remove an item by its name (case-insensitive substring or exact match) across all categories
+  static bool removeItemByName(String name) {
+    final lower = name.toLowerCase().trim();
+    for (final list in _categoryStore.values) {
+      final index = list.indexWhere((it) {
+        final itemLower = it.name.toLowerCase().trim();
+        return itemLower == lower ||
+            itemLower.contains(lower) ||
+            lower.contains(itemLower);
+      });
+      if (index != -1) {
+        final removedItem = list.removeAt(index);
+        NotificationRepository.addNotification(
+          title: 'Inventory update',
+          description: '${removedItem.name} was removed from your fridge.',
+          type: NotificationType.inventoryUpdate,
+        );
+        _notify();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Remove multiple items by name
+  static int removeMultipleItemsByName(List<String> names) {
+    int count = 0;
+    for (final name in names) {
+      if (removeItemByName(name)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
   /// Reset to initial mock state (for tests)
   static void reset() {
     _categoryStore = _buildInitialStore();

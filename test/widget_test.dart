@@ -1841,7 +1841,24 @@ void main() {
     // Mock AI Assistant Service responses
     AiAssistantService.mockHandler = (request) async {
       final msg = (request['message'] as String? ?? '').toLowerCase();
-      if (msg.contains('apple') && msg.contains('milk')) {
+      if (msg.contains('remove') || msg.contains('delete')) {
+        return {
+          'ok': true,
+          'action': 'remove_inventory_items',
+          'assistantMessage': 'I identified Milk and Apple to remove from your fridge. Please confirm:',
+          'requiresConfirmation': true,
+          'inventoryItems': [
+            {
+              'name': 'Milk',
+              'category': 'Dairy Products',
+            },
+            {
+              'name': 'Apple',
+              'category': 'Fruits',
+            }
+          ],
+        };
+      } else if (msg.contains('apple') && msg.contains('milk')) {
         return {
           'ok': true,
           'action': 'add_inventory_items',
@@ -1953,5 +1970,26 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Here is helpful advice about your fridge.'), findsOneWidget);
+
+    // Wait for SnackBar to dismiss
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+
+    // 6. Test Food Removal flow via AI Assistant
+    final beforeRemovalTotal = FridgeCategoryRepository.totalFridgeItems;
+    await tester.enterText(find.byType(TextField), 'Remove milk and apples from my fridge');
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Proposed Fridge Removals'), findsOneWidget);
+    await tester.ensureVisible(find.text('Remove from Fridge'));
+    expect(find.text('Remove from Fridge'), findsOneWidget);
+
+    // Confirm removal from fridge
+    await tester.tap(find.text('Remove from Fridge'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Removed from Fridge ✓'), findsOneWidget);
+    expect(FridgeCategoryRepository.totalFridgeItems, beforeRemovalTotal - 2);
   });
 }
