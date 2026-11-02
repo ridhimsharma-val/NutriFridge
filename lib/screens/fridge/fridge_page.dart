@@ -37,15 +37,6 @@ class _FridgePageState extends State<FridgePage> {
     await CategoryBottomSheet.show(
       context: context,
       category: categoryData,
-      onAddFood: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Add Food to ${categoryData.name} coming soon'),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 1),
-          ),
-        );
-      },
     );
     if (mounted) {
       setState(() {});

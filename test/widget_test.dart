@@ -135,7 +135,7 @@ void main() {
     expect(find.text('Butter'), findsOneWidget);
     expect(find.text('100 g'), findsOneWidget);
     expect(find.text('Expires in 8 days'), findsOneWidget);
-    expect(find.text('Add Food'), findsOneWidget);
+    expect(find.text('Add Food'), findsNothing);
 
     // Scroll back to top
     await tester.drag(find.byType(ListView), const Offset(0, 120));

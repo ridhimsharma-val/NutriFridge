@@ -209,10 +209,7 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
               child: _category.items.isEmpty
                   ? _buildEmptyState()
                   : ListView(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
                       physics: const BouncingScrollPhysics(),
                       children: [
                         for (int i = 0; i < _category.items.length; i++) ...[
@@ -221,54 +218,6 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
                         ],
                       ],
                     ),
-            ),
-
-            const Divider(height: 1, thickness: 1, color: Color(0xFFEBE5DC)),
-
-            // 4. Bottom action: "+ Add Food" secondary action
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
-              child: Center(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    if (widget.onAddFood != null) {
-                      widget.onAddFood!();
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Add Food to ${_category.name} coming soon'),
-                          behavior: SnackBarBehavior.floating,
-                          duration: const Duration(seconds: 1),
-                        ),
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.add_rounded, size: 17),
-                  label: const Text(
-                    'Add Food',
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF2C485C),
-                    side: const BorderSide(
-                      color: Color(0xFFCBD5E1),
-                      width: 1.2,
-                    ),
-                    backgroundColor: Colors.white.withValues(alpha: 0.8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 22,
-                      vertical: 10,
-                    ),
-                  ),
-                ),
-              ),
             ),
           ],
         ),
@@ -417,7 +366,7 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Tap "+ Add Food" below to stock this shelf',
+            'No items currently in this category',
             style: TextStyle(
               fontSize: 12.5,
               color: Color(0xFF94A3B8),
