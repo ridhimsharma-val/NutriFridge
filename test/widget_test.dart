@@ -19,11 +19,15 @@ import 'package:nutrifridge/screens/fridge/models/fridge_preferences.dart';
 import 'package:nutrifridge/screens/ai_assistant/ai_assistant_screen.dart';
 import 'package:nutrifridge/screens/ai_assistant/services/ai_assistant_service.dart';
 
+import 'package:nutrifridge/screens/add_food/add_food_page.dart';
+import 'package:nutrifridge/screens/home/home_screen.dart';
+
 void main() {
   setUp(() {
     FridgeCategoryRepository.reset();
     FridgePreferencesRepository.reset();
     MockDataRepository.reset();
+    AiAssistantService.resetSession();
     AppImagePicker.mockHandler = (source) async {
       return XFile.fromData(AppImagePicker.sampleMockBytes, name: 'test_photo.png');
     };
@@ -216,7 +220,7 @@ void main() {
     expect(find.text('8 expiring soon'), findsOneWidget);
   });
 
-  testWidgets('Quick Actions and Add Food - Single Food Flow', (WidgetTester tester) async {
+  testWidgets('Add Food - Single Food Flow', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
     tester.view.devicePixelRatio = 3.0;
 
@@ -228,21 +232,11 @@ void main() {
     await tester.pumpWidget(const NutriFridgeApp());
     await tester.pumpAndSettle();
 
-    // 1. Tap center '+' button to open Quick Actions
-    await tester.tap(find.byIcon(Icons.add_rounded));
-    await tester.pumpAndSettle();
-
-    // Verify Quick Actions sheet contents
-    expect(find.text('Quick Actions'), findsOneWidget);
-    expect(find.text('Add Food'), findsOneWidget);
-    expect(find.text('Add something to your fridge'), findsOneWidget);
-    expect(find.text('Log Meal'), findsOneWidget);
-    expect(find.text('Record what you ate'), findsOneWidget);
-    expect(find.text('AI Assistant'), findsOneWidget);
-    expect(find.text('Ask NutriFridge anything'), findsOneWidget);
-
-    // 2. Tap Add Food
-    await tester.tap(find.text('Add Food'));
+    // 1. Open Add Food Page directly via Navigator
+    final navContext = tester.element(find.byType(HomeScreen));
+    Navigator.of(navContext).push(
+      MaterialPageRoute(builder: (_) => const AddFoodPage()),
+    );
     await tester.pumpAndSettle();
 
     // Verify Add Food Page options
@@ -252,7 +246,7 @@ void main() {
     expect(find.text('Grocery / Receipt'), findsOneWidget);
     expect(find.text('Manual Entry'), findsOneWidget);
 
-    // 3. Tap Single Food
+    // 2. Tap Single Food
     await tester.tap(find.text('Single Food'));
     await tester.pumpAndSettle();
 
@@ -292,7 +286,7 @@ void main() {
     expect(find.text('Added Paneer (300 g) to Dairy Products!'), findsOneWidget);
   });
 
-  testWidgets('Quick Actions and Add Food - Manual Entry Flow', (WidgetTester tester) async {
+  testWidgets('Add Food - Manual Entry Flow', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
     tester.view.devicePixelRatio = 3.0;
 
@@ -304,15 +298,14 @@ void main() {
     await tester.pumpWidget(const NutriFridgeApp());
     await tester.pumpAndSettle();
 
-    // 1. Open Quick Actions
-    await tester.tap(find.byIcon(Icons.add_rounded));
+    // 1. Open Add Food Page directly via Navigator
+    final navContext = tester.element(find.byType(HomeScreen));
+    Navigator.of(navContext).push(
+      MaterialPageRoute(builder: (_) => const AddFoodPage()),
+    );
     await tester.pumpAndSettle();
 
-    // 2. Open Add Food
-    await tester.tap(find.text('Add Food'));
-    await tester.pumpAndSettle();
-
-    // 3. Tap Manual Entry
+    // 2. Tap Manual Entry
     await tester.tap(find.text('Manual Entry'));
     await tester.pumpAndSettle();
 
@@ -340,7 +333,7 @@ void main() {
     expect(find.text('Added Organic Strawberries (1 pieces) to Dairy Products!'), findsOneWidget);
   });
 
-  testWidgets('Quick Actions - Log Meal and AI Assistant placeholders', (WidgetTester tester) async {
+  testWidgets('Central "+" button directly opens AI Assistant without Quick Actions', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
     tester.view.devicePixelRatio = 3.0;
 
@@ -352,41 +345,23 @@ void main() {
     await tester.pumpWidget(const NutriFridgeApp());
     await tester.pumpAndSettle();
 
-    // Open Quick Actions
-    await tester.tap(find.byIcon(Icons.add_rounded));
+    // Tap central '+' button
+    await tester.tap(find.byKey(const ValueKey('nav_tab_ai_assistant')));
     await tester.pumpAndSettle();
 
-    // Tap Log Meal -> Opens LogMealScreen
-    await tester.tap(find.text('Log Meal'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Log Meal'), findsOneWidget);
-    expect(find.text("Let's see what you had."), findsOneWidget);
-    expect(find.text('Capture your meal'), findsOneWidget);
-    expect(find.text('Take Photo'), findsOneWidget);
-    expect(find.text('Choose from Gallery'), findsOneWidget);
-    expect(find.text('Analyze Meal'), findsOneWidget);
-
-    // Return back
-    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
-    await tester.pumpAndSettle();
-
-    // Reopen Quick Actions and test AI Assistant navigation
-    await tester.tap(find.byIcon(Icons.add_rounded));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('AI Assistant'));
-    await tester.pumpAndSettle();
-
+    // Directly opens AI Assistant screen
     expect(find.text('NutriFridge AI'), findsOneWidget);
+    expect(find.text('Quick Actions'), findsNothing);
     expect(find.text('Ask anything, add food, or log meal...'), findsOneWidget);
 
     // Return back to dashboard
     await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
     await tester.pumpAndSettle();
+
+    expect(find.text('NutriFridge AI'), findsNothing);
   });
 
-  testWidgets('Quick Actions and Add Food - Multiple Foods Flow', (WidgetTester tester) async {
+  testWidgets('Add Food - Multiple Foods Flow', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
     tester.view.devicePixelRatio = 3.0;
 
@@ -398,15 +373,14 @@ void main() {
     await tester.pumpWidget(const NutriFridgeApp());
     await tester.pumpAndSettle();
 
-    // 1. Open Quick Actions
-    await tester.tap(find.byIcon(Icons.add_rounded));
+    // 1. Open Add Food Page directly via Navigator
+    final navContext = tester.element(find.byType(HomeScreen));
+    Navigator.of(navContext).push(
+      MaterialPageRoute(builder: (_) => const AddFoodPage()),
+    );
     await tester.pumpAndSettle();
 
-    // 2. Open Add Food
-    await tester.tap(find.text('Add Food'));
-    await tester.pumpAndSettle();
-
-    // 3. Tap Multiple Foods
+    // 2. Tap Multiple Foods
     await tester.tap(find.text('Multiple Foods'));
     await tester.pumpAndSettle();
 
@@ -431,7 +405,7 @@ void main() {
     expect(find.text('Added 4 foods to your fridge!'), findsOneWidget);
   });
 
-  testWidgets('Quick Actions and Add Food - Grocery Receipt Flow', (WidgetTester tester) async {
+  testWidgets('Add Food - Grocery Receipt Flow', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
     tester.view.devicePixelRatio = 3.0;
 
@@ -443,15 +417,14 @@ void main() {
     await tester.pumpWidget(const NutriFridgeApp());
     await tester.pumpAndSettle();
 
-    // 1. Open Quick Actions
-    await tester.tap(find.byIcon(Icons.add_rounded));
+    // 1. Open Add Food Page directly via Navigator
+    final navContext = tester.element(find.byType(HomeScreen));
+    Navigator.of(navContext).push(
+      MaterialPageRoute(builder: (_) => const AddFoodPage()),
+    );
     await tester.pumpAndSettle();
 
-    // 2. Open Add Food
-    await tester.tap(find.text('Add Food'));
-    await tester.pumpAndSettle();
-
-    // 3. Tap Grocery / Receipt
+    // 2. Tap Grocery / Receipt
     await tester.tap(find.text('Grocery / Receipt'));
     await tester.pumpAndSettle();
 
@@ -994,13 +967,11 @@ void main() {
     expect(MockDataRepository.nutrition.consumedCalories, 1620);
     expect(FridgeCategoryRepository.getCategoryData('Dairy Products').items.firstWhere((it) => it.name == 'Paneer').quantity, '250 g');
 
-    // 2. Open Quick Actions sheet
-    await tester.tap(find.byIcon(Icons.add_rounded));
-    await tester.pumpAndSettle();
-
-    // 3. Tap "Log Meal"
-    expect(find.text('Log Meal'), findsOneWidget);
-    await tester.tap(find.text('Log Meal'));
+    // 2. Open Log Meal Page directly via Navigator
+    final navContext = tester.element(find.byType(HomeScreen));
+    Navigator.of(navContext).push(
+      MaterialPageRoute(builder: (_) => const LogMealScreen()),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text("Let's see what you had."), findsOneWidget);
@@ -1594,7 +1565,7 @@ void main() {
     // 1. Verify 5 destinations exist in exact order without text labels in navigation
     expect(find.byKey(const ValueKey('nav_tab_home')), findsOneWidget);
     expect(find.byKey(const ValueKey('nav_tab_fridge')), findsOneWidget);
-    expect(find.byKey(const ValueKey('nav_tab_quick_actions')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nav_tab_ai_assistant')), findsOneWidget);
     expect(find.byKey(const ValueKey('nav_tab_progress')), findsOneWidget);
     expect(find.byKey(const ValueKey('nav_tab_profile')), findsOneWidget);
 
@@ -1608,21 +1579,20 @@ void main() {
 
     expect(find.text('My Fridge'), findsOneWidget);
 
-    // 4. Tap central '+' Quick Actions button - should open modal without changing active tab
-    await tester.tap(find.byKey(const ValueKey('nav_tab_quick_actions')));
+    // 4. Tap central '+' button - directly opens AI Assistant without showing Quick Actions sheet
+    await tester.tap(find.byKey(const ValueKey('nav_tab_ai_assistant')));
     await tester.pumpAndSettle();
 
-    // Quick Actions sheet is shown
-    expect(find.text('Quick Actions'), findsOneWidget);
-    expect(find.text('Log Meal'), findsOneWidget);
-    expect(find.text('Add Food'), findsOneWidget);
+    // AI Assistant interface is shown directly (NOT Quick Actions sheet)
+    expect(find.text('NutriFridge AI'), findsOneWidget);
+    expect(find.text('Quick Actions'), findsNothing);
 
-    // Close the Quick Action sheet by tapping top barrier / handle
-    await tester.tapAt(const Offset(20, 20));
+    // Close the AI Assistant by tapping the back button
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
     await tester.pumpAndSettle();
-    expect(find.text('Log Meal'), findsNothing);
+    expect(find.text('NutriFridge AI'), findsNothing);
 
-    // Still on Fridge screen
+    // Still on Fridge screen with tab selection preserved
     expect(find.text('My Fridge'), findsOneWidget);
 
     // 5. Navigate to Progress tab
@@ -1915,7 +1885,7 @@ void main() {
 
     // 1. Verify Header and Welcome message
     expect(find.text('NutriFridge AI'), findsOneWidget);
-    expect(find.textContaining('I am your NutriFridge AI assistant'), findsOneWidget);
+    expect(find.textContaining('I can help manage your fridge and track what you eat'), findsOneWidget);
 
     // 2. Test Quick Prompts
     expect(find.text('Add 2 apples and 1 litre of milk to my fridge'), findsOneWidget);
@@ -1991,5 +1961,103 @@ void main() {
 
     expect(find.text('Removed from Fridge ✓'), findsOneWidget);
     expect(FridgeCategoryRepository.totalFridgeItems, beforeRemovalTotal - 2);
+  });
+
+  testWidgets('Central "+" button direct AI Assistant navigation across tabs & conversation persistence', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      AiAssistantService.mockHandler = null;
+    });
+
+    AiAssistantService.mockHandler = (request) async {
+      return {
+        'ok': true,
+        'action': 'log_meal',
+        'assistantMessage': 'Estimated nutrition for Paneer Rice Bowl. Review fridge deductions before logging:',
+        'requiresConfirmation': true,
+        'meal': {
+          'name': 'Paneer Rice Bowl',
+          'mealType': 'lunch',
+          'ingredients': [
+            {'name': 'Paneer', 'quantity': 100, 'unit': 'g'},
+            {'name': 'Cooked Rice', 'quantity': 150, 'unit': 'g'},
+          ],
+          'nutrition': {
+            'calories': 520,
+            'proteinG': 24,
+            'carbsG': 62,
+            'fatG': 18,
+          }
+        }
+      };
+    };
+
+    await tester.pumpWidget(const NutriFridgeApp());
+    await tester.pumpAndSettle();
+
+    // 1. From Home tab (index 0), tap '+' -> opens AI Assistant directly
+    expect(find.byKey(const ValueKey('nav_tab_ai_assistant')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('nav_tab_ai_assistant')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('NutriFridge AI'), findsOneWidget);
+    expect(find.text('Quick Actions'), findsNothing);
+
+    // Send a meal logging message
+    await tester.enterText(find.byType(TextField), 'I just had a paneer rice bowl');
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Paneer Rice Bowl'), findsOneWidget);
+    expect(find.text('Ingredients & Fridge Deductions'), findsOneWidget);
+
+    // Tap back button -> returns to Home tab
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+    await tester.pumpAndSettle();
+
+    // Still on Home screen
+    expect(find.byKey(const ValueKey('nav_tab_home')), findsOneWidget);
+
+    // 2. Open AI Assistant again -> previous conversation is retained!
+    await tester.tap(find.byKey(const ValueKey('nav_tab_ai_assistant')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Paneer Rice Bowl'), findsOneWidget);
+
+    // Tap back to return
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+    await tester.pumpAndSettle();
+
+    // 3. Navigate to Progress tab (index 3), then tap '+' -> opens AI Assistant directly
+    await tester.tap(find.byKey(const ValueKey('nav_tab_progress')));
+    await tester.pumpAndSettle();
+    expect(find.text('Your nutrition, over time.'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('nav_tab_ai_assistant')));
+    await tester.pumpAndSettle();
+    expect(find.text('NutriFridge AI'), findsOneWidget);
+
+    // Tap back -> returns to Progress screen
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('Your nutrition, over time.'), findsOneWidget);
+
+    // 4. Navigate to Profile tab (index 4), then tap '+' -> opens AI Assistant directly
+    await tester.tap(find.byKey(const ValueKey('nav_tab_profile')));
+    await tester.pumpAndSettle();
+    expect(find.text('Your food preferences and personal settings.'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('nav_tab_ai_assistant')));
+    await tester.pumpAndSettle();
+    expect(find.text('NutriFridge AI'), findsOneWidget);
+
+    // Tap back -> returns to Profile screen
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('Your food preferences and personal settings.'), findsOneWidget);
   });
 }

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
+import '../core/transitions/hero_transition_route.dart';
 import '../widgets/custom_bottom_nav.dart';
+import 'ai_assistant/ai_assistant_screen.dart';
 import 'fridge/fridge_page.dart';
 import 'home/home_screen.dart';
 import 'profile/profile_screen.dart';
 import 'progress/progress_screen.dart';
-import 'quick_actions/widgets/quick_action_sheet.dart';
 
 class MainNavigationShell extends StatefulWidget {
   const MainNavigationShell({super.key});
@@ -20,14 +21,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   final List<Widget> _screens = const [
     HomeScreen(),
     FridgePage(),
-    SizedBox.shrink(), // Placeholder for central log action
+    SizedBox.shrink(), // Non-navigable placeholder for central AI action button
     ProgressScreen(),
     ProfileScreen(),
   ];
 
   void _onNavItemSelected(int index) {
     if (index == 2) {
-      _showQuickActionsSheet();
+      _openAiAssistant();
       return;
     }
     setState(() {
@@ -35,8 +36,12 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     });
   }
 
-  void _showQuickActionsSheet() async {
-    await QuickActionSheet.show(context);
+  void _openAiAssistant() async {
+    await Navigator.of(context).push(
+      HeroTransitionRoute(
+        page: const AiAssistantScreen(),
+      ),
+    );
     if (mounted) {
       setState(() {});
     }
@@ -65,7 +70,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         bottomNavigationBar: CustomBottomNav(
           currentIndex: _currentIndex,
           onItemSelected: _onNavItemSelected,
-          onLogMealPressed: _showQuickActionsSheet,
+          onLogMealPressed: _openAiAssistant,
         ),
       ),
     );

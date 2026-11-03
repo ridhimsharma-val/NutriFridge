@@ -9,17 +9,19 @@ import 'navigation/liquid_float_navigation.dart';
 /// - Symmetrical fluid wave notch along the bar surface
 /// - Icons only, no text labels
 /// - Clean white/cream surface with rounded top corners
-/// - Dedicated central '+' action button that triggers Quick Actions without tab mutation
+/// - Dedicated central '+' action button that directly opens AI Assistant without tab mutation
 class CustomBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onItemSelected;
   final VoidCallback onLogMealPressed;
+  final VoidCallback? onActionPressed;
 
   const CustomBottomNav({
     super.key,
     required this.currentIndex,
     required this.onItemSelected,
     required this.onLogMealPressed,
+    this.onActionPressed,
   });
 
   @override
@@ -27,7 +29,7 @@ class CustomBottomNav extends StatelessWidget {
     return LiquidFloatNavigationBar(
       currentIndex: currentIndex,
       onItemSelected: onItemSelected,
-      onActionPressed: onLogMealPressed,
+      onActionPressed: onActionPressed ?? onLogMealPressed,
       items: LiquidFloatNavItem.nutriFridgeItems,
       backgroundColor: AppColors.cardWhite,
       activeColor: AppColors.tealPrimary,

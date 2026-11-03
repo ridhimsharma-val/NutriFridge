@@ -289,10 +289,10 @@ class _LiquidFloatNavigationBarState extends State<LiquidFloatNavigationBar>
                             return Expanded(
                               key: actionKey,
                               child: Tooltip(
-                                message: item.tooltip ?? 'Quick Actions',
+                                message: item.tooltip ?? 'AI Assistant',
                                 child: Semantics(
                                   button: true,
-                                  label: item.tooltip ?? 'Quick Actions',
+                                  label: item.tooltip ?? 'AI Assistant',
                                   child: Material(
                                     color: Colors.transparent,
                                     child: InkWell(

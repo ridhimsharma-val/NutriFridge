@@ -24,7 +24,7 @@ class LiquidFloatNavItem {
     ),
     LiquidFloatNavItem(
       icon: Icons.add_rounded,
-      tooltip: 'Quick Actions',
+      tooltip: 'AI Assistant',
       isActionButton: true,
     ),
     LiquidFloatNavItem(

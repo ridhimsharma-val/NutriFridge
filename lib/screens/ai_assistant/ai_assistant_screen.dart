@@ -10,7 +10,8 @@ import 'models/ai_message.dart';
 import 'services/ai_assistant_service.dart';
 
 /// Full-featured, interactive AI Assistant screen for NutriFridge.
-/// Supports natural-language inventory management, meal logging, and contextual Q&A.
+/// Acts as the single primary entry point for natural-language food addition,
+/// meal logging with ingredient fridge deduction, and contextual nutrition Q&A.
 class AiAssistantScreen extends StatefulWidget {
   final String? initialPrompt;
 
@@ -35,16 +36,25 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   static const List<String> _quickPrompts = [
     'Add 2 apples and 1 litre of milk to my fridge',
+    'I ate two chapatis and a bowl of dal for lunch',
+    'I bought 500 g tomatoes and 250 g paneer',
+    'Log my breakfast: oats, milk and a banana',
     'Remove milk and apples from my fridge',
-    'I ate a paneer rice bowl for lunch',
-    'What fruits do I have in my fridge?',
-    'What can I cook using my available ingredients?',
   ];
 
   @override
   void initState() {
     super.initState();
-    _seedInitialWelcome();
+    // Load session messages to ensure conversation is preserved across navigations
+    if (AiAssistantService.sessionMessages.isEmpty) {
+      AiAssistantService.resetSession();
+    }
+    _messages.addAll(AiAssistantService.sessionMessages);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToBottom();
+    });
+
     if (widget.initialPrompt != null && widget.initialPrompt!.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _handleSend(promptOverride: widget.initialPrompt);
@@ -59,17 +69,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     super.dispose();
   }
 
-  void _seedInitialWelcome() {
-    _messages.add(
-      AiChatMessage(
-        id: 'msg_welcome',
-        text:
-            'Hello! I am your NutriFridge AI assistant.\n\nYou can ask me to add groceries to your fridge, log what you ate, check your current perishables, or get cooking ideas.',
-        isUser: false,
-        timestamp: DateTime.now(),
-        action: 'assistant_reply',
-      ),
-    );
+  void _syncSession() {
+    AiAssistantService.sessionMessages = List.from(_messages);
   }
 
   void _scrollToBottom() {
@@ -120,6 +121,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
     setState(() {
       _messages.add(userMessage);
+      _syncSession();
       _textController.clear();
       _selectedImageBase64 = null;
       _selectedImageMimeType = null;
@@ -129,7 +131,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
     _scrollToBottom();
 
-    // Call live n8n backend
+    // Call live n8n backend or intelligent local processing
     final response = await AiAssistantService.sendRequest(
       message: text,
       imageBase64: imageToSend,
@@ -169,6 +171,20 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       }
     }
 
+    // Pre-populate deduction selections for matched fridge items
+    final Set<String> initialSelectedDeductions = {};
+    if (meal != null && meal['ingredients'] is List) {
+      for (final ing in meal['ingredients']) {
+        if (ing is Map && ing['name'] != null) {
+          final ingName = ing['name'] as String;
+          final match = FridgeCategoryRepository.findItemByName(ingName);
+          if (match != null || ing['matchedInventoryItemId'] != null) {
+            initialSelectedDeductions.add(ingName);
+          }
+        }
+      }
+    }
+
     final assistantMessage = AiChatMessage(
       id: 'msg_ai_${DateTime.now().millisecondsSinceEpoch}',
       text: assistantText,
@@ -181,14 +197,247 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       inventoryItems: inventoryItems,
       meal: meal,
       suggestedDeductions: suggestedDeductions,
+      selectedDeductionIngredients: initialSelectedDeductions,
     );
 
     setState(() {
       _messages.add(assistantMessage);
+      _syncSession();
       _isSending = false;
     });
 
     _scrollToBottom();
+  }
+
+  void _removeItemFromProposedAdditions(AiChatMessage message, int indexToRemove) {
+    if (message.isConfirmed) return;
+    final updatedList = List<Map<String, dynamic>>.from(message.inventoryItems);
+    if (indexToRemove >= 0 && indexToRemove < updatedList.length) {
+      updatedList.removeAt(indexToRemove);
+    }
+    final index = _messages.indexWhere((m) => m.id == message.id);
+    if (index != -1) {
+      setState(() {
+        _messages[index] = _messages[index].copyWith(inventoryItems: updatedList);
+        _syncSession();
+      });
+    }
+  }
+
+  void _toggleIngredientDeduction(AiChatMessage message, String ingredientName) {
+    if (message.isConfirmed) return;
+    final current = Set<String>.from(message.selectedDeductionIngredients);
+    if (current.contains(ingredientName)) {
+      current.remove(ingredientName);
+    } else {
+      current.add(ingredientName);
+    }
+    final index = _messages.indexWhere((m) => m.id == message.id);
+    if (index != -1) {
+      setState(() {
+        _messages[index] = _messages[index].copyWith(selectedDeductionIngredients: current);
+        _syncSession();
+      });
+    }
+  }
+
+  void _showEditMealDialog(AiChatMessage message) {
+    if (message.isConfirmed || message.meal == null) return;
+    final meal = Map<String, dynamic>.from(message.meal!);
+    final nutrition = Map<String, dynamic>.from(meal['nutrition'] as Map? ?? {});
+
+    final nameController = TextEditingController(text: meal['name'] as String? ?? 'Meal');
+    String mealType = (meal['mealType'] as String? ?? 'lunch').toLowerCase();
+    final caloriesController = TextEditingController(text: '${nutrition['calories'] ?? 450}');
+    final proteinController = TextEditingController(text: '${nutrition['proteinG'] ?? 20}');
+    final carbsController = TextEditingController(text: '${nutrition['carbsG'] ?? 50}');
+    final fatController = TextEditingController(text: '${nutrition['fatG'] ?? 15}');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 38,
+                        height: 4.5,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD6DDD8),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Edit Meal & Nutrition', style: AppTypography.cardTitle),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.of(sheetContext).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Meal Name',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text('Quick Portion Multiplier', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [0.5, 1.0, 1.5, 2.0].map((scale) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              foregroundColor: AppColors.tealPrimary,
+                              side: const BorderSide(color: AppColors.tealPrimary),
+                            ),
+                            onPressed: () {
+                              final baseCal = (nutrition['calories'] as num?)?.toDouble() ?? 450.0;
+                              final baseProt = (nutrition['proteinG'] as num?)?.toDouble() ?? 20.0;
+                              final baseCarbs = (nutrition['carbsG'] as num?)?.toDouble() ?? 50.0;
+                              final baseFat = (nutrition['fatG'] as num?)?.toDouble() ?? 15.0;
+
+                              setDialogState(() {
+                                caloriesController.text = '${(baseCal * scale).round()}';
+                                proteinController.text = '${(baseProt * scale).round()}';
+                                carbsController.text = '${(baseCarbs * scale).round()}';
+                                fatController.text = '${(baseFat * scale).round()}';
+                              });
+                            },
+                            child: Text('${scale}x'),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: caloriesController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Calories (kcal)',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: proteinController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Protein (g)',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: carbsController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Carbs (g)',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: fatController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Fat (g)',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.tealPrimary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          final updatedCalories = int.tryParse(caloriesController.text) ?? 450;
+                          final updatedProtein = int.tryParse(proteinController.text) ?? 20;
+                          final updatedCarbs = int.tryParse(carbsController.text) ?? 50;
+                          final updatedFat = int.tryParse(fatController.text) ?? 15;
+
+                          nutrition['calories'] = updatedCalories;
+                          nutrition['proteinG'] = updatedProtein;
+                          nutrition['carbsG'] = updatedCarbs;
+                          nutrition['fatG'] = updatedFat;
+                          nutrition['isEstimate'] = true;
+
+                          meal['name'] = nameController.text.trim();
+                          meal['mealType'] = mealType;
+                          meal['nutrition'] = nutrition;
+
+                          final idx = _messages.indexWhere((m) => m.id == message.id);
+                          if (idx != -1) {
+                            setState(() {
+                              _messages[idx] = _messages[idx].copyWith(meal: meal);
+                              _syncSession();
+                            });
+                          }
+                          Navigator.of(sheetContext).pop();
+                        },
+                        child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   void _confirmAddInventory(AiChatMessage message) {
@@ -216,6 +465,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     if (index != -1) {
       setState(() {
         _messages[index] = _messages[index].copyWith(isConfirmed: true);
+        _syncSession();
       });
     }
 
@@ -264,6 +514,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     if (index != -1) {
       setState(() {
         _messages[index] = _messages[index].copyWith(isConfirmed: true);
+        _syncSession();
       });
     }
 
@@ -313,11 +564,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       }
     }
 
-    // Capitalize mealType
     final formattedType = mealType.isNotEmpty
         ? mealType[0].toUpperCase() + mealType.substring(1)
         : 'Lunch';
 
+    // 1. Update MockDataRepository (nutrition totals, meal history, wellness)
     MockDataRepository.logMeal(
       mealType: formattedType,
       mealName: name,
@@ -328,26 +579,13 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       ingredients: ingredients,
     );
 
-    // Also deduct/remove matching ingredients from fridge inventory
+    // 2. Deduct ONLY the user-selected/confirmed fridge ingredients
     int deductedCount = 0;
-    if (message.suggestedDeductions.isNotEmpty) {
-      for (final deduction in message.suggestedDeductions) {
-        final deductionName = deduction['name'] as String? ?? '';
-        final deductionId = deduction['matchedInventoryItemId'] as String?;
-        if (deductionId != null && deductionId.isNotEmpty) {
-          FridgeCategoryRepository.removeItem('', deductionId);
-          deductedCount++;
-        } else if (deductionName.isNotEmpty) {
-          if (FridgeCategoryRepository.removeItemByName(deductionName)) {
-            deductedCount++;
-          }
-        }
-      }
-    } else {
-      for (final ing in ingredients) {
-        if (FridgeCategoryRepository.removeItemByName(ing)) {
-          deductedCount++;
-        }
+    final selectedIngNames = message.selectedDeductionIngredients;
+
+    for (final ingName in selectedIngNames) {
+      if (FridgeCategoryRepository.removeItemByName(ingName)) {
+        deductedCount++;
       }
     }
 
@@ -356,6 +594,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     if (index != -1) {
       setState(() {
         _messages[index] = _messages[index].copyWith(isConfirmed: true);
+        _syncSession();
       });
     }
 
@@ -465,7 +704,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Center(
-                    child: Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 18),
+                    child: Icon(Icons.kitchen_rounded, color: Colors.white, size: 18),
                   ),
                 ),
               ),
@@ -473,13 +712,27 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              'NutriFridge AI',
-              style: AppTypography.cardTitle.copyWith(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-              ),
-              overflow: TextOverflow.ellipsis,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'NutriFridge AI',
+                  style: AppTypography.cardTitle.copyWith(
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const Text(
+                  'Primary Assistant & Food Logger',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -490,8 +743,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           tooltip: 'Reset Conversation',
           onPressed: () {
             setState(() {
+              AiAssistantService.resetSession();
               _messages.clear();
-              _seedInitialWelcome();
+              _messages.addAll(AiAssistantService.sessionMessages);
             });
           },
         ),
@@ -678,63 +932,104 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               Expanded(
                 child: Text(
                   'Proposed Fridge Additions',
-                  style: AppTypography.cardTitle.copyWith(fontSize: 13, fontWeight: FontWeight.w700),
+                  style: AppTypography.cardTitle.copyWith(fontSize: 13.5, fontWeight: FontWeight.w700),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (!message.isConfirmed)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'Review & Confirm',
+                    style: TextStyle(fontSize: 10, color: Color(0xFF2E7D32), fontWeight: FontWeight.w700),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 10),
-          ...message.inventoryItems.map((item) {
-            final name = item['name'] ?? 'Item';
-            final cat = item['category'] ?? 'Others';
-            final qty = item['quantity'] != null ? '${item['quantity']} ${item['unit'] ?? ''}'.trim() : '';
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: const BoxDecoration(
-                      color: AppColors.tealPrimary,
-                      shape: BoxShape.circle,
-                    ),
+          for (int i = 0; i < message.inventoryItems.length; i++) ...[
+            Builder(
+              builder: (context) {
+                final item = message.inventoryItems[i];
+                final name = item['name'] ?? 'Item';
+                final cat = item['category'] ?? 'Others';
+                final qty = item['quantity'] != null ? '${item['quantity']} ${item['unit'] ?? ''}'.trim() : '1 item';
+                final exp = (item['expiryDaysEstimate'] as num?)?.toInt() ?? 5;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE8E2D9), width: 0.8),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      name,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
-                    ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: AppColors.tealPrimary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                            ),
+                            Text(
+                              '$qty • $cat',
+                              style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEDF7ED),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Expires in $exp d',
+                          style: const TextStyle(fontSize: 10, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      if (!message.isConfirmed) ...[
+                        const SizedBox(width: 4),
+                        InkWell(
+                          onTap: () => _removeItemFromProposedAdditions(message, i),
+                          borderRadius: BorderRadius.circular(12),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(Icons.close_rounded, size: 16, color: Color(0xFF94A3B8)),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                  if (qty.isNotEmpty)
-                    Text(
-                      qty,
-                      style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
-                    ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.tealSurface,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      cat,
-                      style: const TextStyle(fontSize: 10, color: AppColors.tealPrimary, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-          const SizedBox(height: 12),
+                );
+              },
+            ),
+          ],
+          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             height: 40,
             child: ElevatedButton.icon(
-              onPressed: message.isConfirmed ? null : () => _confirmAddInventory(message),
+              onPressed: (message.isConfirmed || message.inventoryItems.isEmpty)
+                  ? null
+                  : () => _confirmAddInventory(message),
               icon: Icon(
                 message.isConfirmed ? Icons.check_circle_rounded : Icons.add_rounded,
                 size: 18,
@@ -866,11 +1161,13 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     final carbs = nutrition['carbsG'] ?? 50;
     final fat = nutrition['fatG'] ?? 15;
 
+    final List<dynamic> ingredients = (meal['ingredients'] is List) ? meal['ingredients'] as List : [];
+
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF9F0),
+        color: const Color(0xFFFFFBF5),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFFE0B2), width: 1),
+        border: Border.all(color: const Color(0xFFFFE0B2), width: 1.2),
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -882,7 +1179,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               Expanded(
                 child: Text(
                   name,
-                  style: AppTypography.cardTitle.copyWith(fontSize: 14, fontWeight: FontWeight.w700),
+                  style: AppTypography.cardTitle.copyWith(fontSize: 14.5, fontWeight: FontWeight.w700),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -897,6 +1194,16 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                   style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.peachPrimary),
                 ),
               ),
+              if (!message.isConfirmed) ...[
+                const SizedBox(width: 6),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.tealPrimary),
+                  tooltip: 'Edit Portions / Nutrition',
+                  constraints: const BoxConstraints(),
+                  padding: const EdgeInsets.all(4),
+                  onPressed: () => _showEditMealDialog(message),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 10),
@@ -909,6 +1216,134 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               Expanded(child: _buildMacroMini('Fat', '${fat}g', const Color(0xFFEC4899))),
             ],
           ),
+          const SizedBox(height: 8),
+          // Sizing uncertainty disclaimer
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF3E0),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline_rounded, size: 13, color: Color(0xFFD97706)),
+                SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    'Estimated nutrition • Sizing approximate, not medical advice.',
+                    style: TextStyle(fontSize: 10.5, color: Color(0xFF92400E), fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Ingredients deduction section
+          if (ingredients.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Text(
+              'Ingredients & Fridge Deductions',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+            ),
+            const SizedBox(width: 2),
+            const Text(
+              'Select which ingredients came from your fridge inventory:',
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 8),
+            for (final ing in ingredients) ...[
+              if (ing is Map) ...[
+                Builder(
+                  builder: (context) {
+                    final ingName = ing['name'] as String? ?? 'Ingredient';
+                    final qtyStr = ing['quantity'] != null
+                        ? '${ing['quantity']} ${ing['unit'] ?? ''}'.trim()
+                        : '';
+                    final matchedItem = FridgeCategoryRepository.findItemByName(ingName);
+                    final isTracked = matchedItem != null;
+                    final isSelected = message.selectedDeductionIngredients.contains(ingName);
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isTracked
+                            ? (isSelected ? const Color(0xFFF0FDF4) : Colors.white)
+                            : const Color(0xFFFAFAFA),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isTracked
+                              ? (isSelected ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0))
+                              : const Color(0xFFE2E8F0),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          if (isTracked) ...[
+                            Checkbox(
+                              value: isSelected,
+                              onChanged: message.isConfirmed
+                                  ? null
+                                  : (_) => _toggleIngredientDeduction(message, ingName),
+                              activeColor: AppColors.tealPrimary,
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            const SizedBox(width: 4),
+                          ] else ...[
+                            const SizedBox(width: 6),
+                            const Icon(Icons.circle_outlined, size: 14, color: Color(0xFF94A3B8)),
+                            const SizedBox(width: 8),
+                          ],
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  qtyStr.isNotEmpty ? '$ingName ($qtyStr)' : ingName,
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5),
+                                ),
+                                if (isTracked)
+                                  Text(
+                                    'In fridge: ${matchedItem.quantity}',
+                                    style: const TextStyle(
+                                      fontSize: 10.5,
+                                      color: AppColors.tealPrimary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  )
+                                else
+                                  const Text(
+                                    'Pantry / External',
+                                    style: TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          if (isTracked)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isSelected ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                isSelected ? 'Will deduct' : 'Keep',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: isSelected ? const Color(0xFF166534) : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ],
+          ],
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,

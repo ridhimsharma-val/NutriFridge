@@ -15,6 +15,7 @@ class AiChatMessage {
   final List<Map<String, dynamic>> inventoryItems;
   final Map<String, dynamic>? meal;
   final List<Map<String, dynamic>> suggestedDeductions;
+  final Set<String> selectedDeductionIngredients;
   final String? attachedImageBase64;
 
   const AiChatMessage({
@@ -30,6 +31,7 @@ class AiChatMessage {
     this.inventoryItems = const [],
     this.meal,
     this.suggestedDeductions = const [],
+    this.selectedDeductionIngredients = const {},
     this.attachedImageBase64,
   });
 
@@ -46,6 +48,7 @@ class AiChatMessage {
     List<Map<String, dynamic>>? inventoryItems,
     Map<String, dynamic>? meal,
     List<Map<String, dynamic>>? suggestedDeductions,
+    Set<String>? selectedDeductionIngredients,
     String? attachedImageBase64,
   }) {
     return AiChatMessage(
@@ -61,6 +64,8 @@ class AiChatMessage {
       inventoryItems: inventoryItems ?? this.inventoryItems,
       meal: meal ?? this.meal,
       suggestedDeductions: suggestedDeductions ?? this.suggestedDeductions,
+      selectedDeductionIngredients:
+          selectedDeductionIngredients ?? this.selectedDeductionIngredients,
       attachedImageBase64: attachedImageBase64 ?? this.attachedImageBase64,
     );
   }
