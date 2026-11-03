@@ -3124,5 +3124,36 @@ void main() {
       // Verify inventory was NOT touched
       expect(FridgeCategoryRepository.findItemByName('Apple'), isNotNull);
     });
+
+    // NUTRIFRIDGE AI — MICROPHONE BUTTON IN COMPOSER
+    testWidgets('AI Assistant Screen - Microphone button in composer displays coming soon SnackBar', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(const MaterialApp(home: AiAssistantScreen()));
+      await tester.pumpAndSettle();
+
+      // 1. Verify composer elements layout: Camera, Microphone, Text Field, Send
+      expect(find.byIcon(Icons.camera_alt_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.mic_none_rounded), findsOneWidget);
+      expect(find.byType(TextField), findsOneWidget);
+      expect(find.byIcon(Icons.arrow_upward_rounded), findsOneWidget);
+
+      // 2. Tap microphone icon button
+      await tester.tap(find.byIcon(Icons.mic_none_rounded));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // 3. Verify placeholder message is displayed
+      expect(find.text('Voice input is coming soon!'), findsOneWidget);
+
+      // 4. Verify text input still functions normally
+      await tester.enterText(find.byType(TextField), 'Hello AI');
+      expect(find.text('Hello AI'), findsOneWidget);
+    });
   });
 }

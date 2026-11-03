@@ -98,6 +98,30 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     }
   }
 
+  void _handleVoiceInputPlaceholder() {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Row(
+          children: [
+            Icon(Icons.mic_none_rounded, color: Colors.white, size: 20),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Voice input is coming soon!',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: AppColors.tealPrimary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   void _retryLastUserMessage() {
     for (int i = _messages.length - 1; i >= 0; i--) {
       if (_messages[i].isUser) {
@@ -2324,10 +2348,17 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             ],
           ),
 
+          // Microphone Button (Voice Input Placeholder)
+          IconButton(
+            icon: const Icon(Icons.mic_none_rounded, color: AppColors.tealPrimary),
+            tooltip: 'Voice Input',
+            onPressed: _handleVoiceInputPlaceholder,
+          ),
+
           // Text Field
           Expanded(
             child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 6),
+              margin: const EdgeInsets.symmetric(horizontal: 4),
               padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
                 color: const Color(0xFFF1F5F2),
