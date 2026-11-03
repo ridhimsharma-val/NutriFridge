@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import '../screens/fridge/models/category_item.dart';
+import '../screens/home/services/meal_recommendation_service.dart';
 import '../screens/profile/models/user_profile_data.dart';
 import 'notification_data.dart';
 
@@ -19,22 +19,36 @@ class RecipeRecommendation {
   final String title;
   final int calories;
   final int proteinGrams;
+  final int carbsGrams;
+  final int fatGrams;
+  final int prepTimeMinutes;
   final int fridgeItemsUsed;
   final String tag;
+  final String mealType;
   final String imageUrl;
   final List<String> matchReasons;
+  final List<String> requiredIngredients;
+  final List<String> missingIngredients;
+  final String? explanation;
 
   const RecipeRecommendation({
     required this.title,
     required this.calories,
     required this.proteinGrams,
+    this.carbsGrams = 62,
+    this.fatGrams = 18,
+    this.prepTimeMinutes = 20,
     required this.fridgeItemsUsed,
     this.tag = 'Picked for your fridge',
+    this.mealType = '',
     required this.imageUrl,
     this.matchReasons = const [
-      'Uses 4 items from your fridge',
+      'Uses items from your fridge',
       "Helps complete today's protein goal",
     ],
+    this.requiredIngredients = const [],
+    this.missingIngredients = const [],
+    this.explanation,
   });
 }
 
@@ -178,19 +192,7 @@ class MockDataRepository {
   }
 
   static RecipeRecommendation? _deriveDynamicRecommendation() {
-    // Generate recommendation only from actual confirmed fridge inventory
-    final paneer = FridgeCategoryRepository.findItemByName('Paneer');
-    if (paneer != null) {
-      return const RecipeRecommendation(
-        title: 'Paneer Rice Bowl',
-        calories: 520,
-        proteinGrams: 24,
-        fridgeItemsUsed: 1,
-        tag: 'From your fridge',
-        imageUrl: 'assets/images/paneer_rice_bowl.jpg',
-      );
-    }
-    return null;
+    return MealRecommendationService.getRecommendation();
   }
 
   static WellnessScoreData? _explicitWellness;
@@ -340,9 +342,17 @@ class MockDataRepository {
       title: 'Paneer Rice Bowl',
       calories: 520,
       proteinGrams: 24,
+      carbsGrams: 62,
+      fatGrams: 18,
+      prepTimeMinutes: 20,
       fridgeItemsUsed: 4,
       tag: 'Picked for your fridge',
       imageUrl: 'assets/images/paneer_rice_bowl.jpg',
+      matchReasons: [
+        'Uses 4 ingredients from your fridge',
+        "Helps support today's protein goal",
+      ],
+      requiredIngredients: ['Paneer', 'Rice', 'Capsicum', 'Onion'],
     );
     _explicitWellness = const WellnessScoreData(
       currentScore: 82,

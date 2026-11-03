@@ -183,7 +183,9 @@ class RecommendationCard extends StatelessWidget {
                             ],
                           ),
                           child: Text(
-                            recommendation.tag,
+                            recommendation.mealType.isNotEmpty
+                                ? recommendation.mealType.toUpperCase()
+                                : recommendation.tag,
                             style: AppTypography.badgeText.copyWith(
                               color: AppColors.textPrimary,
                               fontWeight: FontWeight.w600,
@@ -239,25 +241,19 @@ class RecommendationCard extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text(
-                                      'Uses 4 items from your fridge',
-                                      style: AppTypography.badgeText.copyWith(
-                                        color: AppColors.tealPrimary,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 11,
+                                    for (final reason in recommendation.matchReasons) ...[
+                                      Text(
+                                        reason,
+                                        style: AppTypography.badgeText.copyWith(
+                                          color: AppColors.tealPrimary,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 11,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      "Helps complete today's protein goal",
-                                      style: AppTypography.badgeText.copyWith(
-                                        color: AppColors.tealPrimary,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 11,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+                                      if (reason != recommendation.matchReasons.last)
+                                        const SizedBox(height: 3),
+                                    ],
                                   ],
                                 ),
                               ),

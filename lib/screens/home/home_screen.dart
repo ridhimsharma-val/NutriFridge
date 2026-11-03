@@ -3,6 +3,7 @@ import '../../core/transitions/hero_transition_route.dart';
 import '../../models/notification_data.dart';
 import '../../models/nutrition_data.dart';
 import '../ai_assistant/ai_assistant_screen.dart';
+import '../fridge/models/category_item.dart';
 import '../meal_detail/meal_detail_screen.dart';
 import 'widgets/dashboard_header.dart';
 import 'widgets/meal_status_card.dart';
@@ -28,6 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
       listenable: Listenable.merge([
         MockDataRepository.notifier,
         NotificationRepository.notifier,
+        FridgeCategoryRepository.notifier,
       ]),
       builder: (context, _) {
         final recommendation = MockDataRepository.recommendation;

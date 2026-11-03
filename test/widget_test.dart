@@ -19,6 +19,8 @@ import 'package:nutrifridge/screens/fridge/models/fridge_preferences.dart';
 import 'package:nutrifridge/screens/ai_assistant/ai_assistant_screen.dart';
 import 'package:nutrifridge/screens/ai_assistant/services/ai_assistant_service.dart';
 import 'package:nutrifridge/screens/fridge/widgets/food_details_sheet.dart';
+import 'package:nutrifridge/screens/home/services/meal_recommendation_service.dart';
+import 'package:nutrifridge/screens/profile/models/user_profile_data.dart';
 
 import 'package:nutrifridge/screens/add_food/add_food_page.dart';
 import 'package:nutrifridge/screens/home/home_screen.dart';
@@ -28,6 +30,7 @@ void main() {
     FridgeCategoryRepository.reset();
     FridgePreferencesRepository.reset();
     MockDataRepository.reset();
+    MealRecommendationService.resetClock();
     AiAssistantService.resetSession();
     AppImagePicker.mockHandler = (source) async {
       return XFile.fromData(AppImagePicker.sampleMockBytes, name: 'test_photo.png');
@@ -3156,6 +3159,221 @@ void main() {
       // 4. Verify text input still functions normally
       await tester.enterText(find.byType(TextField), 'Hello AI');
       expect(find.text('Hello AI'), findsOneWidget);
+    });
+  });
+
+  // NUTRIFRIDGE — DYNAMIC AND TIME-AWARE HOME MEAL RECOMMENDATIONS
+  group('Time-Aware Dynamic Meal Recommendations', () {
+    setUp(() {
+      FridgeCategoryRepository.reset();
+      MockDataRepository.reset();
+      MealRecommendationService.resetClock();
+    });
+
+    test('Meal slot determination across 24-hour cycle', () {
+      // Breakfast: 05:00 - 10:59
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 5, 0)), MealTimeSlot.breakfast);
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 8, 30)), MealTimeSlot.breakfast);
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 10, 59)), MealTimeSlot.breakfast);
+
+      // Lunch: 11:00 - 15:59
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 11, 0)), MealTimeSlot.lunch);
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 13, 0)), MealTimeSlot.lunch);
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 15, 59)), MealTimeSlot.lunch);
+
+      // Snack: 16:00 - 18:59
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 16, 0)), MealTimeSlot.snack);
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 17, 30)), MealTimeSlot.snack);
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 18, 59)), MealTimeSlot.snack);
+
+      // Dinner: 19:00 - 04:59 (including late night)
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 19, 0)), MealTimeSlot.dinner);
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 21, 30)), MealTimeSlot.dinner);
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 23, 59)), MealTimeSlot.dinner);
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 1, 30)), MealTimeSlot.dinner);
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 4, 59)), MealTimeSlot.dinner);
+    });
+
+    test('Empty fridge returns null recommendation', () {
+      FridgeCategoryRepository.reset();
+      expect(FridgeCategoryRepository.totalFridgeItems, 0);
+      final rec = MealRecommendationService.getRecommendation();
+      expect(rec, isNull);
+    });
+
+    test('Time slot selection generates matching meal type and high-quality photo asset', () {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+
+      // 1. Morning Breakfast
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 8, 0);
+      final bRec = MealRecommendationService.getRecommendation();
+      expect(bRec, isNotNull);
+      expect(bRec!.mealType, 'BREAKFAST');
+      expect(bRec.imageUrl, startsWith('assets/images/'));
+
+      // 2. Afternoon Lunch
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 13, 0);
+      final lRec = MealRecommendationService.getRecommendation();
+      expect(lRec, isNotNull);
+      expect(lRec!.mealType, 'LUNCH');
+      expect(lRec.imageUrl, startsWith('assets/images/'));
+
+      // 3. Evening Snack
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 17, 0);
+      final sRec = MealRecommendationService.getRecommendation();
+      expect(sRec, isNotNull);
+      expect(sRec!.mealType, 'SNACK');
+      expect(sRec.imageUrl, startsWith('assets/images/'));
+
+      // 4. Night Dinner
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 20, 0);
+      final dRec = MealRecommendationService.getRecommendation();
+      expect(dRec, isNotNull);
+      expect(dRec!.mealType, 'DINNER');
+      expect(dRec.imageUrl, startsWith('assets/images/'));
+    });
+
+    test('Dietary preferences and allergy restrictions are strictly enforced', () {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 13, 0);
+
+      // Vegetarian profile rejects non-veg dishes
+      MockDataRepository.updateProfile(
+        const UserProfileData(
+          displayName: 'Test Veg',
+          dietaryPreference: 'Vegetarian',
+          nutritionGoal: null,
+          dailyCalorieTarget: null,
+          allergies: {},
+          avoidedFoods: {},
+          customRestrictions: [],
+          mealRemindersEnabled: false,
+          expiryAlertsEnabled: false,
+        ),
+      );
+      final vegRec = MealRecommendationService.getRecommendation();
+      expect(vegRec, isNotNull);
+      expect(vegRec!.title, isNot('Grilled Chicken Salad'));
+      expect(vegRec.title, isNot('Pan-Seared Fish with Greens'));
+
+      // Nut allergy rejects nut-containing meals
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 17, 0);
+      MockDataRepository.updateProfile(
+        const UserProfileData(
+          displayName: 'Test Allergy',
+          dietaryPreference: null,
+          nutritionGoal: null,
+          dailyCalorieTarget: null,
+          allergies: {'Peanuts'},
+          avoidedFoods: {},
+          customRestrictions: [],
+          mealRemindersEnabled: false,
+          expiryAlertsEnabled: false,
+        ),
+      );
+      final allergyRec = MealRecommendationService.getRecommendation();
+      expect(allergyRec, isNotNull);
+      expect(allergyRec!.title, isNot('Peanut Butter Apple Slices'));
+      expect(allergyRec.title, isNot('Nut & Dry Fruit Energy Mix'));
+    });
+
+    testWidgets('Empty fridge inventory shows empty state card on Dashboard', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      FridgeCategoryRepository.reset();
+      MockDataRepository.reset();
+
+      await tester.pumpWidget(const NutriFridgeApp());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Suggested for you'), findsOneWidget);
+      expect(find.text('Your next meal starts with your fridge.'), findsOneWidget);
+      expect(find.text('Add a few ingredients and NutriFridge AI can help you decide what to cook.'), findsOneWidget);
+      expect(find.text('Ask NutriFridge AI'), findsOneWidget);
+    });
+
+    testWidgets('Dashboard dynamically updates recommendation when inventory is added', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      FridgeCategoryRepository.reset();
+      MockDataRepository.reset();
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 8, 30);
+
+      await tester.pumpWidget(const NutriFridgeApp());
+      await tester.pumpAndSettle();
+
+      // Initially empty state
+      expect(find.text('Your next meal starts with your fridge.'), findsOneWidget);
+      expect(find.text('BREAKFAST'), findsNothing);
+
+      // Dynamically add breakfast ingredients to the fridge
+      FridgeCategoryRepository.addItemToCategory(
+        'Fruits',
+        const CategoryFoodItem(
+          id: 'dyn_banana',
+          name: 'Banana',
+          quantity: '3 pieces',
+          expiryDays: 2,
+        ),
+      );
+      FridgeCategoryRepository.addItemToCategory(
+        'Dairy Products',
+        const CategoryFoodItem(
+          id: 'dyn_milk',
+          name: 'Milk',
+          quantity: '500 ml',
+          expiryDays: 2,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Recommendation card is dynamically rendered with BREAKFAST badge
+      expect(find.text('BREAKFAST'), findsOneWidget);
+      expect(find.text('Banana Oat Smoothie'), findsOneWidget);
+      expect(find.text('Your next meal starts with your fridge.'), findsNothing);
+    });
+
+    testWidgets('Dynamic recommendation Hero transition and meal detail handoff', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 13, 0);
+
+      await tester.pumpWidget(const NutriFridgeApp());
+      await tester.pumpAndSettle();
+
+      // Find recommendation card
+      expect(find.byType(RecommendationCard), findsOneWidget);
+      expect(find.text('LUNCH'), findsOneWidget);
+
+      // Tap recommendation card -> navigates to MealDetailScreen
+      await tester.tap(find.byType(RecommendationCard));
+      await tester.pumpAndSettle();
+
+      // Verify MealDetailScreen loaded with dynamic ingredients & AI recipe CTA
+      expect(find.text('Ingredients'), findsOneWidget);
+      expect(find.text('Cook it your way'), findsOneWidget);
+      expect(find.text('Get AI Recipe'), findsOneWidget);
+
+      // Tap back -> back to dashboard
+      await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+      await tester.pumpAndSettle();
+      expect(find.text('Suggested for you'), findsOneWidget);
     });
   });
 }

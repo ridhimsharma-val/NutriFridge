@@ -1,5 +1,6 @@
 import '../../../models/nutrition_data.dart';
 import '../../fridge/models/category_item.dart';
+import '../../home/services/meal_recommendation_service.dart';
 import 'recipe_video_item.dart';
 
 /// Inventory availability status for a recipe ingredient.
@@ -55,64 +56,57 @@ class MealDetailInfo {
   /// Derives detailed meal information from the dashboard [RecipeRecommendation],
   /// cross-referencing [FridgeCategoryRepository] for real-time inventory tracking.
   factory MealDetailInfo.fromRecommendation(RecipeRecommendation rec) {
-    // 1. Check Paneer in fridge inventory
-    final paneerItem = FridgeCategoryRepository.findItemByName('Paneer', exact: true);
-    final paneerIngredient = MealIngredientItem(
-      name: 'Paneer',
-      recipeQuantity: '150 g diced',
-      availability: paneerItem != null
-          ? IngredientAvailability.available
-          : IngredientAvailability.notTracked,
-      statusLabel: paneerItem != null
-          ? 'In fridge · ${paneerItem.quantity}'
-          : 'Not in fridge',
-    );
+    List<String> ingredientsToResolve = rec.requiredIngredients;
+    if (ingredientsToResolve.isEmpty) {
+      final catalogMatch = MealRecommendationService.recipeCatalog
+          .where((r) => r.title.toLowerCase() == rec.title.toLowerCase())
+          .firstOrNull;
+      if (catalogMatch != null) {
+        ingredientsToResolve = catalogMatch.requiredIngredients;
+      } else {
+        ingredientsToResolve = const ['Paneer', 'Rice', 'Capsicum', 'Onion'];
+      }
+    }
 
-    // 2. Check Rice (Pantry staple / leftover rice)
-    final riceItem = FridgeCategoryRepository.findItemByName('Rice', exact: true);
-    final riceIngredient = MealIngredientItem(
-      name: 'Rice',
-      recipeQuantity: '1 cooked bowl',
-      availability: riceItem != null
-          ? IngredientAvailability.available
-          : IngredientAvailability.partial,
-      statusLabel: riceItem != null
-          ? 'In fridge · ${riceItem.quantity}'
-          : 'Available in pantry',
-    );
+    final resolvedIngredients = <MealIngredientItem>[];
+    for (final ingName in ingredientsToResolve) {
+      final foundItem = FridgeCategoryRepository.findItemByName(ingName, exact: true);
+      if (foundItem != null) {
+        resolvedIngredients.add(
+          MealIngredientItem(
+            name: ingName,
+            recipeQuantity: foundItem.quantity,
+            availability: IngredientAvailability.available,
+            statusLabel: 'In fridge · ${foundItem.quantity}',
+          ),
+        );
+      } else if (ingName.toLowerCase() == 'rice') {
+        resolvedIngredients.add(
+          const MealIngredientItem(
+            name: 'Rice',
+            recipeQuantity: '1 cooked bowl',
+            availability: IngredientAvailability.partial,
+            statusLabel: 'Available in pantry',
+          ),
+        );
+      } else {
+        resolvedIngredients.add(
+          MealIngredientItem(
+            name: ingName,
+            recipeQuantity: '1 medium chopped',
+            availability: IngredientAvailability.notTracked,
+            statusLabel: 'Not in fridge',
+          ),
+        );
+      }
+    }
 
-    // 3. Check Capsicum in fridge inventory
-    final capsicumItem = FridgeCategoryRepository.findItemByName('Capsicum', exact: true);
-    final capsicumIngredient = MealIngredientItem(
-      name: 'Capsicum',
-      recipeQuantity: '1 sliced',
-      availability: capsicumItem != null
-          ? IngredientAvailability.available
-          : IngredientAvailability.notTracked,
-      statusLabel: capsicumItem != null
-          ? 'In fridge · ${capsicumItem.quantity}'
-          : 'Not in fridge',
-    );
-
-    // 4. Check Onion in fridge inventory
-    final onionItem = FridgeCategoryRepository.findItemByName('Onion', exact: true);
-    final onionIngredient = MealIngredientItem(
-      name: 'Onion',
-      recipeQuantity: '1 medium chopped',
-      availability: onionItem != null
-          ? IngredientAvailability.available
-          : IngredientAvailability.notTracked,
-      statusLabel: onionItem != null
-          ? 'In fridge · ${onionItem.quantity}'
-          : 'Not in fridge',
-    );
-
-    final resolvedIngredients = [
-      paneerIngredient,
-      riceIngredient,
-      capsicumIngredient,
-      onionIngredient,
-    ];
+    final reasons = rec.matchReasons.isNotEmpty
+        ? rec.matchReasons
+        : [
+            'Uses ${rec.fridgeItemsUsed > 0 ? rec.fridgeItemsUsed : 4} ingredients from your fridge',
+            "Helps support today's protein goal",
+          ];
 
     return MealDetailInfo(
       name: rec.title,
@@ -120,14 +114,12 @@ class MealDetailInfo {
       imageUrl: rec.imageUrl,
       calories: rec.calories,
       proteinGrams: rec.proteinGrams,
-      carbsGrams: 62,
-      fatGrams: 18,
-      prepTimeMinutes: 20,
-      whyReasons: [
-        'Uses ${rec.fridgeItemsUsed > 0 ? rec.fridgeItemsUsed : 4} ingredients from your fridge',
-        "Helps support today's protein goal",
-      ],
+      carbsGrams: rec.carbsGrams,
+      fatGrams: rec.fatGrams,
+      prepTimeMinutes: rec.prepTimeMinutes,
+      whyReasons: reasons,
       ingredients: resolvedIngredients,
+      videos: const [],
     );
   }
 }

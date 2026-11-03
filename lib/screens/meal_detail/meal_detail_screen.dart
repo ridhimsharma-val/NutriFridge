@@ -542,16 +542,19 @@ class MealDetailScreen extends StatelessWidget {
           const SizedBox(width: 8),
 
           // Inventory Status Label (subtle text, not large colored badges)
-          Text(
-            item.statusLabel,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: item.availability == IngredientAvailability.available
-                  ? AppColors.tealPrimary
-                  : (item.availability == IngredientAvailability.partial
-                      ? AppColors.amberPrimary
-                      : AppColors.textTertiary),
+          Flexible(
+            child: Text(
+              item.statusLabel,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: item.availability == IngredientAvailability.available
+                    ? AppColors.tealPrimary
+                    : (item.availability == IngredientAvailability.partial
+                        ? AppColors.amberPrimary
+                        : AppColors.textTertiary),
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
