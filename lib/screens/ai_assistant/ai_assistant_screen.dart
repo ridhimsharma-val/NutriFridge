@@ -34,14 +34,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   String? _selectedImageMimeType;
   String? _selectedImageName;
 
-  static const List<String> _quickPrompts = [
-    'Add 2 apples and 1 litre of milk to my fridge',
-    'I ate two chapatis and a bowl of dal for lunch',
-    'I bought 500 g tomatoes and 250 g paneer',
-    'Log my breakfast: oats, milk and a banana',
-    'Remove milk and apples from my fridge',
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -640,10 +632,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Quick suggestions chips
-            _buildQuickPromptsBar(),
-            const Divider(height: 1, thickness: 1, color: Color(0xFFE2EBE5)),
-
             // Messages timeline
             Expanded(
               child: ListView.builder(
@@ -760,34 +748,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           },
         ),
       ],
-    );
-  }
-
-  Widget _buildQuickPromptsBar() {
-    return Container(
-      height: 48,
-      color: Colors.white,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        itemCount: _quickPrompts.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final prompt = _quickPrompts[index];
-          return ActionChip(
-            label: Text(
-              prompt,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.tealPrimary),
-            ),
-            backgroundColor: AppColors.tealSurface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: const BorderSide(color: Color(0xFFC8E6C9), width: 1),
-            ),
-            onPressed: () => _handleSend(promptOverride: prompt),
-          );
-        },
-      ),
     );
   }
 

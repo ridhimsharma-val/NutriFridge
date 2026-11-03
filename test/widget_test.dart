@@ -1957,12 +1957,13 @@ void main() {
     expect(find.text('NutriFridge AI'), findsOneWidget);
     expect(find.textContaining('I can help manage your fridge and track what you eat'), findsOneWidget);
 
-    // 2. Test Quick Prompts
-    expect(find.text('Add 2 apples and 1 litre of milk to my fridge'), findsOneWidget);
+    // 2. Verify suggestion chips are completely removed
+    expect(find.byType(ActionChip), findsNothing);
 
-    // 3. Test Add Food flow via prompt
+    // 3. Test Add Food flow via message composer
     final initialFridgeTotal = FridgeCategoryRepository.totalFridgeItems;
-    await tester.tap(find.text('Add 2 apples and 1 litre of milk to my fridge'));
+    await tester.enterText(find.byType(TextField), 'Add 2 apples and 1 litre of milk to my fridge');
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
     await tester.pumpAndSettle();
 
     expect(find.text('Proposed Fridge Additions'), findsOneWidget);
