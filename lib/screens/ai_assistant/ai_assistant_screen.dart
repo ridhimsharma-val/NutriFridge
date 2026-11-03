@@ -30,6 +30,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   final List<AiChatMessage> _messages = [];
   bool _isSending = false;
+  bool _isConfirmingInventory = false;
   String? _selectedImageBase64;
   String? _selectedImageMimeType;
   String? _selectedImageName;
@@ -147,14 +148,29 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         (response['assistantMessage'] as String?) ?? 'Processed your request.';
     final String action = (response['action'] as String?) ?? 'assistant_reply';
     final bool requiresConfirmation = (response['requiresConfirmation'] as bool?) ?? false;
-    final bool needsClarification = (response['needsClarification'] as bool?) ?? false;
-    final String? clarifyingQuestion = response['clarifyingQuestion'] as String?;
+    bool needsClarification = (response['needsClarification'] as bool?) ?? false;
+    String? clarifyingQuestion = response['clarifyingQuestion'] as String?;
 
     final List<Map<String, dynamic>> inventoryItems = [];
     if (response['inventoryItems'] is List) {
       for (final it in response['inventoryItems']) {
         if (it is Map) {
           inventoryItems.add(Map<String, dynamic>.from(it));
+        }
+      }
+    }
+
+    // If Gemini proposes items with missing or ambiguous quantity, ask for clarification
+    if (action == 'add_inventory_items' && inventoryItems.isNotEmpty) {
+      for (final it in inventoryItems) {
+        final rawQty = it['quantity'];
+        if (rawQty == null || (rawQty is num && rawQty <= 0) || (rawQty is String && rawQty.trim().isEmpty)) {
+          needsClarification = true;
+          final itemName = (it['name'] as String?) ?? 'food item';
+          clarifyingQuestion =
+              'How much $itemName would you like to add? Please specify the quantity and unit.';
+          inventoryItems.clear();
+          break;
         }
       }
     }
@@ -209,6 +225,127 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     });
 
     _scrollToBottom();
+  }
+
+  static num _parseQuantity(dynamic q) {
+    if (q is num) return q;
+    if (q is String) {
+      final clean = RegExp(r'([0-9]+(?:\.[0-9]+)?)').firstMatch(q);
+      if (clean != null) {
+        return num.tryParse(clean.group(1)!) ?? 1;
+      }
+    }
+    return 1;
+  }
+
+  static String _parseUnit(dynamic u) {
+    if (u is String && u.trim().isNotEmpty) {
+      return u.trim();
+    }
+    return 'piece';
+  }
+
+  static num _getStepForUnit(String unit, [num? currentVal]) {
+    final u = unit.trim().toLowerCase();
+    if (u == 'g' || u == 'gram' || u == 'grams') return 50;
+    if (u == 'ml' || u == 'millilitre' || u == 'millilitres') return 50;
+    if (u == 'kg' || u == 'kilogram' || u == 'kilograms') return 0.1;
+    if (u == 'l' || u == 'litre' || u == 'litres' || u == 'liter' || u == 'liters') {
+      if (currentVal != null && (currentVal % 0.5 != 0) && (currentVal % 0.25 == 0)) {
+        return 0.25;
+      }
+      return 0.5;
+    }
+    return 1;
+  }
+
+  static num _getMinForUnit(String unit, [num? currentVal]) {
+    final u = unit.trim().toLowerCase();
+    if (u == 'g' || u == 'gram' || u == 'grams') return 50;
+    if (u == 'ml' || u == 'millilitre' || u == 'millilitres') return 50;
+    if (u == 'kg' || u == 'kilogram' || u == 'kilograms') return 0.1;
+    if (u == 'l' || u == 'litre' || u == 'litres' || u == 'liter' || u == 'liters') {
+      if (currentVal != null && currentVal > 0 && currentVal < 0.5) return currentVal;
+      return 0.5;
+    }
+    return 1;
+  }
+
+  void _incrementProposedItem(AiChatMessage message, int itemIndex) {
+    if (message.isConfirmed) return;
+    final msgIdx = _messages.indexWhere((m) => m.id == message.id);
+    if (msgIdx == -1) return;
+
+    final updatedList = List<Map<String, dynamic>>.from(
+      message.inventoryItems.map((it) => Map<String, dynamic>.from(it)),
+    );
+    if (itemIndex < 0 || itemIndex >= updatedList.length) return;
+
+    final item = updatedList[itemIndex];
+    final currentQty = _parseQuantity(item['quantity']);
+    final unit = _parseUnit(item['unit']);
+    final step = _getStepForUnit(unit, currentQty);
+
+    num newQty = currentQty + step;
+    if (step is double || currentQty is double) {
+      newQty = double.parse(newQty.toStringAsFixed(2));
+      if (newQty == newQty.roundToDouble()) {
+        newQty = newQty.toInt();
+      }
+    } else {
+      newQty = newQty.toInt();
+    }
+
+    item['quantity'] = newQty;
+    updatedList[itemIndex] = item;
+
+    setState(() {
+      _messages[msgIdx] = _messages[msgIdx].copyWith(inventoryItems: updatedList);
+      _syncSession();
+    });
+  }
+
+  void _decrementProposedItem(AiChatMessage message, int itemIndex) {
+    if (message.isConfirmed) return;
+    final msgIdx = _messages.indexWhere((m) => m.id == message.id);
+    if (msgIdx == -1) return;
+
+    final updatedList = List<Map<String, dynamic>>.from(
+      message.inventoryItems.map((it) => Map<String, dynamic>.from(it)),
+    );
+    if (itemIndex < 0 || itemIndex >= updatedList.length) return;
+
+    final item = updatedList[itemIndex];
+    final currentQty = _parseQuantity(item['quantity']);
+    final unit = _parseUnit(item['unit']);
+    final minVal = _getMinForUnit(unit, currentQty);
+    final step = _getStepForUnit(unit, currentQty);
+
+    if (currentQty <= minVal) {
+      return;
+    }
+
+    num newQty = currentQty - step;
+    if (newQty < minVal) {
+      newQty = minVal;
+    }
+
+    if (step is double || currentQty is double) {
+      newQty = double.parse(newQty.toStringAsFixed(2));
+      if (newQty == newQty.roundToDouble()) {
+        newQty = newQty.toInt();
+      }
+    } else {
+      newQty = newQty.toInt();
+    }
+
+    item['quantity'] = newQty;
+    updatedList[itemIndex] = item;
+
+    setState(() {
+      _messages[msgIdx] = _messages[msgIdx].copyWith(inventoryItems: updatedList);
+      _syncSession();
+    });
   }
 
   void _removeItemFromProposedAdditions(AiChatMessage message, int indexToRemove) {
@@ -443,54 +580,68 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   }
 
   void _confirmAddInventory(AiChatMessage message) {
-    if (message.inventoryItems.isEmpty) return;
+    if (_isConfirmingInventory || message.isConfirmed || message.inventoryItems.isEmpty) return;
 
-    for (final itemJson in message.inventoryItems) {
-      final name = itemJson['name'] as String? ?? 'Food Item';
-      final category = itemJson['category'] as String? ?? 'Others';
-      final quantity = itemJson['quantity'] != null
-          ? '${itemJson['quantity']} ${itemJson['unit'] ?? ''}'.trim()
-          : '1 item';
-      final expiryDays = (itemJson['expiryDaysEstimate'] as num?)?.toInt() ?? 5;
+    setState(() {
+      _isConfirmingInventory = true;
+    });
 
-      final newItem = CategoryFoodItem(
-        id: 'item_${DateTime.now().millisecondsSinceEpoch}_$name',
-        name: name,
-        quantity: quantity,
-        expiryDays: expiryDays,
-      );
+    try {
+      int addedCount = 0;
+      for (final itemJson in message.inventoryItems) {
+        final name = itemJson['name'] as String? ?? 'Food Item';
+        final category = itemJson['category'] as String? ?? 'Others';
+        final qty = _parseQuantity(itemJson['quantity']);
+        final unit = _parseUnit(itemJson['unit']);
+        final expiryDays = (itemJson['expiryDaysEstimate'] as num?)?.toInt() ?? 5;
+        final imageAsset = itemJson['imageAsset'] as String?;
 
-      FridgeCategoryRepository.addItemToCategory(category, newItem);
-    }
+        FridgeCategoryRepository.addOrMergeItem(
+          categoryName: category,
+          name: name,
+          quantity: qty,
+          unit: unit,
+          expiryDays: expiryDays,
+          imageAsset: imageAsset,
+        );
+        addedCount++;
+      }
 
-    final index = _messages.indexWhere((m) => m.id == message.id);
-    if (index != -1) {
-      setState(() {
-        _messages[index] = _messages[index].copyWith(isConfirmed: true);
-        _syncSession();
-      });
-    }
+      final index = _messages.indexWhere((m) => m.id == message.id);
+      if (index != -1) {
+        setState(() {
+          _messages[index] = _messages[index].copyWith(isConfirmed: true);
+          _syncSession();
+        });
+      }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Added ${message.inventoryItems.length} items to your fridge!',
-                style: const TextStyle(fontWeight: FontWeight.w600),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Added $addedCount ${addedCount == 1 ? 'item' : 'items'} to your fridge!',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
+          backgroundColor: AppColors.tealPrimary,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 3),
         ),
-        backgroundColor: AppColors.tealPrimary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isConfirmingInventory = false;
+        });
+      }
+    }
   }
 
   void _confirmRemoveInventory(AiChatMessage message) {
@@ -854,7 +1005,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               ),
 
               // Embedded Action: Add Inventory Items
-              if (message.action == 'add_inventory_items' && message.inventoryItems.isNotEmpty) ...[
+              if (message.action == 'add_inventory_items' &&
+                  (message.inventoryItems.isNotEmpty || message.requiresConfirmation)) ...[
                 const SizedBox(height: 14),
                 _buildInventoryActionCard(message),
               ],
@@ -904,6 +1056,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   }
 
   Widget _buildInventoryActionCard(AiChatMessage message) {
+    final hasItems = message.inventoryItems.isNotEmpty;
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.cardCream,
@@ -925,7 +1079,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (!message.isConfirmed)
+              if (!message.isConfirmed && hasItems)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
@@ -940,91 +1094,228 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             ],
           ),
           const SizedBox(height: 10),
-          for (int i = 0; i < message.inventoryItems.length; i++) ...[
-            Builder(
-              builder: (context) {
-                final item = message.inventoryItems[i];
-                final name = item['name'] ?? 'Item';
-                final cat = item['category'] ?? 'Others';
-                final qty = item['quantity'] != null ? '${item['quantity']} ${item['unit'] ?? ''}'.trim() : '1 item';
-                final exp = (item['expiryDaysEstimate'] as num?)?.toInt() ?? 5;
+          if (!hasItems)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE8E2D9), width: 0.8),
+              ),
+              child: const Center(
+                child: Text(
+                  'All proposed items have been dismissed.',
+                  style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                ),
+              ),
+            )
+          else
+            for (int i = 0; i < message.inventoryItems.length; i++) ...[
+              Builder(
+                builder: (context) {
+                  final item = message.inventoryItems[i];
+                  final name = item['name'] ?? 'Item';
+                  final cat = item['category'] ?? 'Others';
+                  final qty = _parseQuantity(item['quantity']);
+                  final unit = _parseUnit(item['unit']);
+                  final exp = (item['expiryDaysEstimate'] as num?)?.toInt() ?? 5;
+                  final formattedQty = FridgeCategoryRepository.formatQuantity(qty, unit);
+                  final minVal = _getMinForUnit(unit, qty);
+                  final canDecrease = !message.isConfirmed && (qty > minVal);
 
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFE8E2D9), width: 0.8),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
-                          color: AppColors.tealPrimary,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
+                  return Container(
+                    key: ValueKey('proposed_item_${name}_$i'),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE8E2D9), width: 0.8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              name,
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                            Container(
+                              margin: const EdgeInsets.only(top: 4),
+                              width: 7,
+                              height: 7,
+                              decoration: const BoxDecoration(
+                                color: AppColors.tealPrimary,
+                                shape: BoxShape.circle,
+                              ),
                             ),
-                            Text(
-                              '$qty • $cat',
-                              style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                                  ),
+                                  const SizedBox(height: 1),
+                                  Text(
+                                    cat,
+                                    style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                                  ),
+                                ],
+                              ),
                             ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEDF7ED),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Expires in $exp d',
+                                style: const TextStyle(fontSize: 10, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            if (!message.isConfirmed) ...[
+                              const SizedBox(width: 4),
+                              InkWell(
+                                key: ValueKey('remove_proposed_${name}_$i'),
+                                onTap: () => _removeItemFromProposedAdditions(message, i),
+                                borderRadius: BorderRadius.circular(12),
+                                child: const Padding(
+                                  padding: EdgeInsets.all(4),
+                                  child: Icon(Icons.close_rounded, size: 16, color: Color(0xFF94A3B8)),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEDF7ED),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'Expires in $exp d',
-                          style: const TextStyle(fontSize: 10, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      if (!message.isConfirmed) ...[
-                        const SizedBox(width: 4),
-                        InkWell(
-                          onTap: () => _removeItemFromProposedAdditions(message, i),
-                          borderRadius: BorderRadius.circular(12),
-                          child: const Padding(
-                            padding: EdgeInsets.all(4),
-                            child: Icon(Icons.close_rounded, size: 16, color: Color(0xFF94A3B8)),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF7FAF8),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFE2EBE5), width: 0.8),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'Quantity to add',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              if (message.isConfirmed)
+                                Text(
+                                  formattedQty,
+                                  key: ValueKey('qty_text_${name}_$i'),
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.tealPrimary,
+                                  ),
+                                )
+                              else
+                                Row(
+                                  children: [
+                                    // Minus Button
+                                    Material(
+                                      color: canDecrease ? Colors.white : const Color(0xFFF1F5F9),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                        side: BorderSide(
+                                          color: canDecrease ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0),
+                                          width: 0.8,
+                                        ),
+                                      ),
+                                      child: InkWell(
+                                        key: ValueKey('decrease_proposed_${name}_$i'),
+                                        borderRadius: BorderRadius.circular(6),
+                                        onTap: canDecrease ? () => _decrementProposedItem(message, i) : null,
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(4.0),
+                                          child: Icon(
+                                            Icons.remove_rounded,
+                                            size: 15,
+                                            color: canDecrease ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    // Quantity display
+                                    Expanded(
+                                      child: Center(
+                                        child: Text(
+                                          formattedQty,
+                                          key: ValueKey('qty_text_${name}_$i'),
+                                          style: const TextStyle(
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF1E293B),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    // Plus Button
+                                    Material(
+                                      color: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                        side: const BorderSide(color: Color(0xFFCBD5E1), width: 0.8),
+                                      ),
+                                      child: InkWell(
+                                        key: ValueKey('increase_proposed_${name}_$i'),
+                                        borderRadius: BorderRadius.circular(6),
+                                        onTap: () => _incrementProposedItem(message, i),
+                                        child: const Padding(
+                                          padding: EdgeInsets.all(4.0),
+                                          child: Icon(
+                                            Icons.add_rounded,
+                                            size: 15,
+                                            color: Color(0xFF1E293B),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                            ],
                           ),
                         ),
                       ],
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-          const SizedBox(height: 10),
+                    ),
+                  );
+                },
+              ),
+            ],
+          const SizedBox(height: 6),
           SizedBox(
             width: double.infinity,
             height: 40,
             child: ElevatedButton.icon(
-              onPressed: (message.isConfirmed || message.inventoryItems.isEmpty)
+              onPressed: (message.isConfirmed || !hasItems || _isConfirmingInventory)
                   ? null
                   : () => _confirmAddInventory(message),
-              icon: Icon(
-                message.isConfirmed ? Icons.check_circle_rounded : Icons.add_rounded,
-                size: 18,
-              ),
+              icon: _isConfirmingInventory
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Icon(
+                      message.isConfirmed ? Icons.check_circle_rounded : Icons.add_rounded,
+                      size: 18,
+                    ),
               label: Text(
-                message.isConfirmed ? 'Added to Fridge ✓' : 'Add to Fridge',
+                message.isConfirmed
+                    ? 'Added to Fridge ✓'
+                    : (_isConfirmingInventory ? 'Adding to Fridge...' : 'Add to Fridge'),
                 style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
               ),
               style: ElevatedButton.styleFrom(

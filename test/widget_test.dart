@@ -2322,4 +2322,221 @@ void main() {
     // Sheet should be popped and item removed from active inventory!
     expect(FridgeCategoryRepository.findItemById('frt_1'), isNull);
   });
+
+  testWidgets('AI Assistant - Proposed Additions Editable Quantity Selectors & Inventory Merging Test Suite', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      AiAssistantService.mockHandler = null;
+    });
+
+    // Preset inventory: exactly 2 Apples in fridge to verify merging (Scenario 6)
+    FridgeCategoryRepository.reset();
+    FridgeCategoryRepository.addItemToCategory(
+      'Fruits',
+      const CategoryFoodItem(
+        id: 'frt_existing_apple',
+        name: 'Apple',
+        quantity: '2 pieces',
+        expiryDays: 5,
+        imageAsset: 'assets/images/foods/apple.jpg',
+      ),
+    );
+    expect(FridgeCategoryRepository.totalFridgeItems, 1);
+    expect(FridgeCategoryRepository.findItemByName('Apple')!.quantity, '2 pieces');
+
+    AiAssistantService.mockHandler = (request) async {
+      return {
+        'success': true,
+        'action': 'add_inventory_items',
+        'assistantMessage': 'I detected these food items from your grocery run:',
+        'requiresConfirmation': true,
+        'inventoryItems': [
+          {
+            'name': 'Paneer',
+            'category': 'Dairy Products',
+            'quantity': 250,
+            'unit': 'g',
+            'expiryDaysEstimate': 3,
+          },
+          {
+            'name': 'Apple',
+            'category': 'Fruits',
+            'quantity': 1,
+            'unit': 'piece',
+            'expiryDaysEstimate': 6,
+          },
+          {
+            'name': 'Carrot',
+            'category': 'Vegetables',
+            'quantity': 1,
+            'unit': 'piece',
+            'expiryDaysEstimate': 5,
+          },
+        ],
+      };
+    };
+
+    await tester.pumpWidget(const MaterialApp(home: AiAssistantScreen()));
+    await tester.pumpAndSettle();
+
+    // Send grocery prompt to get proposed additions
+    await tester.enterText(find.byType(TextField), 'Add groceries');
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    // Verify proposed card is visible
+    expect(find.text('Proposed Fridge Additions'), findsOneWidget);
+
+    // Scenario 1: Default Gemini quantities
+    // Paneer default: 250 g
+    expect(find.byKey(const ValueKey('qty_text_Paneer_0')), findsOneWidget);
+    expect(find.text('250 g'), findsOneWidget);
+    // Apple default: 1 piece, Carrot default: 1 piece
+    expect(find.byKey(const ValueKey('qty_text_Apple_1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('qty_text_Carrot_2')), findsOneWidget);
+    expect(find.text('1 piece'), findsNWidgets(2));
+
+    // Scenario 8: Trying to decrement below minimum value must be blocked
+    // Apple is at minimum (1 piece), canDecrease is false
+    await tester.tap(find.byKey(const ValueKey('decrease_proposed_Apple_1')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('qty_text_Apple_1')), findsOneWidget);
+    expect(find.text('1 piece'), findsNWidgets(2)); // Remains 1 piece!
+
+    // Scenario 2: Incrementing quantity before adding
+    // Increment Apple: 1 piece -> 2 pieces -> 3 pieces -> 4 pieces
+    await tester.tap(find.byKey(const ValueKey('increase_proposed_Apple_1')));
+    await tester.pumpAndSettle();
+    expect(find.text('2 pieces'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('increase_proposed_Apple_1')));
+    await tester.pumpAndSettle();
+    expect(find.text('3 pieces'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('increase_proposed_Apple_1')));
+    await tester.pumpAndSettle();
+    expect(find.text('4 pieces'), findsOneWidget);
+
+    // Scenario 3: Decrementing quantity before adding
+    // Paneer: 250 g increment by 50 g steps: 250 -> 300 -> 350 g
+    await tester.tap(find.byKey(const ValueKey('increase_proposed_Paneer_0')));
+    await tester.pumpAndSettle();
+    expect(find.text('300 g'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('increase_proposed_Paneer_0')));
+    await tester.pumpAndSettle();
+    expect(find.text('350 g'), findsOneWidget);
+
+    // Decrement Paneer back by 50 g: 350 -> 300 g
+    await tester.tap(find.byKey(const ValueKey('decrease_proposed_Paneer_0')));
+    await tester.pumpAndSettle();
+    expect(find.text('300 g'), findsOneWidget);
+
+    // Scenario 4: Multiple items with different increments operate independently
+    // Paneer is 300 g (50 g increments), Apple is 4 pieces (1 step increments)
+    expect(find.text('300 g'), findsOneWidget);
+    expect(find.text('4 pieces'), findsOneWidget);
+
+    // Scenario 5: Removing one item from a multi-item proposal and adding the remainder
+    // Remove Carrot (item 2)
+    await tester.tap(find.byKey(const ValueKey('remove_proposed_Carrot_2')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('qty_text_Carrot_2')), findsNothing);
+    // Paneer and Apple remain
+    expect(find.byKey(const ValueKey('qty_text_Paneer_0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('qty_text_Apple_1')), findsOneWidget);
+
+    // Scenario 9: Confirming addition disables the button and updates the fridge repository immediately
+    await tester.ensureVisible(find.text('Add to Fridge'));
+    await tester.tap(find.text('Add to Fridge'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Added to Fridge ✓'), findsOneWidget);
+    // Button is disabled when confirmed
+    final button = tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Added to Fridge ✓'));
+    expect(button.onPressed, isNull);
+
+    // Scenario 6: Merging with existing inventory (Existing 2 Apples + Added 4 Apples = 6 Apples)
+    final mergedApple = FridgeCategoryRepository.findItemByName('Apple');
+    expect(mergedApple, isNotNull);
+    expect(mergedApple!.quantity, '6 pieces');
+
+    // Scenario 7: Adding a brand new item to the fridge (Paneer was not in fridge, added with edited 300 g)
+    final addedPaneer = FridgeCategoryRepository.findItemByName('Paneer');
+    expect(addedPaneer, isNotNull);
+    expect(addedPaneer!.quantity, '300 g');
+
+    // Carrot was removed, so not in fridge
+    expect(FridgeCategoryRepository.findItemByName('Carrot'), isNull);
+
+    // Total fridge items: 2 Apples (merged into existing) + 1 Paneer = 2 items!
+    expect(FridgeCategoryRepository.totalFridgeItems, 2);
+  });
+
+  testWidgets('AI Assistant - Ambiguous quantity prompts for clarification and all-dismissed state', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      AiAssistantService.mockHandler = null;
+    });
+
+    FridgeCategoryRepository.reset();
+
+    // 1. Ambiguous quantity returned by Gemini
+    AiAssistantService.mockHandler = (request) async {
+      final msg = (request['message'] as String? ?? '').toLowerCase();
+      if (msg.contains('ambiguous')) {
+        return {
+          'success': true,
+          'action': 'add_inventory_items',
+          'assistantMessage': 'I found milk.',
+          'inventoryItems': [
+            {'name': 'Milk', 'category': 'Dairy Products', 'quantity': null, 'unit': ''},
+          ],
+        };
+      }
+      return {
+        'success': true,
+        'action': 'add_inventory_items',
+        'assistantMessage': 'Found 1 item.',
+        'requiresConfirmation': true,
+        'inventoryItems': [
+          {'name': 'Butter', 'category': 'Dairy Products', 'quantity': 100, 'unit': 'g', 'expiryDaysEstimate': 10},
+        ],
+      };
+    };
+
+    await tester.pumpWidget(const MaterialApp(home: AiAssistantScreen()));
+    await tester.pumpAndSettle();
+
+    // Send ambiguous request
+    await tester.enterText(find.byType(TextField), 'Add ambiguous item');
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    // Must show clarification card instead of silently fabricating a quantity
+    expect(find.text('Clarification Needed'), findsOneWidget);
+    expect(find.textContaining('How much Milk would you like to add?'), findsOneWidget);
+
+    // 2. Test dismissing all items disables confirmation
+    await tester.enterText(find.byType(TextField), 'Add butter');
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('100 g'), findsOneWidget);
+    // Dismiss butter
+    await tester.tap(find.byKey(const ValueKey('remove_proposed_Butter_0')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('All proposed items have been dismissed.'), findsOneWidget);
+    final addBtn = tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Add to Fridge'));
+    expect(addBtn.onPressed, isNull);
+  });
 }

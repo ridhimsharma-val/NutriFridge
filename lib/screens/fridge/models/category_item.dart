@@ -45,8 +45,13 @@ class CategoryFoodItem {
     return match != null ? int.tryParse(match.group(1)!) ?? 1 : 1;
   }
 
+  num get decimalAmount {
+    final match = RegExp(r'([0-9]+(?:\.[0-9]+)?)').firstMatch(quantity);
+    return match != null ? num.tryParse(match.group(1)!) ?? 1 : 1;
+  }
+
   String get unit {
-    final match = RegExp(r'\d+\s*([a-zA-Z]+)').firstMatch(quantity);
+    final match = RegExp(r'[0-9.]+\s*([a-zA-Z]+)').firstMatch(quantity);
     return match != null ? match.group(1)! : 'g';
   }
 
@@ -736,6 +741,233 @@ class FridgeCategoryRepository {
       type: NotificationType.inventoryUpdate,
     );
     _notify();
+  }
+
+  /// Formats quantity with clean number and plural-aware unit
+  static String formatQuantity(num quantity, String unit) {
+    final cleanUnit = unit.trim().toLowerCase();
+    String numStr;
+    if (quantity is int || quantity == quantity.roundToDouble()) {
+      numStr = '${quantity.toInt()}';
+    } else {
+      numStr = quantity.toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '');
+    }
+
+    if (cleanUnit == 'piece' || cleanUnit == 'pieces' || cleanUnit == 'pc' || cleanUnit == 'pcs') {
+      return '$numStr ${quantity == 1 ? 'piece' : 'pieces'}';
+    }
+    if (cleanUnit == 'pack' || cleanUnit == 'packs' || cleanUnit == 'pkt' || cleanUnit == 'pkts') {
+      return '$numStr ${quantity == 1 ? 'pack' : 'packs'}';
+    }
+    if (cleanUnit == 'bottle' || cleanUnit == 'bottles') {
+      return '$numStr ${quantity == 1 ? 'bottle' : 'bottles'}';
+    }
+    if (cleanUnit == 'box' || cleanUnit == 'boxes') {
+      return '$numStr ${quantity == 1 ? 'box' : 'boxes'}';
+    }
+    if (cleanUnit == 'jar' || cleanUnit == 'jars') {
+      return '$numStr ${quantity == 1 ? 'jar' : 'jars'}';
+    }
+    if (cleanUnit == 'tub' || cleanUnit == 'tubs') {
+      return '$numStr ${quantity == 1 ? 'tub' : 'tubs'}';
+    }
+    if (cleanUnit == 'can' || cleanUnit == 'cans') {
+      return '$numStr ${quantity == 1 ? 'can' : 'cans'}';
+    }
+    if (cleanUnit == 'item' || cleanUnit == 'items') {
+      return '$numStr ${quantity == 1 ? 'item' : 'items'}';
+    }
+    if (cleanUnit == 'l' || cleanUnit == 'liter' || cleanUnit == 'liters' || cleanUnit == 'litre' || cleanUnit == 'litres') {
+      return '$numStr L';
+    }
+    if (cleanUnit == 'ml' || cleanUnit == 'millilitre' || cleanUnit == 'millilitres') {
+      return '$numStr ml';
+    }
+    if (cleanUnit == 'g' || cleanUnit == 'gram' || cleanUnit == 'grams') {
+      return '$numStr g';
+    }
+    if (cleanUnit == 'kg' || cleanUnit == 'kilogram' || cleanUnit == 'kilograms') {
+      return '$numStr kg';
+    }
+    return '$numStr $unit'.trim();
+  }
+
+  /// Normalizes units to check compatibility
+  static String normalizeUnit(String unit) {
+    final u = unit.trim().toLowerCase();
+    if (u == 'g' || u == 'gram' || u == 'grams') return 'g';
+    if (u == 'kg' || u == 'kilogram' || u == 'kilograms') return 'kg';
+    if (u == 'ml' || u == 'millilitre' || u == 'millilitres') return 'ml';
+    if (u == 'l' || u == 'litre' || u == 'litres' || u == 'liter' || u == 'liters') return 'l';
+    if (u == 'piece' || u == 'pieces' || u == 'pc' || u == 'pcs') return 'piece';
+    if (u == 'pack' || u == 'packs' || u == 'pkt' || u == 'pkts') return 'pack';
+    if (u == 'bottle' || u == 'bottles') return 'bottle';
+    if (u == 'jar' || u == 'jars') return 'jar';
+    if (u == 'tub' || u == 'tubs') return 'tub';
+    if (u == 'box' || u == 'boxes') return 'box';
+    if (u == 'can' || u == 'cans') return 'can';
+    if (u == 'item' || u == 'items') return 'item';
+    return u;
+  }
+
+  /// Checks if two units are compatible for quantity merging
+  static bool areUnitsCompatible(String unitA, String unitB) {
+    final a = normalizeUnit(unitA);
+    final b = normalizeUnit(unitB);
+    if (a == b) return true;
+    const countable = {'piece', 'pack', 'bottle', 'jar', 'tub', 'box', 'can', 'item'};
+    if (countable.contains(a) && countable.contains(b)) return true;
+    const weight = {'g', 'kg'};
+    if (weight.contains(a) && weight.contains(b)) return true;
+    const volume = {'ml', 'l'};
+    if (volume.contains(a) && volume.contains(b)) return true;
+    return false;
+  }
+
+  /// Helper to test if two food names represent the same item (handles singular/plural)
+  static bool isFoodNameMatching(String name1, String name2) {
+    final a = name1.trim().toLowerCase();
+    final b = name2.trim().toLowerCase();
+    if (a == b) return true;
+    if (a.endsWith('s') && a.substring(0, a.length - 1) == b) return true;
+    if (b.endsWith('s') && b.substring(0, b.length - 1) == a) return true;
+    if (a.endsWith('es') && a.substring(0, a.length - 2) == b) return true;
+    if (b.endsWith('es') && b.substring(0, b.length - 2) == a) return true;
+    return false;
+  }
+
+  /// Adds a food item to inventory, or if an item with the same name and compatible unit
+  /// already exists, increases its quantity.
+  static CategoryFoodItem addOrMergeItem({
+    required String categoryName,
+    required String name,
+    required num quantity,
+    required String unit,
+    int? expiryDays,
+    String? imageAsset,
+  }) {
+    final canonicalName = _canonicalizeCategory(categoryName);
+
+    // 1. Look for existing item with matching name
+    // Check canonical category first
+    CategoryFoodItem? existingItem;
+    String? foundCategory;
+
+    final targetList = _categoryStore[canonicalName];
+    if (targetList != null) {
+      for (final it in targetList) {
+        if (isFoodNameMatching(it.name, name)) {
+          existingItem = it;
+          foundCategory = canonicalName;
+          break;
+        }
+      }
+    }
+
+    // If not found in target category, check all categories
+    if (existingItem == null) {
+      for (final entry in _categoryStore.entries) {
+        for (final it in entry.value) {
+          if (isFoodNameMatching(it.name, name)) {
+            existingItem = it;
+            foundCategory = entry.key;
+            break;
+          }
+        }
+        if (existingItem != null) break;
+      }
+    }
+
+    // 2. If matching item exists, check unit compatibility and merge
+    if (existingItem != null && foundCategory != null) {
+      final existingUnit = existingItem.unit;
+      if (areUnitsCompatible(existingUnit, unit)) {
+        final existingQty = existingItem.decimalAmount;
+        final normExisting = normalizeUnit(existingUnit);
+        final normAdded = normalizeUnit(unit);
+
+        num mergedAmount;
+        String mergedUnit;
+
+        if (normExisting == normAdded) {
+          mergedAmount = existingQty + quantity;
+          mergedUnit = existingUnit.isNotEmpty ? existingUnit : unit;
+        } else if (normExisting == 'g' && normAdded == 'kg') {
+          mergedAmount = existingQty + (quantity * 1000);
+          mergedUnit = 'g';
+        } else if (normExisting == 'kg' && normAdded == 'g') {
+          mergedAmount = existingQty + (quantity / 1000);
+          mergedUnit = 'kg';
+        } else if (normExisting == 'ml' && normAdded == 'l') {
+          mergedAmount = existingQty + (quantity * 1000);
+          mergedUnit = 'ml';
+        } else if (normExisting == 'l' && normAdded == 'ml') {
+          mergedAmount = existingQty + (quantity / 1000);
+          mergedUnit = 'L';
+        } else {
+          // Countable
+          mergedAmount = existingQty + quantity;
+          mergedUnit = existingUnit.isNotEmpty ? existingUnit : unit;
+        }
+
+        final newQtyStr = formatQuantity(mergedAmount, mergedUnit);
+        final updatedItem = existingItem.copyWith(
+          quantity: newQtyStr,
+          expiryDays: expiryDays ?? existingItem.expiryDays,
+        );
+
+        final catList = _categoryStore[foundCategory]!;
+        final idx = catList.indexWhere((it) => it.id == existingItem!.id);
+        if (idx != -1) {
+          catList[idx] = updatedItem;
+        }
+
+        NotificationRepository.addNotification(
+          title: 'Inventory update',
+          description: 'Updated ${updatedItem.name} quantity to $newQtyStr.',
+          type: NotificationType.inventoryUpdate,
+        );
+        _notify();
+        return updatedItem;
+      }
+    }
+
+    // 3. Brand new item (or incompatible unit)
+    final resolvedImage = (imageAsset != null &&
+            imageAsset.isNotEmpty &&
+            !imageAsset.contains('categories/vegetables') &&
+            !imageAsset.contains('categories/fruits') &&
+            !imageAsset.contains('categories/dairy_products') &&
+            !imageAsset.contains('categories/non_veg') &&
+            !imageAsset.contains('categories/leftovers') &&
+            !imageAsset.contains('categories/packaged_food') &&
+            !imageAsset.contains('categories/juices') &&
+            !imageAsset.contains('categories/ice_cream') &&
+            !imageAsset.contains('categories/frozen_food') &&
+            !imageAsset.contains('categories/dry_fruits') &&
+            !imageAsset.contains('categories/others'))
+        ? imageAsset
+        : FoodItemAssetRegistry.getAssetForItem(name, canonicalName);
+
+    final cleanQtyStr = formatQuantity(quantity, unit);
+    final newItem = CategoryFoodItem(
+      id: 'item_${DateTime.now().millisecondsSinceEpoch}_${name.toLowerCase().replaceAll(RegExp(r'\s+'), '_')}',
+      name: name,
+      quantity: cleanQtyStr,
+      expiryDays: expiryDays ?? 5,
+      imageAsset: resolvedImage,
+    );
+
+    final list = _categoryStore.putIfAbsent(canonicalName, () => []);
+    list.add(newItem);
+
+    NotificationRepository.addNotification(
+      title: 'Inventory update',
+      description: '${newItem.name} was added to your fridge.',
+      type: NotificationType.inventoryUpdate,
+    );
+    _notify();
+    return newItem;
   }
 
   /// Add multiple items to categories
