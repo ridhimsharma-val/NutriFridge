@@ -343,31 +343,36 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
 
   Widget _buildEmptyState() {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            _category.iconEmoji,
-            style: const TextStyle(fontSize: 40),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'No items in ${_category.name}',
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF64748B),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _category.iconEmoji,
+              style: const TextStyle(fontSize: 42),
             ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'No items currently in this category',
-            style: TextStyle(
-              fontSize: 12.5,
-              color: Color(0xFF94A3B8),
+            const SizedBox(height: 12),
+            const Text(
+              'Nothing here yet',
+              style: TextStyle(
+                fontSize: 16.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1E293B),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 6),
+            const Text(
+              'Add food using NutriFridge AI.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF64748B),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

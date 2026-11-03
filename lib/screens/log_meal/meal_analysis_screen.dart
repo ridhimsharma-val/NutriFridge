@@ -13,14 +13,14 @@ import 'models/meal_nutrition_estimate.dart';
 class MealAnalysisScreen extends StatefulWidget {
   final Uint8List? imageBytes;
   final XFile? imageFile;
-  final String initialMealName;
+  final String? initialMealName;
   final List<DetectedFoodItem>? initialFoods;
 
   const MealAnalysisScreen({
     super.key,
     this.imageBytes,
     this.imageFile,
-    this.initialMealName = 'Paneer Rice Bowl',
+    this.initialMealName,
     this.initialFoods,
   });
 
@@ -35,10 +35,10 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
   @override
   void initState() {
     super.initState();
-    _mealName = widget.initialMealName;
+    _mealName = widget.initialMealName ?? '';
     _detectedFoods = widget.initialFoods != null
         ? List.from(widget.initialFoods!)
-        : DetectedFoodItem.initialSampleDetection;
+        : [];
   }
 
   void _editMealName() {

@@ -27,12 +27,14 @@ class CategoryFoodItem {
   });
 
   ExpiryStatus get status {
+    if (expiryDays < 0) return ExpiryStatus.normal;
     if (expiryDays <= 2) return ExpiryStatus.urgent;
     if (expiryDays <= 4) return ExpiryStatus.expiringSoon;
     return ExpiryStatus.normal;
   }
 
   String get expiryLabel {
+    if (expiryDays < 0) return 'Expiry unspecified';
     if (expiryDays == 0) return 'Expires today';
     if (expiryDays == 1) return 'Expires in 1 day';
     return 'Expires in $expiryDays days';
@@ -243,6 +245,35 @@ class FoodItemAssetRegistry {
 
     return 'assets/images/foods/apple.jpg';
   }
+
+  /// Returns a clean representative emoji for a canonical fridge category.
+  static String getEmojiForCategory(String category) {
+    switch (category) {
+      case 'Dairy Products':
+        return '🥛';
+      case 'Vegetables':
+        return '🥕';
+      case 'Fruits':
+        return '🍎';
+      case 'Non-Veg':
+        return '🍗';
+      case 'Meals & Leftovers':
+        return '🍲';
+      case 'Packaged Food':
+        return '🍞';
+      case 'Drinks & Juices':
+        return '🧃';
+      case 'Ice Cream':
+        return '🍨';
+      case 'Frozen Food':
+        return '🧊';
+      case 'Dry Fruits':
+        return '🥜';
+      case 'Others':
+      default:
+        return '🍴';
+    }
+  }
 }
 
 /// Data model representing a refrigerator category with its inventory
@@ -307,6 +338,18 @@ class FridgeCategoryRepository {
   }
 
   static Map<String, List<CategoryFoodItem>> _buildInitialStore() {
+    return {
+      for (final cat in canonicalCategories) cat: <CategoryFoodItem>[],
+    };
+  }
+
+  /// Seeds demo fixture data for automated test suites
+  static void seedSampleDataForTesting() {
+    _categoryStore = _buildSampleFixtureStore();
+    _notify();
+  }
+
+  static Map<String, List<CategoryFoodItem>> _buildSampleFixtureStore() {
     return {
       'Dairy Products': [
         const CategoryFoodItem(
@@ -651,12 +694,12 @@ class FridgeCategoryRepository {
     return null;
   }
 
-  /// Number of items expiring soon (expiryDays <= 3)
+  /// Number of items expiring soon (expiryDays between 0 and 3 days)
   static int get expiringSoonCount {
     int count = 0;
     for (final list in _categoryStore.values) {
       for (final item in list) {
-        if (item.expiryDays <= 3) {
+        if (item.expiryDays >= 0 && item.expiryDays <= 3) {
           count++;
         }
       }

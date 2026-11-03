@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/services/app_image_picker.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
+import '../ai_assistant/services/ai_assistant_service.dart';
 import '../fridge/models/category_item.dart';
 import 'widgets/food_detection_result.dart';
 import 'widgets/food_scan_preview.dart';
@@ -22,6 +24,12 @@ class _SingleFoodScanPageState extends State<SingleFoodScanPage> {
   bool _isAnalyzing = false;
   bool _analysisComplete = false;
 
+  String _detectedFoodName = '';
+  String _detectedCategory = 'Others';
+  int _detectedQuantity = 1;
+  String _detectedUnit = 'piece';
+  int _detectedExpiryDays = 5;
+
   Future<void> _pickImage(ImageSource source) async {
     try {
       final file = await AppImagePicker.pickImage(
@@ -39,7 +47,7 @@ class _SingleFoodScanPageState extends State<SingleFoodScanPage> {
       if (mounted) {
         setState(() {
           _previewImageBytes = bytes;
-          _previewImage = 'assets/images/categories/dairy_paneer.png';
+          _previewImage = null;
           _analysisComplete = false;
         });
       }
@@ -80,18 +88,58 @@ class _SingleFoodScanPageState extends State<SingleFoodScanPage> {
   }
 
   Future<void> _analyzeFood() async {
+    if (_previewImageBytes == null) {
+      _showFeedback('Please take or choose a photo first.');
+      return;
+    }
+
     setState(() {
       _isAnalyzing = true;
     });
 
-    // Simulate AI processing latency
-    await Future.delayed(const Duration(milliseconds: 900));
+    try {
+      final base64Image = base64Encode(_previewImageBytes!);
+      final response = await AiAssistantService.sendRequest(
+        message: 'Identify this food item for fridge inventory',
+        imageBase64: base64Image,
+        mimeType: 'image/jpeg',
+        actionHint: 'add_inventory',
+      );
 
-    if (mounted) {
-      setState(() {
-        _isAnalyzing = false;
-        _analysisComplete = true;
-      });
+      if (!mounted) return;
+
+      final items = response['inventoryItems'];
+      if (items is List && items.isNotEmpty) {
+        final item = items.first as Map<String, dynamic>;
+        setState(() {
+          _detectedFoodName = item['name']?.toString() ?? 'Food Item';
+          _detectedCategory = item['category']?.toString() ?? 'Others';
+          _detectedQuantity = (item['quantity'] is num) ? (item['quantity'] as num).toInt() : 1;
+          _detectedUnit = item['unit']?.toString() ?? 'piece';
+          _detectedExpiryDays = (item['expiryDaysEstimate'] is num)
+              ? (item['expiryDaysEstimate'] as num).toInt()
+              : 5;
+          _isAnalyzing = false;
+          _analysisComplete = true;
+        });
+      } else {
+        setState(() {
+          _isAnalyzing = false;
+          _analysisComplete = false;
+        });
+        _showFeedback(
+          response['assistantMessage'] as String? ??
+              'Could not identify this food item. Please try again.',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isAnalyzing = false;
+          _analysisComplete = false;
+        });
+        _showFeedback('Unable to analyze food. Please check connection and try again.');
+      }
     }
   }
 
@@ -172,13 +220,13 @@ class _SingleFoodScanPageState extends State<SingleFoodScanPage> {
         body: SafeArea(
           child: _analysisComplete
               ? FoodDetectionResult(
-                  foodName: 'Paneer',
-                  initialCategory: 'Dairy Products',
-                  initialQuantity: 250,
-                  unit: 'g',
-                  stepAmount: 50,
-                  expiryDays: 3,
-                  imageAsset: _previewImage ?? 'assets/images/categories/dairy_paneer.png',
+                  foodName: _detectedFoodName,
+                  initialCategory: _detectedCategory,
+                  initialQuantity: _detectedQuantity,
+                  unit: _detectedUnit,
+                  stepAmount: (_detectedUnit == 'g' || _detectedUnit == 'ml') ? 50 : 1,
+                  expiryDays: _detectedExpiryDays,
+                  imageAsset: _previewImage ?? FoodItemAssetRegistry.getAssetForItem(_detectedFoodName, _detectedCategory),
                   onAddToFridge: _onAddToFridge,
                 )
               : FoodScanPreview(

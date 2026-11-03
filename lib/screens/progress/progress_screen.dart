@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/nutrition_data.dart';
+import '../ai_assistant/ai_assistant_screen.dart';
 import 'models/progress_data.dart';
 import 'widgets/consistency_heatmap.dart';
 import 'widgets/macro_donut_chart.dart';
@@ -59,40 +60,50 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
                     const SizedBox(height: 20),
 
-                    // 2. Cinematic Wellness Hero
-                    WellnessScoreHero(
-                      score: analytics.wellnessScore,
-                      previousScore: analytics.previousWellnessScore,
-                      interpretation: analytics.wellnessInterpretation,
-                    ),
+                    if (!analytics.hasRecords)
+                      _buildEmptyState()
+                    else ...[
+                      // 2. Cinematic Wellness Hero
+                      WellnessScoreHero(
+                        score: analytics.wellnessScore,
+                        previousScore: analytics.previousWellnessScore,
+                        interpretation: analytics.wellnessInterpretation,
+                      ),
 
-                    const SizedBox(height: 20),
+                      const SizedBox(height: 20),
 
-                    // 3. Macronutrient Donut Chart
-                    MacroDonutChart(
-                      proteinGrams: analytics.totalProteinGrams ~/ analytics.daySummaries.length,
-                      carbsGrams: analytics.totalCarbsGrams ~/ analytics.daySummaries.length,
-                      fatGrams: analytics.totalFatGrams ~/ analytics.daySummaries.length,
-                      centerCalories: analytics.averageDailyCalories,
-                      centerLabel: _selectedPeriod == 'Week' ? 'Daily avg' : 'Monthly avg',
-                    ),
+                      // 3. Macronutrient Donut Chart
+                      MacroDonutChart(
+                        proteinGrams: analytics.daySummaries.isNotEmpty
+                            ? analytics.totalProteinGrams ~/ analytics.daySummaries.length
+                            : 0,
+                        carbsGrams: analytics.daySummaries.isNotEmpty
+                            ? analytics.totalCarbsGrams ~/ analytics.daySummaries.length
+                            : 0,
+                        fatGrams: analytics.daySummaries.isNotEmpty
+                            ? analytics.totalFatGrams ~/ analytics.daySummaries.length
+                            : 0,
+                        centerCalories: analytics.averageDailyCalories,
+                        centerLabel: _selectedPeriod == 'Week' ? 'Daily avg' : 'Monthly avg',
+                      ),
 
-                    const SizedBox(height: 20),
+                      const SizedBox(height: 20),
 
-                    // 4. Weekly Calorie Chart
-                    WeeklyCaloriesChart(
-                      summaries: analytics.daySummaries,
-                      period: _selectedPeriod,
-                    ),
+                      // 4. Weekly Calorie Chart
+                      WeeklyCaloriesChart(
+                        summaries: analytics.daySummaries,
+                        period: _selectedPeriod,
+                      ),
 
-                    const SizedBox(height: 20),
+                      const SizedBox(height: 20),
 
-                    // 5. Minimal LeetCode-style Consistency Heatmap
-                    ConsistencyHeatmap(
-                      cells: analytics.heatmapCells,
-                      factualSummary: analytics.factualConsistencySummary,
-                      period: _selectedPeriod,
-                    ),
+                      // 5. Minimal LeetCode-style Consistency Heatmap
+                      ConsistencyHeatmap(
+                        cells: analytics.heatmapCells,
+                        factualSummary: analytics.factualConsistencySummary,
+                        period: _selectedPeriod,
+                      ),
+                    ],
 
                     // Bottom navigation clearance
                     const SizedBox(height: 80),
@@ -102,6 +113,78 @@ class _ProgressScreenState extends State<ProgressScreen> {
             },
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+      decoration: BoxDecoration(
+        color: AppColors.cardWhite,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.cardBorder, width: 1.2),
+        boxShadow: const [AppColors.softShadow],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.tealLight,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.tealPrimary.withValues(alpha: 0.15)),
+            ),
+            child: const Icon(
+              Icons.insights_rounded,
+              size: 32,
+              color: AppColors.tealPrimary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Your nutrition journey starts with your first meal.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Charts and insights will populate here as you log meals using NutriFridge AI.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w400,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const AiAssistantScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Log a Meal with AI'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.tealPrimary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+          ),
+        ],
       ),
     );
   }

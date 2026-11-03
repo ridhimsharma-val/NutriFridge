@@ -58,7 +58,7 @@ class NotificationRepository {
     notifier.value++;
   }
 
-  static List<AppNotification> _notifications = _buildInitialNotifications();
+  static List<AppNotification> _notifications = [];
 
   /// Total count of unread notifications
   static int get unreadCount => _notifications.where((n) => !n.isRead).length;
@@ -70,8 +70,13 @@ class NotificationRepository {
   static List<AppNotification> get notifications =>
       List.unmodifiable(_notifications);
 
-  /// Builds clean initial session notifications deriving from inventory & meals
-  static List<AppNotification> _buildInitialNotifications() {
+  /// Seeds demo notifications for test suites
+  static void seedSampleNotificationsForTesting() {
+    _notifications = _buildSampleFixtureNotifications();
+    _notify();
+  }
+
+  static List<AppNotification> _buildSampleFixtureNotifications() {
     final now = DateTime.now();
 
     // Check if an expiring food item exists in fridge inventory
@@ -184,9 +189,9 @@ class NotificationRepository {
     _notify();
   }
 
-  /// Resets notifications repository (for tests)
+  /// Resets notifications repository to clean empty initial state
   static void reset() {
-    _notifications = _buildInitialNotifications();
+    _notifications = [];
     _notify();
   }
 }

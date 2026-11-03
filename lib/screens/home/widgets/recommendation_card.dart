@@ -4,23 +4,27 @@ import '../../../core/theme/app_typography.dart';
 import '../../../models/nutrition_data.dart';
 
 class RecommendationCard extends StatelessWidget {
-  final RecipeRecommendation recommendation;
+  final RecipeRecommendation? recommendation;
   final VoidCallback? onTap;
+  final VoidCallback? onOpenAssistant;
   final String? heroTag;
 
   const RecommendationCard({
     super.key,
-    required this.recommendation,
+    this.recommendation,
     this.onTap,
+    this.onOpenAssistant,
     this.heroTag,
   });
 
   String get _heroTag =>
       heroTag ??
-      'meal-hero-image-${recommendation.title.toLowerCase().replaceAll(RegExp(r'\s+'), '-')}';
+      'meal-hero-image-${recommendation?.title.toLowerCase().replaceAll(RegExp(r'\s+'), '-') ?? 'empty'}';
 
   @override
   Widget build(BuildContext context) {
+    final rec = recommendation;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -34,10 +38,100 @@ class RecommendationCard extends StatelessWidget {
         const SizedBox(height: 10),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(22),
-            child: Container(
+          child: rec == null
+              ? _buildEmptyState(context)
+              : _buildCardContent(rec),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return InkWell(
+      onTap: onOpenAssistant ?? onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: AppColors.peachCard,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: AppColors.peachBorder,
+            width: 1.2,
+          ),
+          boxShadow: const [AppColors.softShadow],
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.peachBorder),
+                  ),
+                  child: const Icon(
+                    Icons.restaurant_menu_rounded,
+                    size: 20,
+                    color: AppColors.peachPrimary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Your next meal starts with your fridge.',
+                    style: AppTypography.cardTitle.copyWith(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Add a few ingredients and NutriFridge AI can help you decide what to cook.',
+              style: AppTypography.subtitle.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Ask NutriFridge AI',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.tealPrimary,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 15,
+                  color: AppColors.tealPrimary,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardContent(RecipeRecommendation recommendation) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
               decoration: BoxDecoration(
                 color: AppColors.peachCard,
                 borderRadius: BorderRadius.circular(22),
@@ -197,29 +291,29 @@ class RecommendationCard extends StatelessWidget {
                 ],
               ),
             ),
-          ),
-        ),
-      ],
     );
   }
 
-  Widget _buildFoodImage() {
-    if (recommendation.imageUrl.startsWith('assets/')) {
+  Widget _buildFoodImage([RecipeRecommendation? rec]) {
+    final url = rec?.imageUrl ?? recommendation?.imageUrl;
+    if (url != null && url.startsWith('assets/')) {
       return Image.asset(
-        recommendation.imageUrl,
+        url,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) => _buildFallbackImage(),
       );
+    } else if (url != null && url.isNotEmpty) {
+      return Image.network(
+        url,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _buildFallbackImage(),
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return _buildImagePlaceholder();
+        },
+      );
     }
-    return Image.network(
-      recommendation.imageUrl,
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) => _buildFallbackImage(),
-      loadingBuilder: (context, child, loadingProgress) {
-        if (loadingProgress == null) return child;
-        return _buildImagePlaceholder();
-      },
-    );
+    return _buildFallbackImage();
   }
 
   Widget _buildFallbackImage() {

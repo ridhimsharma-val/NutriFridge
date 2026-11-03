@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/services/app_image_picker.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
+import '../ai_assistant/services/ai_assistant_service.dart';
 import '../fridge/models/category_item.dart';
 import 'widgets/food_scan_preview.dart';
 
@@ -46,44 +48,7 @@ class _MultipleFoodsPageState extends State<MultipleFoodsPage> {
   @override
   void initState() {
     super.initState();
-    _detectedItems = [
-      _DetectedItemState(
-        name: 'Paneer',
-        quantity: 250,
-        unit: 'g',
-        category: 'Dairy Products',
-        step: 50,
-        expiryDays: 3,
-        emoji: '🧀',
-      ),
-      _DetectedItemState(
-        name: 'Apple',
-        quantity: 3,
-        unit: 'pieces',
-        category: 'Fruits',
-        step: 1,
-        expiryDays: 6,
-        emoji: '🍎',
-      ),
-      _DetectedItemState(
-        name: 'Carrot',
-        quantity: 4,
-        unit: 'pieces',
-        category: 'Vegetables',
-        step: 1,
-        expiryDays: 5,
-        emoji: '🥕',
-      ),
-      _DetectedItemState(
-        name: 'Milk',
-        quantity: 500,
-        unit: 'ml',
-        category: 'Dairy Products',
-        step: 50,
-        expiryDays: 2,
-        emoji: '🥛',
-      ),
-    ];
+    _detectedItems = [];
   }
 
   Uint8List? _previewImageBytes;
@@ -105,8 +70,9 @@ class _MultipleFoodsPageState extends State<MultipleFoodsPage> {
       if (mounted) {
         setState(() {
           _previewImageBytes = bytes;
-          _previewImage = 'assets/images/paneer_rice_bowl.jpg';
+          _previewImage = null;
           _analysisComplete = false;
+          _detectedItems = [];
         });
       }
     } on PlatformException catch (e) {
@@ -146,17 +112,67 @@ class _MultipleFoodsPageState extends State<MultipleFoodsPage> {
   }
 
   Future<void> _analyzeFoods() async {
+    if (_previewImageBytes == null) {
+      _showFeedback('Please take or choose a photo first.');
+      return;
+    }
+
     setState(() {
       _isAnalyzing = true;
     });
 
-    await Future.delayed(const Duration(milliseconds: 900));
+    try {
+      final base64Image = base64Encode(_previewImageBytes!);
+      final response = await AiAssistantService.sendRequest(
+        message: 'Identify all food items in this photo for fridge inventory',
+        imageBase64: base64Image,
+        mimeType: 'image/jpeg',
+        actionHint: 'add_inventory',
+      );
 
-    if (mounted) {
+      if (!mounted) return;
+
+      final items = response['inventoryItems'];
+      final List<_DetectedItemState> parsedItems = [];
+
+      if (items is List && items.isNotEmpty) {
+        for (final raw in items) {
+          final item = raw as Map<String, dynamic>;
+          final name = item['name']?.toString() ?? 'Item';
+          final cat = item['category']?.toString() ?? 'Others';
+          final qty = (item['quantity'] is num) ? (item['quantity'] as num).toInt() : 1;
+          final unit = item['unit']?.toString() ?? 'piece';
+          final exp = (item['expiryDaysEstimate'] is num)
+              ? (item['expiryDaysEstimate'] as num).toInt()
+              : 5;
+          parsedItems.add(
+            _DetectedItemState(
+              name: name,
+              quantity: qty,
+              unit: unit,
+              category: cat,
+              step: 1,
+              expiryDays: exp,
+              emoji: FoodItemAssetRegistry.getEmojiForCategory(cat),
+            ),
+          );
+        }
+      }
+
       setState(() {
         _isAnalyzing = false;
         _analysisComplete = true;
+        _detectedItems = parsedItems;
       });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isAnalyzing = false;
+          _analysisComplete = true;
+          _detectedItems = [];
+        });
+        _showFeedback('Unable to analyze foods. Please try again.');
+      }
     }
   }
 
@@ -260,6 +276,48 @@ class _MultipleFoodsPageState extends State<MultipleFoodsPage> {
   }
 
   Widget _buildReviewList() {
+    if (_detectedItems.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.search_off_rounded, size: 52, color: AppColors.textTertiary),
+              const SizedBox(height: 16),
+              Text(
+                'No food items detected in this image.',
+                textAlign: TextAlign.center,
+                style: AppTypography.cardTitle.copyWith(fontSize: 17),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Try taking another photo with clearer lighting and visible food items.',
+                textAlign: TextAlign.center,
+                style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _analysisComplete = false;
+                  });
+                },
+                icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                label: const Text('Try Another Photo'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.tealPrimary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final selectedCount = _detectedItems.where((it) => it.isSelected).length;
 
     return Column(
@@ -272,7 +330,7 @@ class _MultipleFoodsPageState extends State<MultipleFoodsPage> {
             children: [
               Expanded(
                 child: Text(
-                  'Detected 4 foods',
+                  'Detected ${_detectedItems.length} ${_detectedItems.length == 1 ? "food" : "foods"}',
                   style: AppTypography.greeting.copyWith(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
@@ -281,7 +339,7 @@ class _MultipleFoodsPageState extends State<MultipleFoodsPage> {
               ),
               const SizedBox(width: 8),
               Text(
-                '$selectedCount of 4 selected',
+                '$selectedCount of ${_detectedItems.length} selected',
                 style: AppTypography.bodyMedium.copyWith(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,

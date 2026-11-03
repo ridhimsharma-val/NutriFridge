@@ -9,13 +9,13 @@ import '../../fridge/models/category_item.dart';
 /// Collapsed state is visually unchanged.
 /// Expanding reveals a 7-day interactive wellness chart, supporting factors, and disclaimer.
 class WellnessScoreCard extends StatefulWidget {
-  final WellnessScoreData wellnessData;
+  final WellnessScoreData? wellnessData;
   final bool isExpanded;
   final VoidCallback? onToggle;
 
   const WellnessScoreCard({
     super.key,
-    required this.wellnessData,
+    this.wellnessData,
     this.isExpanded = false,
     this.onToggle,
   });
@@ -25,7 +25,7 @@ class WellnessScoreCard extends StatefulWidget {
 }
 
 class _WellnessScoreCardState extends State<WellnessScoreCard> {
-  int _selectedDayIndex = 6; // Defaults to Today (Sunday)
+  int _selectedDayIndex = 6;
 
   static const List<_DayScore> _sevenDayHistory = [
     _DayScore(day: 'Mon', score: 76),
@@ -41,13 +41,14 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
   Widget build(BuildContext context) {
     final isExpanded = widget.isExpanded;
     final wellnessData = widget.wellnessData;
+    final bool hasData = wellnessData != null && wellnessData.hasSufficientData;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: widget.onToggle,
+          onTap: hasData ? widget.onToggle : null,
           borderRadius: BorderRadius.circular(22),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
@@ -68,145 +69,189 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
               ),
               boxShadow: const [AppColors.softShadow],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Top Collapsed Summary Row (Visually unchanged)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18.0,
-                    vertical: 16.0,
-                  ),
-                  child: Row(
-                    children: [
-                      // Left Column: Information & Delta
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Header title (Editorial typography, visually unchanged)
-                            Text(
-                              "Today's Wellness",
-                              style: AppTypography.cardTitle.copyWith(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            // Subtitle / qualitative feedback
-                            Text(
-                              wellnessData.statusText,
-                              style: AppTypography.scoreSubtitle.copyWith(
-                                color: AppColors.tealPrimary,
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            // Upward score comparison pill
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.cardWhite.withValues(alpha: 0.88),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: const Color(0xFFBCE3D3),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Text(
-                                '+${wellnessData.scoreDiff} points from yesterday',
-                                style: AppTypography.badgeText.copyWith(
-                                  color: AppColors.tealPrimary,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      // Right Column: Circular Progress Ring with Score
-                      SizedBox(
-                        width: 86,
-                        height: 86,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            // Background white disk
-                            Container(
-                              width: 78,
-                              height: 78,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppColors.cardWhite.withValues(alpha: 0.9),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.tealPrimary
-                                        .withValues(alpha: 0.08),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // Custom Circular Ring
-                            CustomPaint(
-                              size: const Size(86, 86),
-                              painter: _ScoreRingPainter(
-                                progress: wellnessData.currentScore /
-                                    wellnessData.maxScore.toDouble(),
-                                trackColor: const Color(0xFFD4ECE2),
-                                progressColor: AppColors.tealAccent,
-                                strokeWidth: 6.5,
-                              ),
-                            ),
-                            // Score Number
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  '${wellnessData.currentScore}',
-                                  style: AppTypography.scoreLarge.copyWith(
-                                    fontSize: 29,
-                                    height: 1.0,
-                                  ),
-                                ),
-                                Text(
-                                  '/ 100',
-                                  style: AppTypography.badgeText.copyWith(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 9.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Expanded Section Animated Inline
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                  child: isExpanded
-                      ? _buildExpandedContent(wellnessData)
-                      : const SizedBox.shrink(),
-                ),
-              ],
+            padding: const EdgeInsets.symmetric(
+              horizontal: 18.0,
+              vertical: 16.0,
             ),
+            child: hasData
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Top Collapsed Summary Row
+                      _buildSummaryRow(wellnessData),
+                      if (isExpanded) ...[
+                        const SizedBox(height: 16),
+                        _buildExpandedContent(wellnessData),
+                      ],
+                    ],
+                  )
+                : _buildEmptyState(),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: AppColors.cardWhite.withValues(alpha: 0.9),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.spa_rounded,
+                size: 18,
+                color: AppColors.tealPrimary,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              "Today's Wellness",
+              style: AppTypography.cardTitle.copyWith(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          'Your wellness insights will appear here as you log meals.',
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textSecondary,
+            height: 1.35,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryRow(WellnessScoreData wellnessData) {
+    return Row(
+      children: [
+        // Left Column: Information & Delta
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "Today's Wellness",
+                style: AppTypography.cardTitle.copyWith(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                wellnessData.statusText,
+                style: AppTypography.scoreSubtitle.copyWith(
+                  color: AppColors.tealPrimary,
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (wellnessData.scoreDiff != 0) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.cardWhite.withValues(alpha: 0.88),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: const Color(0xFFBCE3D3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    '${wellnessData.scoreDiff > 0 ? "+" : ""}${wellnessData.scoreDiff} points from yesterday',
+                    style: AppTypography.badgeText.copyWith(
+                      color: AppColors.tealPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(width: 14),
+        // Right Column: Circular Progress Ring with Score
+        SizedBox(
+          width: 86,
+          height: 86,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 78,
+                height: 78,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.cardWhite.withValues(alpha: 0.9),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.tealPrimary.withValues(alpha: 0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+              ),
+              _buildProgressRing(wellnessData),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${wellnessData.currentScore}',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1B6B5A),
+                      letterSpacing: -0.8,
+                    ),
+                  ),
+                  Text(
+                    'pts',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.tealPrimary.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgressRing(WellnessScoreData wellnessData) {
+    return CustomPaint(
+      size: const Size(86, 86),
+      painter: _ScoreRingPainter(
+        progress: (wellnessData.currentScore / wellnessData.maxScore.toDouble()).clamp(0.0, 1.0),
+        trackColor: const Color(0xFFD4ECE2),
+        progressColor: AppColors.tealAccent,
+        strokeWidth: 6.5,
       ),
     );
   }

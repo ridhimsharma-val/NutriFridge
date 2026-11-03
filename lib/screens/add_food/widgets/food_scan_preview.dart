@@ -229,7 +229,7 @@ class FoodScanPreview extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               // If an image is selected, show prominent Analyze CTA button
-              if (previewImageAsset != null && !isAnalyzing) ...[
+              if ((previewImageAsset != null || previewImageBytes != null) && !isAnalyzing) ...[
                 SizedBox(
                   width: double.infinity,
                   height: 54,
@@ -240,7 +240,7 @@ class FoodScanPreview extends StatelessWidget {
                       foregroundColor: Colors.white,
                       elevation: 2,
                       shadowColor: AppColors.tealPrimary.withValues(alpha: 0.4),
-                      shape: RoundedRectangle400Border(
+                      shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),

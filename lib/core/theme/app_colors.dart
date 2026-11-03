@@ -28,6 +28,10 @@ class AppColors {
   static const Color amberPrimary = Color(0xFFF59E0B);
   static const Color amberLight = Color(0xFFFEF3C7);
 
+  // Status & Validation
+  static const Color error = Color(0xFFDC2626);
+  static const Color borderGrey = Color(0xFFE2E8F0);
+
   // Text Hierarchy
   static const Color textPrimary = Color(0xFF182622); // Dark charcoal/green-black
   static const Color textSecondary = Color(0xFF6C8178); // Subtle gray-green

@@ -16,8 +16,8 @@ class RecipeVideoItem {
     this.isSamplePlaceholder = true,
   });
 
-  /// Sample video recommendations for Paneer Rice Bowl
-  static const List<RecipeVideoItem> defaultVideos = [
+  /// Sample video recommendations for automated tests or fixtures
+  static const List<RecipeVideoItem> sampleVideosForTesting = [
     RecipeVideoItem(
       id: 'vid_1',
       title: 'Homestyle Paneer Rice Bowl in 15 Minutes',

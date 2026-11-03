@@ -1,10 +1,13 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/services/app_image_picker.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
+import '../ai_assistant/services/ai_assistant_service.dart';
 import 'meal_analysis_screen.dart';
+import 'models/detected_food_item.dart';
 
 /// Screen 1 of the Log Meal feature: Photo capture and plate selection.
 class LogMealScreen extends StatefulWidget {
@@ -136,17 +139,90 @@ class _LogMealScreenState extends State<LogMealScreen> {
     );
   }
 
-  void _onAnalyzeMeal() {
+  Future<void> _onAnalyzeMeal() async {
     if (_imageBytes == null && _selectedImage == null) return;
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => MealAnalysisScreen(
-          imageBytes: _imageBytes,
-          imageFile: _selectedImage,
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final base64Image = _imageBytes != null ? base64Encode(_imageBytes!) : null;
+      final response = await AiAssistantService.sendRequest(
+        message: 'Analyze this meal photo, identify dish name and ingredients with estimated amounts',
+        imageBase64: base64Image,
+        mimeType: 'image/jpeg',
+        actionHint: 'log_meal',
+      );
+
+      if (!mounted) return;
+
+      String mealName = 'My Meal';
+      List<DetectedFoodItem> detectedFoods = [];
+
+      if (response['meal'] is Map) {
+        final mealMap = response['meal'] as Map<String, dynamic>;
+        mealName = mealMap['name']?.toString() ?? 'My Meal';
+        if (mealMap['ingredients'] is List) {
+          detectedFoods = (mealMap['ingredients'] as List).map((ing) {
+            final m = ing as Map<String, dynamic>;
+            final name = m['name']?.toString() ?? 'Food';
+            final qty = (m['quantity'] is num) ? (m['quantity'] as num).toDouble() : 100.0;
+            final unit = m['unit']?.toString() ?? 'g';
+            return DetectedFoodItem(
+              id: 'item_${name.toLowerCase()}',
+              name: name,
+              amount: qty,
+              unit: unit,
+            );
+          }).toList();
+        }
+      }
+
+      if (detectedFoods.isEmpty && response['inventoryItems'] is List) {
+        detectedFoods = (response['inventoryItems'] as List).map((raw) {
+          final m = raw as Map<String, dynamic>;
+          final name = m['name']?.toString() ?? 'Food';
+          final qty = (m['quantity'] is num) ? (m['quantity'] as num).toDouble() : 100.0;
+          final unit = m['unit']?.toString() ?? 'g';
+          return DetectedFoodItem(
+            id: 'item_${name.toLowerCase()}',
+            name: name,
+            amount: qty,
+            unit: unit,
+          );
+        }).toList();
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => MealAnalysisScreen(
+            imageBytes: _imageBytes,
+            imageFile: _selectedImage,
+            initialMealName: mealName,
+            initialFoods: detectedFoods,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => MealAnalysisScreen(
+              imageBytes: _imageBytes,
+              imageFile: _selectedImage,
+            ),
+          ),
+        );
+      }
+    }
   }
 
   @override

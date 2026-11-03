@@ -395,6 +395,26 @@ class NutritionCard extends StatelessWidget {
     final meals = MockDataRepository.meals;
     final history = MockDataRepository.loggedMealsHistory;
 
+    if (meals.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9FBF9),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFECEFEA), width: 0.8),
+        ),
+        child: const Text(
+          'No meals logged yet today',
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      );
+    }
+
     return Column(
       children: meals.map((meal) {
         final isCompleted = meal.isCompleted;
@@ -413,23 +433,13 @@ class NutritionCard extends StatelessWidget {
         int calories = 0;
         String macroInfo = '';
 
-        if (isCompleted) {
-          if (loggedRecord != null) {
-            displayName = loggedRecord['mealName'] ?? meal.name;
-            calories = loggedRecord['calories'] as int? ?? 0;
-            final p = loggedRecord['protein'] ?? 0;
-            final c = loggedRecord['carbs'] ?? 0;
-            final f = loggedRecord['fat'] ?? 0;
-            macroInfo = '${p}g P · ${c}g C · ${f}g F';
-          } else if (meal.name.toLowerCase() == 'breakfast') {
-            displayName = 'Oats & Banana';
-            calories = 350;
-            macroInfo = '18g P · 48g C · 10g F';
-          } else if (meal.name.toLowerCase() == 'lunch') {
-            displayName = 'Paneer Rice Bowl';
-            calories = 520;
-            macroInfo = '24g P · 65g C · 18g F';
-          }
+        if (isCompleted && loggedRecord != null) {
+          displayName = loggedRecord['mealName'] ?? meal.name;
+          calories = loggedRecord['calories'] as int? ?? 0;
+          final p = loggedRecord['protein'] ?? 0;
+          final c = loggedRecord['carbs'] ?? 0;
+          final f = loggedRecord['fat'] ?? 0;
+          macroInfo = '${p}g P · ${c}g C · ${f}g F';
         }
 
         return Container(

@@ -14,14 +14,14 @@ class UserProfileData {
 
   const UserProfileData({
     required this.displayName,
-    this.dietaryPreference = 'Vegetarian',
-    this.nutritionGoal = 'Balanced eating',
-    this.dailyCalorieTarget = 2200,
+    this.dietaryPreference,
+    this.nutritionGoal,
+    this.dailyCalorieTarget,
     this.allergies = const {},
     this.avoidedFoods = const {},
     this.customRestrictions = const [],
-    this.mealRemindersEnabled = true,
-    this.expiryAlertsEnabled = true,
+    this.mealRemindersEnabled = false,
+    this.expiryAlertsEnabled = false,
   });
 
   /// Standard dietary preference options

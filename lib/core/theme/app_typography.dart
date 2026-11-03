@@ -54,6 +54,12 @@ class AppTypography {
         color: AppColors.textSecondary,
       );
 
+  static TextStyle get bodySmall => GoogleFonts.plusJakartaSans(
+        fontSize: 12.5,
+        fontWeight: FontWeight.w500,
+        color: AppColors.textSecondary,
+      );
+
   static TextStyle get nutritionValue => GoogleFonts.plusJakartaSans(
         fontSize: 15,
         fontWeight: FontWeight.w700,

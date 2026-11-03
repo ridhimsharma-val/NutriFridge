@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/transitions/hero_transition_route.dart';
 import '../../models/notification_data.dart';
 import '../../models/nutrition_data.dart';
+import '../ai_assistant/ai_assistant_screen.dart';
 import '../meal_detail/meal_detail_screen.dart';
 import 'widgets/dashboard_header.dart';
 import 'widgets/meal_status_card.dart';
@@ -23,15 +24,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const recommendation = MockDataRepository.recommendation;
-    const wellness = MockDataRepository.wellness;
-
     return ListenableBuilder(
       listenable: Listenable.merge([
         MockDataRepository.notifier,
         NotificationRepository.notifier,
       ]),
       builder: (context, _) {
+        final recommendation = MockDataRepository.recommendation;
+        final wellness = MockDataRepository.wellness;
         final nutrition = MockDataRepository.nutrition;
         final meals = MockDataRepository.meals;
         final hasUnread = NotificationRepository.hasUnread;
@@ -57,14 +57,29 @@ class _HomeScreenState extends State<HomeScreen> {
                   // 2. Suggested For You
                   RecommendationCard(
                     recommendation: recommendation,
-                    onTap: () {
+                    onOpenAssistant: () {
                       Navigator.of(context).push(
-                        HeroTransitionRoute(
-                          page: MealDetailScreen(
-                            recommendation: recommendation,
-                          ),
+                        MaterialPageRoute(
+                          builder: (context) => const AiAssistantScreen(),
                         ),
                       );
+                    },
+                    onTap: () {
+                      if (recommendation != null) {
+                        Navigator.of(context).push(
+                          HeroTransitionRoute(
+                            page: MealDetailScreen(
+                              recommendation: recommendation,
+                            ),
+                          ),
+                        );
+                      } else {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const AiAssistantScreen(),
+                          ),
+                        );
+                      }
                     },
                   ),
 

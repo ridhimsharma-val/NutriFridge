@@ -32,6 +32,69 @@ void main() {
     AppImagePicker.mockHandler = (source) async {
       return XFile.fromData(AppImagePicker.sampleMockBytes, name: 'test_photo.png');
     };
+    AiAssistantService.mockHandler = (request) async {
+      final message = (request['message'] as String? ?? '').toLowerCase();
+      final hasImage = request['imageBase64'] != null;
+
+      if (message.contains('receipt') || message.contains('grocery')) {
+        return {
+          'success': true,
+          'action': 'add_inventory_items',
+          'assistantMessage': 'I extracted these items from your receipt:',
+          'requiresConfirmation': true,
+          'inventoryItems': [
+            {'name': 'Milk', 'category': 'Dairy Products', 'quantity': 500, 'unit': 'ml', 'expiryDaysEstimate': 3},
+            {'name': 'Paneer', 'category': 'Dairy Products', 'quantity': 250, 'unit': 'g', 'expiryDaysEstimate': 4},
+            {'name': 'Apples', 'category': 'Fruits', 'quantity': 4, 'unit': 'pieces', 'expiryDaysEstimate': 7},
+            {'name': 'Carrots', 'category': 'Vegetables', 'quantity': 500, 'unit': 'g', 'expiryDaysEstimate': 6},
+            {'name': 'Bread', 'category': 'Packaged Food', 'quantity': 1, 'unit': 'pack', 'expiryDaysEstimate': 4},
+          ],
+        };
+      }
+
+      if (hasImage && (message.contains('multiple') || message.contains('all food'))) {
+        return {
+          'success': true,
+          'action': 'add_inventory_items',
+          'assistantMessage': 'I detected these food items:',
+          'requiresConfirmation': true,
+          'inventoryItems': [
+            {'name': 'Paneer', 'category': 'Dairy Products', 'quantity': 250, 'unit': 'g', 'expiryDaysEstimate': 3},
+            {'name': 'Apple', 'category': 'Fruits', 'quantity': 3, 'unit': 'pieces', 'expiryDaysEstimate': 6},
+            {'name': 'Carrot', 'category': 'Vegetables', 'quantity': 4, 'unit': 'pieces', 'expiryDaysEstimate': 5},
+            {'name': 'Milk', 'category': 'Dairy Products', 'quantity': 500, 'unit': 'ml', 'expiryDaysEstimate': 2},
+          ],
+        };
+      }
+
+      if (message.contains('meal') || request['actionHint'] == 'log_meal') {
+        return {
+          'success': true,
+          'action': 'log_meal',
+          'assistantMessage': 'I detected a Paneer Rice Bowl in this photo.',
+          'meal': {
+            'name': 'Paneer Rice Bowl',
+            'mealType': 'lunch',
+            'nutrition': {'calories': 520, 'protein': 24, 'carbs': 62, 'fat': 18},
+            'ingredients': [
+              {'name': 'Paneer', 'quantity': 100, 'unit': 'g', 'inFridge': true},
+              {'name': 'Rice', 'quantity': 150, 'unit': 'g', 'inFridge': false},
+              {'name': 'Vegetables', 'quantity': 80, 'unit': 'g', 'inFridge': true},
+            ],
+          },
+        };
+      }
+
+      return {
+        'success': true,
+        'action': 'add_inventory_items',
+        'assistantMessage': 'I detected Paneer in the image.',
+        'requiresConfirmation': true,
+        'inventoryItems': [
+          {'name': 'Paneer', 'category': 'Dairy Products', 'quantity': 250, 'unit': 'g', 'expiryDaysEstimate': 3},
+        ],
+      };
+    };
   });
 
   testWidgets('NutriFridge dashboard smoke test', (WidgetTester tester) async {
@@ -51,16 +114,15 @@ void main() {
     expect(find.byType(DashboardHeader), findsOneWidget);
     expect(find.byIcon(Icons.notifications_outlined), findsOneWidget);
 
-    // Verify Suggested for you
+    // Verify Suggested for you clean empty state
     expect(find.text('Suggested for you'), findsOneWidget);
-    expect(find.text('Paneer Rice Bowl'), findsOneWidget);
-    expect(find.text('Uses 4 items from your fridge'), findsOneWidget);
-    expect(find.text("Helps complete today's protein goal"), findsOneWidget);
+    expect(find.text('Your next meal starts with your fridge.'), findsOneWidget);
+    expect(find.text('Add a few ingredients and NutriFridge AI can help you decide what to cook.'), findsOneWidget);
+    expect(find.text('Ask NutriFridge AI'), findsOneWidget);
 
-    // Verify Today's Wellness
+    // Verify Today's Wellness clean empty state
     expect(find.text("Today's Wellness"), findsOneWidget);
-    expect(find.text('82'), findsOneWidget);
-    expect(find.text('Great today'), findsOneWidget);
+    expect(find.text('Your wellness insights will appear here as you log meals.'), findsOneWidget);
 
     // Verify Nutrition Today
     expect(find.text('Nutrition Today'), findsOneWidget);
@@ -68,12 +130,9 @@ void main() {
     expect(find.text('Carbs'), findsOneWidget);
     expect(find.text('Fat'), findsOneWidget);
 
-    // Verify Today's Meals
+    // Verify Today's Meals clean empty state
     expect(find.text("Today's Meals"), findsOneWidget);
-    expect(find.text('Breakfast'), findsOneWidget);
-    expect(find.text('Lunch'), findsOneWidget);
-    expect(find.text('Snack'), findsOneWidget);
-    expect(find.text('Dinner'), findsOneWidget);
+    expect(find.text('No meals logged yet today'), findsOneWidget);
 
     // Verify Navigation Bar items (Design 06: Float - Icons only, no text labels)
     expect(find.byIcon(Icons.home_rounded), findsOneWidget);
@@ -86,8 +145,17 @@ void main() {
     await tester.tap(find.byIcon(Icons.kitchen_rounded));
     await tester.pumpAndSettle();
 
-    // Verify Fridge screen elements in closed state (dynamic total items and expiring count)
+    // Verify Fridge screen elements in clean closed state (0 items and 0 expiring count)
     expect(find.text('My Fridge'), findsOneWidget);
+    expect(find.text('0 items'), findsOneWidget);
+    expect(find.text('0 expiring soon'), findsNothing);
+    expect(find.text('Tap to open'), findsNothing);
+    expect(find.text('3°C  OPTIMAL'), findsNothing);
+    expect(find.text('-18°C'), findsNothing);
+
+    // Seed test fixtures to verify door opening, 11 categories and food detail quantity updates
+    FridgeCategoryRepository.seedSampleDataForTesting();
+    await tester.pumpAndSettle();
     expect(find.text('35 items'), findsOneWidget);
     expect(find.text('9 expiring soon'), findsOneWidget);
     expect(find.text('Tap to open'), findsNothing);
@@ -445,6 +513,7 @@ void main() {
   });
 
   testWidgets('Complete Mock Fridge Inventory - All 11 Categories Populated & State Sync', (WidgetTester tester) async {
+    FridgeCategoryRepository.seedSampleDataForTesting();
     // 1. Verify every single category in the repository has items (none empty)
     for (final categoryName in FridgeCategoryRepository.canonicalCategories) {
       final categoryData = FridgeCategoryRepository.getCategoryData(categoryName);
@@ -530,7 +599,7 @@ void main() {
   });
 
   test('Item-specific food imagery verification across all categories', () {
-    FridgeCategoryRepository.reset();
+    FridgeCategoryRepository.seedSampleDataForTesting();
 
     // 1. Check all canonical categories
     for (final categoryName in FridgeCategoryRepository.canonicalCategories) {
@@ -664,10 +733,13 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
 
-    // 1. Pump MealAnalysisScreen directly inside a MaterialApp
+    // 1. Pump MealAnalysisScreen with test fixture dataset
     await tester.pumpWidget(
-      const MaterialApp(
-        home: MealAnalysisScreen(),
+      MaterialApp(
+        home: MealAnalysisScreen(
+          initialMealName: 'Paneer Rice Bowl',
+          initialFoods: DetectedFoodItem.sampleDetectionForTesting,
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -751,7 +823,9 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
 
-    // 1. Initial Fridge and Dashboard state check
+    // 1. Initial Fridge and Dashboard state check using test fixtures
+    MockDataRepository.seedSampleDataForTesting();
+    FridgeCategoryRepository.seedSampleDataForTesting();
     expect(MockDataRepository.nutrition.consumedCalories, 1620);
     expect(FridgeCategoryRepository.getCategoryData('Dairy Products').items.firstWhere((it) => it.name == 'Paneer').quantity, '250 g');
 
@@ -948,9 +1022,10 @@ void main() {
       AppImagePicker.mockHandler = null;
     });
 
-    // Reset shared state
-    MockDataRepository.reset();
-    FridgeCategoryRepository.reset();
+    // Seed fixtures for end-to-end flow test
+    MockDataRepository.seedSampleDataForTesting();
+    FridgeCategoryRepository.seedSampleDataForTesting();
+    MockDataRepository.clearLoggedMealsHistoryForTesting();
 
     AppImagePicker.mockHandler = (source) async {
       return XFile.fromData(AppImagePicker.sampleMockBytes, name: 'captured_meal.png');
@@ -1076,6 +1151,14 @@ void main() {
     await tester.tap(find.byIcon(Icons.bar_chart_rounded));
     await tester.pumpAndSettle();
 
+    // Verify Clean Empty Progress State
+    expect(find.text('Your nutrition journey starts with your first meal.'), findsOneWidget);
+    expect(find.text('Log a Meal with AI'), findsOneWidget);
+
+    // Seed test fixtures to verify cinematic analytics, donut charts and weekly trends
+    MockDataRepository.seedSampleDataForTesting();
+    await tester.pumpAndSettle();
+
     // 3. Verify Header and Subtitle
     expect(find.text('Your nutrition, over time.'), findsOneWidget);
     expect(find.text('Week'), findsOneWidget);
@@ -1103,17 +1186,17 @@ void main() {
     // Tap on Monday bar
     await tester.tap(find.text('Mon'));
     await tester.pumpAndSettle();
-    expect(find.text('Monday, Oct 20'), findsOneWidget);
-    expect(find.text('1980 kcal • 3 meals logged'), findsOneWidget);
+    expect(find.textContaining('Monday'), findsOneWidget);
+    expect(find.textContaining('meals logged'), findsWidgets);
 
     // 7. Verify LeetCode-style Consistency Heatmap
     await tester.ensureVisible(find.text('Meal logging consistency'));
     expect(find.text('Meal logging consistency'), findsOneWidget);
     expect(find.text('Your meal activity'), findsOneWidget);
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsOneWidget);
-    expect(find.text('2'), findsOneWidget);
-    expect(find.text('3+'), findsOneWidget);
+    expect(find.text('0'), findsWidgets);
+    expect(find.text('1'), findsWidgets);
+    expect(find.text('2'), findsWidgets);
+    expect(find.text('3+'), findsWidgets);
     expect(find.textContaining('Meals logged on'), findsOneWidget);
 
     // 8. Verify Removed Sections are NOT present
@@ -1138,8 +1221,8 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
 
-    MockDataRepository.reset();
-    FridgeCategoryRepository.reset();
+    MockDataRepository.seedSampleDataForTesting();
+    FridgeCategoryRepository.seedSampleDataForTesting();
 
     // 1. Pump App and Settle
     await tester.pumpWidget(const NutriFridgeApp());
@@ -1326,9 +1409,9 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
 
-    FridgeCategoryRepository.reset();
-    MockDataRepository.reset();
-    NotificationRepository.reset();
+    FridgeCategoryRepository.seedSampleDataForTesting();
+    MockDataRepository.seedSampleDataForTesting();
+    NotificationRepository.seedSampleNotificationsForTesting();
 
     // 1. Pump App and Settle on Home Screen
     await tester.pumpWidget(const NutriFridgeApp());
@@ -1437,8 +1520,8 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
 
-    FridgeCategoryRepository.reset();
-    MockDataRepository.reset();
+    FridgeCategoryRepository.seedSampleDataForTesting();
+    MockDataRepository.seedSampleDataForTesting();
     NotificationRepository.reset();
 
     // 1. Pump App and Settle on Dashboard
@@ -1517,21 +1600,11 @@ void main() {
     await tester.pumpAndSettle(const Duration(seconds: 3));
     expect(find.text('NutriFridge Assistant'), findsNothing);
 
-    // 8. Verify YouTube Video Carousel
+    // 8. Verify Video Section shows honest neutral message when no videos exist
     await tester.drag(find.byType(SingleChildScrollView), const Offset(0, -320));
     await tester.pumpAndSettle();
     expect(find.text("Watch how it's made"), findsOneWidget);
-    expect(find.text('Cooking videos for this meal.'), findsOneWidget);
-    expect(find.text('Homestyle Paneer Rice Bowl in 15 Minutes'), findsOneWidget);
-    expect(find.text('Fresh Kitchen Tales'), findsOneWidget);
-    expect(find.text('8:24'), findsOneWidget);
-
-    // Tap video card -> honest sample notice
-    await tester.tap(find.text('Homestyle Paneer Rice Bowl in 15 Minutes'));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('Sample Video'), findsOneWidget);
-    await tester.tap(find.text('OK'));
-    await tester.pumpAndSettle();
+    expect(find.text('No video tutorials available for this recipe.'), findsOneWidget);
 
     // 9. Back Navigation -> Returns to Dashboard in previous state
     await tester.ensureVisible(find.byIcon(Icons.arrow_back_rounded));
@@ -1553,8 +1626,8 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
 
-    MockDataRepository.reset();
-    FridgeCategoryRepository.reset();
+    MockDataRepository.seedSampleDataForTesting();
+    FridgeCategoryRepository.seedSampleDataForTesting();
 
     await tester.pumpWidget(const NutriFridgeApp());
     await tester.pumpAndSettle();
@@ -1620,8 +1693,8 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
 
-    MockDataRepository.reset();
-    FridgeCategoryRepository.reset();
+    MockDataRepository.seedSampleDataForTesting();
+    FridgeCategoryRepository.seedSampleDataForTesting();
 
     await tester.pumpWidget(const NutriFridgeApp());
     await tester.pumpAndSettle();
@@ -1667,8 +1740,8 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
 
-    MockDataRepository.reset();
-    FridgeCategoryRepository.reset();
+    MockDataRepository.seedSampleDataForTesting();
+    FridgeCategoryRepository.seedSampleDataForTesting();
     FridgePreferencesRepository.reset();
 
     await tester.pumpWidget(const NutriFridgeApp());
@@ -2059,7 +2132,7 @@ void main() {
   });
 
   testWidgets('Food Details Sheet - Quantity Controls and Inventory Actions Test Matrix', (WidgetTester tester) async {
-    FridgeCategoryRepository.reset();
+    FridgeCategoryRepository.seedSampleDataForTesting();
 
     // 1. Change selector only test & 2. Use Paneer & 3. Add Paneer
     final paneer = FridgeCategoryRepository.findItemById('dairy_2')!;

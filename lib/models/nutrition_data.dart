@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../screens/fridge/models/category_item.dart';
 import '../screens/profile/models/user_profile_data.dart';
 import 'notification_data.dart';
 
@@ -42,12 +43,14 @@ class WellnessScoreData {
   final int previousScore;
   final String statusText;
   final int maxScore;
+  final bool hasSufficientData;
 
   const WellnessScoreData({
     required this.currentScore,
     required this.previousScore,
     required this.statusText,
     this.maxScore = 100,
+    this.hasSufficientData = true,
   });
 
   int get scoreDiff => currentScore - previousScore;
@@ -157,75 +160,82 @@ class MockDataRepository {
     notifier.value++;
   }
 
-  static const UserProfile user = UserProfile(
-    name: 'Ridhim',
-    greeting: 'Good Evening, Ridhim 👋',
+  static UserProfile get user => UserProfile(
+    name: _currentProfile.displayName.isNotEmpty ? _currentProfile.displayName : 'Food Explorer',
+    greeting: _currentProfile.displayName.isNotEmpty
+        ? 'Welcome back, ${_currentProfile.displayName} 👋'
+        : 'Welcome to NutriFridge 👋',
     subtitle: 'Ready for a healthier day?',
   );
 
-  static const RecipeRecommendation recommendation = RecipeRecommendation(
-    title: 'Paneer Rice Bowl',
-    calories: 520,
-    proteinGrams: 24,
-    fridgeItemsUsed: 4,
-    tag: 'Picked for your fridge',
-    imageUrl: 'assets/images/paneer_rice_bowl.jpg',
-  );
+  static RecipeRecommendation? _explicitRecommendation;
+  static RecipeRecommendation? get recommendation =>
+      _explicitRecommendation ?? _deriveDynamicRecommendation();
 
-  static const WellnessScoreData wellness = WellnessScoreData(
-    currentScore: 82,
-    previousScore: 78,
-    statusText: 'Great today',
-  );
+  static void setRecommendationForTesting(RecipeRecommendation? rec) {
+    _explicitRecommendation = rec;
+    _notify();
+  }
+
+  static RecipeRecommendation? _deriveDynamicRecommendation() {
+    // Generate recommendation only from actual confirmed fridge inventory
+    final paneer = FridgeCategoryRepository.findItemByName('Paneer');
+    if (paneer != null) {
+      return const RecipeRecommendation(
+        title: 'Paneer Rice Bowl',
+        calories: 520,
+        proteinGrams: 24,
+        fridgeItemsUsed: 1,
+        tag: 'From your fridge',
+        imageUrl: 'assets/images/paneer_rice_bowl.jpg',
+      );
+    }
+    return null;
+  }
+
+  static WellnessScoreData? _explicitWellness;
+  static WellnessScoreData? get wellness =>
+      _explicitWellness ?? _deriveDynamicWellness();
+
+  static void setWellnessForTesting(WellnessScoreData? w) {
+    _explicitWellness = w;
+    _notify();
+  }
+
+  static WellnessScoreData? _deriveDynamicWellness() {
+    if (_loggedMealsHistory.isEmpty) return null;
+    final mealsCount = _loggedMealsHistory.length;
+    final score = (72 + (mealsCount * 5)).clamp(70, 95);
+    final prev = score - 2;
+    return WellnessScoreData(
+      currentScore: score,
+      previousScore: prev,
+      statusText: score >= 85 ? 'Great today' : 'Good progress',
+      hasSufficientData: true,
+    );
+  }
 
   static const DailyNutritionData _initialNutrition = DailyNutritionData(
-    consumedCalories: 1620,
-    targetCalories: 2200,
-    protein: MacroNutrient(name: 'Protein', amountGrams: 72, targetGrams: 90),
-    carbs: MacroNutrient(name: 'Carbs', amountGrams: 210, targetGrams: 260),
-    fat: MacroNutrient(name: 'Fat', amountGrams: 62, targetGrams: 70),
+    consumedCalories: 0,
+    targetCalories: 2000,
+    protein: MacroNutrient(name: 'Protein', amountGrams: 0, targetGrams: 90),
+    carbs: MacroNutrient(name: 'Carbs', amountGrams: 0, targetGrams: 260),
+    fat: MacroNutrient(name: 'Fat', amountGrams: 0, targetGrams: 70),
   );
 
-  static const List<MealItem> _initialMeals = [
-    MealItem(
-      name: 'Breakfast',
-      status: MealStatus.completed,
-      time: '8:30 AM',
-      iconEmoji: '🍳',
-    ),
-    MealItem(
-      name: 'Lunch',
-      status: MealStatus.completed,
-      time: '1:15 PM',
-      iconEmoji: '🥗',
-    ),
-    MealItem(
-      name: 'Snack',
-      status: MealStatus.upcoming,
-      time: '4:45 PM',
-      iconEmoji: '🍎',
-    ),
-    MealItem(
-      name: 'Dinner',
-      status: MealStatus.upcoming,
-      time: '8:00 PM',
-      iconEmoji: '🍲',
-    ),
-  ];
-
   static DailyNutritionData _currentNutrition = _initialNutrition;
-  static List<MealItem> _currentMeals = List<MealItem>.from(_initialMeals);
+  static List<MealItem> _currentMeals = [];
   static final List<Map<String, dynamic>> _loggedMealsHistory = [];
   static UserProfileData _currentProfile = const UserProfileData(
-    displayName: 'Ridhim',
-    dietaryPreference: 'Vegetarian',
-    nutritionGoal: 'Balanced eating',
-    dailyCalorieTarget: 2200,
+    displayName: '',
+    dietaryPreference: null,
+    nutritionGoal: null,
+    dailyCalorieTarget: null,
     allergies: {},
     avoidedFoods: {},
     customRestrictions: [],
-    mealRemindersEnabled: true,
-    expiryAlertsEnabled: true,
+    mealRemindersEnabled: false,
+    expiryAlertsEnabled: false,
   );
 
   /// Current user profile settings
@@ -324,11 +334,55 @@ class MockDataRepository {
     _notify();
   }
 
-  /// Resets mock repository to clean initial state (for tests)
-  static void reset() {
-    _currentNutrition = _initialNutrition;
-    _currentMeals = List<MealItem>.from(_initialMeals);
-    _loggedMealsHistory.clear();
+  /// Seeds sample demo data for specific automated widget test suites
+  static void seedSampleDataForTesting() {
+    _explicitRecommendation = const RecipeRecommendation(
+      title: 'Paneer Rice Bowl',
+      calories: 520,
+      proteinGrams: 24,
+      fridgeItemsUsed: 4,
+      tag: 'Picked for your fridge',
+      imageUrl: 'assets/images/paneer_rice_bowl.jpg',
+    );
+    _explicitWellness = const WellnessScoreData(
+      currentScore: 82,
+      previousScore: 78,
+      statusText: 'Great today',
+      hasSufficientData: true,
+    );
+    _currentNutrition = const DailyNutritionData(
+      consumedCalories: 1620,
+      targetCalories: 2200,
+      protein: MacroNutrient(name: 'Protein', amountGrams: 72, targetGrams: 90),
+      carbs: MacroNutrient(name: 'Carbs', amountGrams: 210, targetGrams: 260),
+      fat: MacroNutrient(name: 'Fat', amountGrams: 62, targetGrams: 70),
+    );
+    _currentMeals = [
+      const MealItem(
+        name: 'Breakfast',
+        status: MealStatus.completed,
+        time: '8:30 AM',
+        iconEmoji: '🍳',
+      ),
+      const MealItem(
+        name: 'Lunch',
+        status: MealStatus.completed,
+        time: '1:15 PM',
+        iconEmoji: '🥗',
+      ),
+      const MealItem(
+        name: 'Snack',
+        status: MealStatus.upcoming,
+        time: '4:45 PM',
+        iconEmoji: '🍎',
+      ),
+      const MealItem(
+        name: 'Dinner',
+        status: MealStatus.upcoming,
+        time: '8:00 PM',
+        iconEmoji: '🍲',
+      ),
+    ];
     _currentProfile = const UserProfileData(
       displayName: 'Ridhim',
       dietaryPreference: 'Vegetarian',
@@ -340,6 +394,51 @@ class MockDataRepository {
       mealRemindersEnabled: true,
       expiryAlertsEnabled: true,
     );
+    _loggedMealsHistory.clear();
+    _loggedMealsHistory.addAll([
+      {
+        'mealType': 'breakfast',
+        'mealName': 'Oats & Banana',
+        'calories': 380,
+        'protein': 14,
+        'carbs': 65,
+        'fat': 8,
+      },
+      {
+        'mealType': 'lunch',
+        'mealName': 'Paneer Rice Bowl',
+        'calories': 520,
+        'protein': 24,
+        'carbs': 62,
+        'fat': 18,
+      },
+    ]);
+    _notify();
+  }
+
+  static void clearLoggedMealsHistoryForTesting() {
+    _loggedMealsHistory.clear();
+    _notify();
+  }
+
+  /// Resets mock repository to clean initial empty state
+  static void reset() {
+    _currentNutrition = _initialNutrition;
+    _currentMeals = [];
+    _loggedMealsHistory.clear();
+    _currentProfile = const UserProfileData(
+      displayName: '',
+      dietaryPreference: null,
+      nutritionGoal: null,
+      dailyCalorieTarget: null,
+      allergies: {},
+      avoidedFoods: {},
+      customRestrictions: [],
+      mealRemindersEnabled: false,
+      expiryAlertsEnabled: false,
+    );
+    _explicitRecommendation = null;
+    _explicitWellness = null;
     NotificationRepository.reset();
     _notify();
   }

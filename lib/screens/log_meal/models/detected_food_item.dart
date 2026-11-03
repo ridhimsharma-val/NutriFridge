@@ -33,8 +33,8 @@ class DetectedFoodItem {
     );
   }
 
-  /// Initial sample detection dataset for prototype UI review.
-  static List<DetectedFoodItem> get initialSampleDetection => [
+  /// Sample detection dataset for automated tests or fixtures
+  static List<DetectedFoodItem> get sampleDetectionForTesting => [
         DetectedFoodItem(
           id: 'item_paneer',
           name: 'Paneer',
@@ -57,4 +57,7 @@ class DetectedFoodItem {
           imageAsset: 'assets/images/categories/vegetables.jpg',
         ),
       ];
+
+  /// Backwards compatibility alias for testing fixtures
+  static List<DetectedFoodItem> get initialSampleDetection => sampleDetectionForTesting;
 }

@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/services/app_image_picker.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
+import '../ai_assistant/services/ai_assistant_service.dart';
 import '../fridge/models/category_item.dart';
 import 'widgets/food_scan_preview.dart';
 
@@ -42,43 +44,7 @@ class _ReceiptScanPageState extends State<ReceiptScanPage> {
   @override
   void initState() {
     super.initState();
-    _extractedItems = [
-      _ReceiptItem(
-        name: 'Milk',
-        quantity: '500 ml',
-        category: 'Dairy Products',
-        expiryDays: 3,
-        emoji: '🥛',
-      ),
-      _ReceiptItem(
-        name: 'Paneer',
-        quantity: '250 g',
-        category: 'Dairy Products',
-        expiryDays: 4,
-        emoji: '🧀',
-      ),
-      _ReceiptItem(
-        name: 'Apples',
-        quantity: '4 pieces',
-        category: 'Fruits',
-        expiryDays: 7,
-        emoji: '🍎',
-      ),
-      _ReceiptItem(
-        name: 'Carrots',
-        quantity: '500 g',
-        category: 'Vegetables',
-        expiryDays: 6,
-        emoji: '🥕',
-      ),
-      _ReceiptItem(
-        name: 'Bread',
-        quantity: '1 pack',
-        category: 'Packaged Food',
-        expiryDays: 4,
-        emoji: '🍞',
-      ),
-    ];
+    _extractedItems = [];
   }
 
   Uint8List? _previewImageBytes;
@@ -100,8 +66,9 @@ class _ReceiptScanPageState extends State<ReceiptScanPage> {
       if (mounted) {
         setState(() {
           _previewImageBytes = bytes;
-          _previewImage = 'assets/categories/raw/UI 1.jpg';
+          _previewImage = null;
           _analysisComplete = false;
+          _extractedItems = [];
         });
       }
     } on PlatformException catch (e) {
@@ -141,17 +108,65 @@ class _ReceiptScanPageState extends State<ReceiptScanPage> {
   }
 
   Future<void> _analyzeReceipt() async {
+    if (_previewImageBytes == null) {
+      _showFeedback('Please take or choose a photo of a receipt or grocery list first.');
+      return;
+    }
+
     setState(() {
       _isAnalyzing = true;
     });
 
-    await Future.delayed(const Duration(milliseconds: 900));
+    try {
+      final base64Image = base64Encode(_previewImageBytes!);
+      final response = await AiAssistantService.sendRequest(
+        message: 'Extract all grocery items, quantities, and units from this receipt image for fridge inventory',
+        imageBase64: base64Image,
+        mimeType: 'image/jpeg',
+        actionHint: 'add_inventory',
+      );
 
-    if (mounted) {
+      if (!mounted) return;
+
+      final items = response['inventoryItems'];
+      final List<_ReceiptItem> parsedItems = [];
+
+      if (items is List && items.isNotEmpty) {
+        for (final raw in items) {
+          final item = raw as Map<String, dynamic>;
+          final name = item['name']?.toString() ?? 'Item';
+          final cat = item['category']?.toString() ?? 'Others';
+          final qty = item['quantity']?.toString() ?? '1';
+          final unit = item['unit']?.toString() ?? 'item';
+          final exp = (item['expiryDaysEstimate'] is num)
+              ? (item['expiryDaysEstimate'] as num).toInt()
+              : 5;
+          parsedItems.add(
+            _ReceiptItem(
+              name: name,
+              quantity: '$qty $unit'.trim(),
+              category: cat,
+              expiryDays: exp,
+              emoji: FoodItemAssetRegistry.getEmojiForCategory(cat),
+            ),
+          );
+        }
+      }
+
       setState(() {
         _isAnalyzing = false;
         _analysisComplete = true;
+        _extractedItems = parsedItems;
       });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isAnalyzing = false;
+          _analysisComplete = true;
+          _extractedItems = [];
+        });
+        _showFeedback('Unable to read receipt items. Please try again.');
+      }
     }
   }
 
@@ -255,6 +270,48 @@ class _ReceiptScanPageState extends State<ReceiptScanPage> {
   }
 
   Widget _buildExtractedItemsList() {
+    if (_extractedItems.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.receipt_long_outlined, size: 52, color: AppColors.textTertiary),
+              const SizedBox(height: 16),
+              Text(
+                'Could not read items from this image.',
+                textAlign: TextAlign.center,
+                style: AppTypography.cardTitle.copyWith(fontSize: 17),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Ensure the receipt or grocery list is clear, flat, and well lit.',
+                textAlign: TextAlign.center,
+                style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _analysisComplete = false;
+                  });
+                },
+                icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                label: const Text('Try Another Image'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.tealPrimary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final selectedCount = _extractedItems.where((it) => it.isSelected).length;
 
     return Column(

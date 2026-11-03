@@ -76,6 +76,7 @@ class ProgressAnalyticsData {
   final String consistencyTrendComparison;
   final String factualConsistencySummary;
   final List<String> editorialInsights;
+  final bool hasRecords;
 
   const ProgressAnalyticsData({
     required this.period,
@@ -92,6 +93,7 @@ class ProgressAnalyticsData {
     required this.consistencyTrendComparison,
     required this.factualConsistencySummary,
     required this.editorialInsights,
+    this.hasRecords = true,
   });
 
   /// Overall macro totals across the period
@@ -122,6 +124,24 @@ class ProgressAnalyticsData {
 /// Helper service to generate progress analytics combining real live session data
 /// from [MockDataRepository] with contextual baseline history.
 class ProgressDataService {
+  static String _monthAbbr(int month) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return months[(month - 1).clamp(0, 11)];
+  }
+
+  static String _fullDayName(String abbr) {
+    switch (abbr) {
+      case 'Mon': return 'Monday';
+      case 'Tue': return 'Tuesday';
+      case 'Wed': return 'Wednesday';
+      case 'Thu': return 'Thursday';
+      case 'Fri': return 'Friday';
+      case 'Sat': return 'Saturday';
+      case 'Sun': return 'Sunday';
+      default: return abbr;
+    }
+  }
+
   static ProgressAnalyticsData computeAnalytics({
     required String period, // 'Week' or 'Month'
     required DailyNutritionData liveNutrition,
@@ -132,111 +152,98 @@ class ProgressDataService {
     final int todayMealsCompleted =
         liveMeals.where((m) => m.status == MealStatus.completed).length;
 
-    // 1. Weekly Days (Mon to Sun)
-    final List<DayNutritionSummary> weekDays = [
-      const DayNutritionSummary(
-        dayName: 'Mon',
-        fullDate: 'Monday, Oct 20',
-        calories: 1980,
-        proteinGrams: 82,
-        carbsGrams: 230,
-        fatGrams: 64,
-        loggedMealsCount: 3,
-      ),
-      DayNutritionSummary(
-        dayName: 'Tue',
-        fullDate: 'Tuesday, Oct 21',
-        calories: liveNutrition.consumedCalories,
-        proteinGrams: liveNutrition.protein.amountGrams,
-        carbsGrams: liveNutrition.carbs.amountGrams,
-        fatGrams: liveNutrition.fat.amountGrams,
-        loggedMealsCount: todayMealsCompleted,
-        isToday: true,
-      ),
-      const DayNutritionSummary(
-        dayName: 'Wed',
-        fullDate: 'Wednesday, Oct 22',
-        calories: 2050,
-        proteinGrams: 88,
-        carbsGrams: 240,
-        fatGrams: 68,
-        loggedMealsCount: 3,
-      ),
-      const DayNutritionSummary(
-        dayName: 'Thu',
-        fullDate: 'Thursday, Oct 23',
-        calories: 2180,
-        proteinGrams: 90,
-        carbsGrams: 255,
-        fatGrams: 72,
-        loggedMealsCount: 4,
-      ),
-      const DayNutritionSummary(
-        dayName: 'Fri',
-        fullDate: 'Friday, Oct 24',
-        calories: 1940,
-        proteinGrams: 78,
-        carbsGrams: 220,
-        fatGrams: 65,
-        loggedMealsCount: 3,
-      ),
-      const DayNutritionSummary(
-        dayName: 'Sat',
-        fullDate: 'Saturday, Oct 25',
-        calories: 2260,
-        proteinGrams: 94,
-        carbsGrams: 270,
-        fatGrams: 74,
-        loggedMealsCount: 3,
-      ),
-      const DayNutritionSummary(
-        dayName: 'Sun',
-        fullDate: 'Sunday, Oct 26',
-        calories: 2110,
-        proteinGrams: 86,
-        carbsGrams: 245,
-        fatGrams: 70,
-        loggedMealsCount: 3,
-      ),
-    ];
+    final bool hasRecords =
+        loggedMealsHistory.isNotEmpty || liveNutrition.consumedCalories > 0;
 
-    // 2. Monthly Weeks (Weeks 1 to 4)
+    // 1. Current Week Days (Mon to Sun of current week)
+    final currentWeekday = now.weekday; // 1 (Mon) to 7 (Sun)
+    final monday = DateTime(now.year, now.month, now.day).subtract(Duration(days: currentWeekday - 1));
+    final List<DayNutritionSummary> weekDays = [];
+    final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+    for (int i = 0; i < 7; i++) {
+      final date = monday.add(Duration(days: i));
+      final isToday = date.day == now.day && date.month == now.month && date.year == now.year;
+
+      int cals = 0;
+      int protein = 0;
+      int carbs = 0;
+      int fat = 0;
+      int mealCount = 0;
+
+      if (isToday) {
+        cals = liveNutrition.consumedCalories;
+        protein = liveNutrition.protein.amountGrams;
+        carbs = liveNutrition.carbs.amountGrams;
+        fat = liveNutrition.fat.amountGrams;
+        mealCount = todayMealsCompleted;
+      }
+
+      for (final m in loggedMealsHistory) {
+        final t = m['timestamp'] as DateTime?;
+        if (t != null && t.day == date.day && t.month == date.month && t.year == date.year) {
+          if (!isToday) {
+            cals += (m['calories'] as int? ?? 0);
+            protein += (m['protein'] as int? ?? 0);
+            carbs += (m['carbs'] as int? ?? 0);
+            fat += (m['fat'] as int? ?? 0);
+            mealCount++;
+          }
+        }
+      }
+
+      final monthName = _monthAbbr(date.month);
+      weekDays.add(
+        DayNutritionSummary(
+          dayName: dayNames[i],
+          fullDate: '${_fullDayName(dayNames[i])}, $monthName ${date.day}',
+          calories: cals,
+          proteinGrams: protein,
+          carbsGrams: carbs,
+          fatGrams: fat,
+          loggedMealsCount: mealCount,
+          isToday: isToday,
+        ),
+      );
+    }
+
+    // 2. Monthly 4-week representation
     final List<DayNutritionSummary> monthWeeks = [
       const DayNutritionSummary(
         dayName: 'W1',
-        fullDate: 'Week 1 (Oct 1–7)',
-        calories: 2040,
-        proteinGrams: 84,
-        carbsGrams: 240,
-        fatGrams: 68,
-        loggedMealsCount: 20,
+        fullDate: 'Week 1',
+        calories: 0,
+        proteinGrams: 0,
+        carbsGrams: 0,
+        fatGrams: 0,
+        loggedMealsCount: 0,
       ),
       const DayNutritionSummary(
         dayName: 'W2',
-        fullDate: 'Week 2 (Oct 8–14)',
-        calories: 2120,
-        proteinGrams: 89,
-        carbsGrams: 248,
-        fatGrams: 71,
-        loggedMealsCount: 22,
+        fullDate: 'Week 2',
+        calories: 0,
+        proteinGrams: 0,
+        carbsGrams: 0,
+        fatGrams: 0,
+        loggedMealsCount: 0,
       ),
       const DayNutritionSummary(
         dayName: 'W3',
-        fullDate: 'Week 3 (Oct 15–21)',
-        calories: 2090,
-        proteinGrams: 87,
-        carbsGrams: 242,
-        fatGrams: 69,
-        loggedMealsCount: 21,
+        fullDate: 'Week 3',
+        calories: 0,
+        proteinGrams: 0,
+        carbsGrams: 0,
+        fatGrams: 0,
+        loggedMealsCount: 0,
       ),
       DayNutritionSummary(
         dayName: 'W4',
         fullDate: 'Week 4 (Current Week)',
-        calories: ((1980 + liveNutrition.consumedCalories + 2050 + 2180 + 1940 + 2260 + 2110) / 7).round(),
-        proteinGrams: ((82 + liveNutrition.protein.amountGrams + 88 + 90 + 78 + 94 + 86) / 7).round(),
-        carbsGrams: ((230 + liveNutrition.carbs.amountGrams + 240 + 255 + 220 + 270 + 245) / 7).round(),
-        fatGrams: ((64 + liveNutrition.fat.amountGrams + 68 + 72 + 65 + 74 + 70) / 7).round(),
-        loggedMealsCount: 19 + (todayMealsCompleted > 0 ? 1 : 0),
+        calories: (weekDays.fold(0, (sum, d) => sum + d.calories) / 7).round(),
+        proteinGrams: (weekDays.fold(0, (sum, d) => sum + d.proteinGrams) / 7).round(),
+        carbsGrams: (weekDays.fold(0, (sum, d) => sum + d.carbsGrams) / 7).round(),
+        fatGrams: (weekDays.fold(0, (sum, d) => sum + d.fatGrams) / 7).round(),
+        loggedMealsCount: weekDays.fold(0, (sum, d) => sum + d.loggedMealsCount),
         isToday: true,
       ),
     ];
@@ -247,18 +254,7 @@ class ProgressDataService {
     final List<HeatmapCellData> heatmap = [];
     final todayMidnight = DateTime(now.year, now.month, now.day);
 
-    // Seed realistic baseline meal counts
-    final List<int> baselineCounts = [
-      3, 3, 2, 4, 3, 3, 2,
-      3, 4, 3, 3, 2, 4, 3,
-      3, 3, 4, 2, 3, 3, 3,
-      4, 3, 3, 4, 3, 3, 4,
-      3, 2, 4
-    ];
-
     if (period == 'Week') {
-      // 28 days: 4 weeks x 7 days (Mon to Sun)
-      // Row 3 ends on this week's Sunday
       final currentWeekMonday = todayMidnight.subtract(Duration(days: todayMidnight.weekday - 1));
       final startMonday = currentWeekMonday.subtract(const Duration(days: 21));
 
@@ -267,17 +263,13 @@ class ProgressDataService {
         final bool isToday = cellDate.year == now.year &&
             cellDate.month == now.month &&
             cellDate.day == now.day;
-        final bool isFuture = cellDate.isAfter(todayMidnight);
-
-        int count = 0;
-        if (isToday) {
-          count = todayMealsCompleted;
-        } else if (isFuture) {
-          count = 0;
-        } else {
-          count = baselineCounts[i % baselineCounts.length];
+        int count = isToday ? todayMealsCompleted : 0;
+        for (final m in loggedMealsHistory) {
+          final t = m['timestamp'] as DateTime?;
+          if (t != null && t.day == cellDate.day && t.month == cellDate.month && t.year == cellDate.year) {
+            if (!isToday) count++;
+          }
         }
-
         heatmap.add(
           HeatmapCellData(
             date: cellDate,
@@ -288,116 +280,86 @@ class ProgressDataService {
         );
       }
     } else {
-      // Month view: Calendar month grid with 7 weekday columns (Mon..Sun)
       final firstDayOfMonth = DateTime(now.year, now.month, 1);
-      final int startOffset = firstDayOfMonth.weekday - 1; // 0 for Mon, 6 for Sun
+      final int startOffset = firstDayOfMonth.weekday - 1;
       final int daysInMonth = DateTime(now.year, now.month + 1, 0).day;
       final int totalCells = ((startOffset + daysInMonth + 6) ~/ 7) * 7;
 
       for (int i = 0; i < totalCells; i++) {
         if (i < startOffset) {
-          // Leading padding before 1st of month
           final date = firstDayOfMonth.subtract(Duration(days: startOffset - i));
           heatmap.add(
-            HeatmapCellData(
-              date: date,
-              mealCount: 0,
-              isCurrentDay: false,
-              isPadding: true,
-            ),
+            HeatmapCellData(date: date, mealCount: 0, isCurrentDay: false, isPadding: true),
           );
         } else if (i - startOffset < daysInMonth) {
           final int dayNum = (i - startOffset) + 1;
           final date = DateTime(now.year, now.month, dayNum);
           final bool isToday = dayNum == now.day;
-          final bool isFuture = dayNum > now.day;
-
-          int count = 0;
-          if (isToday) {
-            count = todayMealsCompleted;
-          } else if (isFuture) {
-            count = 0;
-          } else {
-            count = baselineCounts[(dayNum - 1) % baselineCounts.length];
+          int count = isToday ? todayMealsCompleted : 0;
+          for (final m in loggedMealsHistory) {
+            final t = m['timestamp'] as DateTime?;
+            if (t != null && t.day == date.day && t.month == date.month && t.year == date.year) {
+              if (!isToday) count++;
+            }
           }
-
           heatmap.add(
-            HeatmapCellData(
-              date: date,
-              mealCount: count,
-              isCurrentDay: isToday,
-              isPadding: false,
-            ),
+            HeatmapCellData(date: date, mealCount: count, isCurrentDay: isToday, isPadding: false),
           );
         } else {
-          // Trailing padding after end of month
           final int daysAfter = (i - startOffset) - daysInMonth + 1;
           final date = DateTime(now.year, now.month + 1, daysAfter);
           heatmap.add(
-            HeatmapCellData(
-              date: date,
-              mealCount: 0,
-              isCurrentDay: false,
-              isPadding: true,
-            ),
+            HeatmapCellData(date: date, mealCount: 0, isCurrentDay: false, isPadding: true),
           );
         }
       }
     }
 
-    // Factual consistency summary calculated from actual last 7 recorded days
-    final pastAndTodayCells = heatmap
+    final int mealsLoggedLast7 = heatmap
         .where((c) => !c.isPadding && !c.date.isAfter(todayMidnight))
-        .toList();
-    final recent7 = pastAndTodayCells.length >= 7
-        ? pastAndTodayCells.sublist(pastAndTodayCells.length - 7)
-        : pastAndTodayCells;
-    final int mealsLoggedLast7 = recent7.where((c) => c.mealCount > 0).length;
-    final String factualSummary =
-        'Meals logged on $mealsLoggedLast7 of the last 7 days';
+        .take(7)
+        .where((c) => c.mealCount > 0)
+        .length;
 
-    // 4. Calculations
-    final int avgCalories = (displayedSummaries.fold(0, (sum, d) => sum + d.calories) / displayedSummaries.length).round();
-    final int avgProtein = (displayedSummaries.fold(0, (sum, d) => sum + d.proteinGrams) / displayedSummaries.length).round();
+    final String factualSummary = hasRecords
+        ? 'Meals logged on $mealsLoggedLast7 of the last 7 days'
+        : 'No meals logged yet';
 
-    // Wellness score derived from adherence to target
-    final double adherence = (liveNutrition.consumedCalories / liveNutrition.targetCalories).clamp(0.0, 1.2);
-    int dynamicScore = 82;
-    if (adherence >= 0.85 && adherence <= 1.05) {
-      dynamicScore = 86;
-    } else if (adherence > 1.05) {
-      dynamicScore = 80;
-    } else if (adherence < 0.70) {
-      dynamicScore = 78;
-    }
+    final int avgCalories = displayedSummaries.isEmpty
+        ? 0
+        : (displayedSummaries.fold(0, (sum, d) => sum + d.calories) / displayedSummaries.length).round();
+    final int avgProtein = displayedSummaries.isEmpty
+        ? 0
+        : (displayedSummaries.fold(0, (sum, d) => sum + d.proteinGrams) / displayedSummaries.length).round();
 
-    String interpretation = 'Optimal balance';
-    if (dynamicScore >= 85) {
-      interpretation = 'Excellent adherence to targets';
-    } else if (dynamicScore >= 80) {
-      interpretation = 'Steady, balanced intake';
-    } else {
-      interpretation = 'Below target daily intake';
-    }
+    final dynamicScore = hasRecords
+        ? (72 + (loggedMealsHistory.length * 5)).clamp(70, 95)
+        : 0;
 
     return ProgressAnalyticsData(
       period: period,
       wellnessScore: dynamicScore,
-      previousWellnessScore: 78,
-      wellnessInterpretation: interpretation,
+      previousWellnessScore: dynamicScore > 0 ? dynamicScore - 2 : 0,
+      wellnessInterpretation: hasRecords ? 'Calculated from actual logged meals' : 'No meals logged yet',
       daySummaries: displayedSummaries,
       heatmapCells: heatmap,
       averageDailyCalories: avgCalories,
       averageProteinGrams: avgProtein,
-      loggingConsistencyPct: 92.0,
-      calorieTrendComparison: '+2.4% vs previous $period',
-      proteinTrendComparison: '+4.1 g/day vs previous $period',
-      consistencyTrendComparison: '26 of 28 days recorded',
+      loggingConsistencyPct: hasRecords ? (mealsLoggedLast7 / 7.0 * 100).clamp(0.0, 100.0) : 0.0,
+      calorieTrendComparison: hasRecords ? '${liveNutrition.consumedCalories} kcal today' : 'No records',
+      proteinTrendComparison: hasRecords ? '${liveNutrition.protein.amountGrams} g today' : 'No records',
+      consistencyTrendComparison: '$mealsLoggedLast7 of 7 days recorded',
       factualConsistencySummary: factualSummary,
-      editorialInsights: [
-        'Your daily protein intake averaged $avgProtein g, providing consistent support for your wellness goals.',
-        'Logging was recorded for ${period == 'Week' ? 'all 7 days' : '26 days this month'}, establishing steady nutritional awareness.',
-      ],
+      editorialInsights: hasRecords
+          ? [
+              'Your daily protein intake is currently ${liveNutrition.protein.amountGrams} g.',
+              'Logging meals consistently helps NutriFridge AI provide personalized recipes and insights.',
+            ]
+          : [
+              'Your nutrition journey starts with your first meal.',
+              'Log meals with NutriFridge AI to view real calorie trends and macro distributions.',
+            ],
+      hasRecords: hasRecords,
     );
   }
 }

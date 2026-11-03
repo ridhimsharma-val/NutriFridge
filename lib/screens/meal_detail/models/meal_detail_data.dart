@@ -1,5 +1,6 @@
 import '../../../models/nutrition_data.dart';
 import '../../fridge/models/category_item.dart';
+import 'recipe_video_item.dart';
 
 /// Inventory availability status for a recipe ingredient.
 enum IngredientAvailability {
@@ -35,6 +36,7 @@ class MealDetailInfo {
   final int prepTimeMinutes;
   final List<String> whyReasons;
   final List<MealIngredientItem> ingredients;
+  final List<RecipeVideoItem> videos;
 
   const MealDetailInfo({
     required this.name,
@@ -47,6 +49,7 @@ class MealDetailInfo {
     required this.prepTimeMinutes,
     required this.whyReasons,
     required this.ingredients,
+    this.videos = const [],
   });
 
   /// Derives detailed meal information from the dashboard [RecipeRecommendation],

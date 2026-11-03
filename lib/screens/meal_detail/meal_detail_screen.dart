@@ -4,7 +4,6 @@ import '../../core/theme/app_typography.dart';
 import '../../models/nutrition_data.dart';
 import '../fridge/models/category_item.dart';
 import 'models/meal_detail_data.dart';
-import 'models/recipe_video_item.dart';
 import 'widgets/ai_assistant_modal.dart';
 import 'widgets/video_card.dart';
 
@@ -747,7 +746,44 @@ class MealDetailScreen extends StatelessWidget {
   // 6. WATCH HOW IT'S MADE — VIDEO CAROUSEL
   // ==========================================
   Widget _buildVideoCarousel(MealDetailInfo meal) {
-    const videos = RecipeVideoItem.defaultVideos;
+    if (meal.videos.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Watch how it's made",
+            style: AppTypography.sectionTitle.copyWith(fontSize: 16),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppColors.cardCream.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.borderGrey.withValues(alpha: 0.6)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.videocam_off_outlined, size: 22, color: AppColors.textSecondary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'No video tutorials available for this recipe.',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    final videos = meal.videos;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

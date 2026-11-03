@@ -104,6 +104,16 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     }
   }
 
+  void _retryLastUserMessage() {
+    for (int i = _messages.length - 1; i >= 0; i--) {
+      if (_messages[i].isUser) {
+        final text = _messages[i].text;
+        _handleSend(promptOverride: text);
+        break;
+      }
+    }
+  }
+
   Future<void> _handleSend({String? promptOverride}) async {
     final text = (promptOverride ?? _textController.text).trim();
     if (text.isEmpty && _selectedImageBase64 == null) return;
@@ -906,6 +916,25 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               if (message.needsClarification && message.clarifyingQuestion != null) ...[
                 const SizedBox(height: 12),
                 _buildClarificationCard(message.clarifyingQuestion!),
+              ],
+
+              // Embedded Error Retry Action
+              if (message.action == 'error') ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _retryLastUserMessage,
+                  icon: const Icon(Icons.refresh_rounded, size: 16, color: AppColors.error),
+                  label: const Text(
+                    'Retry',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.error),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFEF2F2),
+                    side: const BorderSide(color: Color(0xFFFECACA)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  ),
+                ),
               ],
             ],
           ),

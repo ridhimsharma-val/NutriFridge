@@ -28,21 +28,59 @@ class MealStatusCardSection extends StatelessWidget {
         const SizedBox(height: 10),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
-          child: Row(
-            children: meals.map((meal) {
-              return Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    right: meal == meals.last ? 0 : 8.0,
+          child: meals.isEmpty
+              ? Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.cardWhite,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.cardBorder, width: 1.1),
+                    boxShadow: const [AppColors.softShadow],
                   ),
-                  child: _MealItemCard(
-                    meal: meal,
-                    onTap: () => onMealTap?.call(meal),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF7FAF8),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.restaurant_outlined,
+                          size: 18,
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'No meals logged yet today',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
+                )
+              : Row(
+                  children: meals.map((meal) {
+                    return Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          right: meal == meals.last ? 0 : 8.0,
+                        ),
+                        child: _MealItemCard(
+                          meal: meal,
+                          onTap: () => onMealTap?.call(meal),
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
-              );
-            }).toList(),
-          ),
         ),
       ],
     );
