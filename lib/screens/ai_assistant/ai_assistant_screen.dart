@@ -535,48 +535,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    // B. Nutrition calculation info section
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F6F0),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFBBE5D4)),
-                      ),
-                      child: const Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(Icons.auto_awesome, size: 18, color: AppColors.tealPrimary),
-                          SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'NutriFridge AI will estimate the nutrition for your meal.',
-                                  style: TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF0F5132),
-                                  ),
-                                ),
-                                SizedBox(height: 2),
-                                Text(
-                                  'You can review the estimated values before logging.',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: Color(0xFF14532D),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // C. Optional manual nutrition entry expandable trigger
+                    // Optional manual nutrition entry expandable trigger
                     InkWell(
                       borderRadius: BorderRadius.circular(12),
                       onTap: () {
@@ -2020,37 +1979,39 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           const SizedBox(height: 4),
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                decoration: BoxDecoration(
-                  color: isManual ? const Color(0xFFEFF6FF) : const Color(0xFFE8F6F0),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: isManual ? const Color(0xFFBFDBFE) : const Color(0xFFA7F3D0),
-                    width: 0.8,
+              if (isManual) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: const Color(0xFFBFDBFE),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.edit_note_rounded,
+                        size: 11,
+                        color: Color(0xFF2563EB),
+                      ),
+                      SizedBox(width: 3),
+                      Text(
+                        'Manual Entry',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1D4ED8),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isManual ? Icons.edit_note_rounded : Icons.auto_awesome,
-                      size: 11,
-                      color: isManual ? const Color(0xFF2563EB) : AppColors.tealPrimary,
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                      isManual ? 'Manual Entry' : 'AI Estimate',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: isManual ? const Color(0xFF1D4ED8) : AppColors.tealPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 6),
+                const SizedBox(width: 6),
+              ],
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                 decoration: BoxDecoration(

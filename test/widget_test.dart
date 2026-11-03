@@ -2724,8 +2724,9 @@ void main() {
     await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
     await tester.pumpAndSettle();
 
-    // Verify initial proposed meal card shows "AI Estimate" badge, no yellow banner, and no "Will deduct" badge
-    expect(find.text('AI Estimate'), findsOneWidget);
+    // Verify initial proposed meal card shows meal type badge, no "AI Estimate" badge, no yellow banner, and no "Will deduct" badge
+    expect(find.text('AI Estimate'), findsNothing);
+    expect(find.text('LUNCH'), findsOneWidget);
     expect(find.text('Approximate nutrition • Actual values may vary'), findsNothing);
     expect(find.textContaining('Estimated nutrition • Sizing approximate'), findsNothing);
     expect(find.text('Will deduct'), findsNothing);
@@ -2734,11 +2735,11 @@ void main() {
     await tester.tap(find.byIcon(Icons.edit_outlined));
     await tester.pumpAndSettle();
 
-    // Test 1: Default view contains only meal name, AI estimation note, expandable manual trigger, and Save Meal button
+    // Test 1: Default view contains only meal name, expandable manual trigger, and Save Meal button (green card removed)
     expect(find.text('Edit Meal'), findsOneWidget);
     expect(find.text('Meal Name *'), findsOneWidget);
-    expect(find.text('NutriFridge AI will estimate the nutrition for your meal.'), findsOneWidget);
-    expect(find.text('You can review the estimated values before logging.'), findsOneWidget);
+    expect(find.text('NutriFridge AI will estimate the nutrition for your meal.'), findsNothing);
+    expect(find.text('You can review the estimated values before logging.'), findsNothing);
     expect(find.text('Enter nutrition manually'), findsOneWidget);
     expect(find.text('Already know the nutrition values? Add them yourself.'), findsOneWidget);
     expect(find.text('Save Meal'), findsOneWidget);
@@ -2794,7 +2795,8 @@ void main() {
     expect(find.text('Paneer Bhurji'), findsOneWidget);
     expect(find.text('380 kcal'), findsOneWidget);
     expect(find.text('28g'), findsOneWidget);
-    expect(find.text('AI Estimate'), findsOneWidget);
+    expect(find.text('AI Estimate'), findsNothing);
+    expect(find.text('LUNCH'), findsOneWidget);
 
     // Test 8: Entering manual nutrition skips AI estimation and uses manual values
     await tester.tap(find.byIcon(Icons.edit_outlined));
