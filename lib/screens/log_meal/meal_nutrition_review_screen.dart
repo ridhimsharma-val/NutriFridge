@@ -502,6 +502,167 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
     );
   }
 
+  void _editNutrition() {
+    final caloriesCtrl = TextEditingController(text: '${_nutrition.calories}');
+    final proteinCtrl = TextEditingController(text: '${_nutrition.proteinGrams}');
+    final carbsCtrl = TextEditingController(text: '${_nutrition.carbsGrams}');
+    final fatCtrl = TextEditingController(text: '${_nutrition.fatGrams}');
+    String? localError;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 38,
+                        height: 4.5,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD6DDD8),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Edit Nutrition Values', style: AppTypography.cardTitle),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.of(sheetContext).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: caloriesCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Calories (kcal)',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: proteinCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Protein (g)',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: carbsCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Carbs (g)',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: fatCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Fat (g)',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (localError != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        localError!,
+                        style: const TextStyle(color: Color(0xFFDC2626), fontSize: 12),
+                      ),
+                    ],
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.tealPrimary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          final cal = int.tryParse(caloriesCtrl.text.trim());
+                          final prot = int.tryParse(proteinCtrl.text.trim());
+                          final carb = int.tryParse(carbsCtrl.text.trim());
+                          final fat = int.tryParse(fatCtrl.text.trim());
+
+                          if (cal == null || prot == null || carb == null || fat == null || cal < 0 || prot < 0 || carb < 0 || fat < 0) {
+                            setDialogState(() {
+                              localError = 'Please enter valid non-negative numbers.';
+                            });
+                            return;
+                          }
+
+                          setState(() {
+                            _nutrition = _nutrition.copyWith(
+                              calories: cal,
+                              proteinGrams: prot,
+                              carbsGrams: carb,
+                              fatGrams: fat,
+                              isEstimate: false,
+                              isManual: true,
+                            );
+                          });
+                          Navigator.of(sheetContext).pop();
+                        },
+                        child: const Text('Save Nutrition', style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   /// Clean, prominent estimated nutrition summary card (Calories & 3 Macronutrients).
   Widget _buildNutritionOverview(MealNutritionEstimate nutrition) {
     return Container(
@@ -515,13 +676,25 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Estimated Calories',
-            style: AppTypography.subtitle.copyWith(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                nutrition.isManual ? 'Meal Calories' : 'Estimated Calories',
+                style: AppTypography.subtitle.copyWith(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, size: 17, color: AppColors.tealPrimary),
+                tooltip: 'Edit Nutrition',
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(4),
+                onPressed: _editNutrition,
+              ),
+            ],
           ),
           const SizedBox(height: 4),
           Row(
@@ -547,6 +720,37 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+            decoration: BoxDecoration(
+              color: nutrition.isManual ? const Color(0xFFEFF6FF) : const Color(0xFFE8F6F0),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: nutrition.isManual ? const Color(0xFFBFDBFE) : const Color(0xFFA7F3D0),
+                width: 0.8,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  nutrition.isManual ? Icons.edit_note_rounded : Icons.auto_awesome,
+                  size: 12,
+                  color: nutrition.isManual ? const Color(0xFF2563EB) : AppColors.tealPrimary,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  nutrition.isManual ? 'Manual Entry' : 'AI Estimate',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: nutrition.isManual ? const Color(0xFF1D4ED8) : AppColors.tealPrimary,
+                  ),
+                ),
+              ],
+            ),
           ),
 
           const SizedBox(height: 16),
@@ -585,15 +789,25 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
             ],
           ),
 
-          const SizedBox(height: 12),
-          Text(
-            'Illustrative mock values for prototype review.',
-            style: AppTypography.subtitle.copyWith(
-              fontSize: 11,
-              color: AppColors.textTertiary,
-              fontStyle: FontStyle.italic,
+          if (!nutrition.isManual) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Icon(Icons.info_outline_rounded, size: 13, color: AppColors.textTertiary),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    nutrition.estimateNote ?? 'Approximate nutrition • Actual values may vary',
+                    style: AppTypography.subtitle.copyWith(
+                      fontSize: 11,
+                      color: AppColors.textTertiary,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
+          ],
         ],
       ),
     );

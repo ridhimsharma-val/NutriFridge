@@ -385,12 +385,28 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     final meal = Map<String, dynamic>.from(message.meal!);
     final nutrition = Map<String, dynamic>.from(meal['nutrition'] as Map? ?? {});
 
-    final nameController = TextEditingController(text: meal['name'] as String? ?? 'Meal');
+    final originalName = (meal['name'] as String? ?? 'Meal').trim();
+    final nameController = TextEditingController(text: originalName);
     String mealType = (meal['mealType'] as String? ?? 'lunch').toLowerCase();
-    final caloriesController = TextEditingController(text: '${nutrition['calories'] ?? 450}');
-    final proteinController = TextEditingController(text: '${nutrition['proteinG'] ?? 20}');
-    final carbsController = TextEditingController(text: '${nutrition['carbsG'] ?? 50}');
-    final fatController = TextEditingController(text: '${nutrition['fatG'] ?? 15}');
+
+    // Prefill manual values only if user had manually entered them before; otherwise keep empty by default
+    final bool hasPreviousManual = nutrition['isManual'] == true;
+    final caloriesController = TextEditingController(
+      text: hasPreviousManual && nutrition['calories'] != null ? '${nutrition['calories']}' : '',
+    );
+    final proteinController = TextEditingController(
+      text: hasPreviousManual && nutrition['proteinG'] != null ? '${nutrition['proteinG']}' : '',
+    );
+    final carbsController = TextEditingController(
+      text: hasPreviousManual && nutrition['carbsG'] != null ? '${nutrition['carbsG']}' : '',
+    );
+    final fatController = TextEditingController(
+      text: hasPreviousManual && nutrition['fatG'] != null ? '${nutrition['fatG']}' : '',
+    );
+
+    bool isManualExpanded = false;
+    bool isEstimating = false;
+    String? errorMessage;
 
     showModalBottomSheet(
       context: context,
@@ -428,7 +444,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Edit Meal & Nutrition', style: AppTypography.cardTitle),
+                        Text('Edit Meal', style: AppTypography.cardTitle.copyWith(fontSize: 18)),
                         IconButton(
                           icon: const Icon(Icons.close_rounded),
                           onPressed: () => Navigator.of(sheetContext).pop(),
@@ -436,137 +452,378 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
+                    // A. Meal Name (Required)
                     TextField(
                       controller: nameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Meal Name',
-                        border: OutlineInputBorder(),
+                      textCapitalization: TextCapitalization.words,
+                      decoration: InputDecoration(
+                        labelText: 'Meal Name *',
+                        hintText: 'e.g. Grilled Chicken Salad',
+                        filled: true,
+                        fillColor: const Color(0xFFF7FAF8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.cardBorder),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.cardBorder),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.tealPrimary, width: 1.5),
+                        ),
                         isDense: true,
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    Text('Quick Portion Multiplier', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [0.5, 1.0, 1.5, 2.0].map((scale) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              visualDensity: VisualDensity.compact,
-                              foregroundColor: AppColors.tealPrimary,
-                              side: const BorderSide(color: AppColors.tealPrimary),
+                    const SizedBox(height: 12),
+                    // B. Nutrition calculation info section
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F6F0),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFBBE5D4)),
+                      ),
+                      child: const Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.auto_awesome, size: 18, color: AppColors.tealPrimary),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'NutriFridge AI will estimate the nutrition for your meal.',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0F5132),
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'You can review the estimated values before logging.',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: Color(0xFF14532D),
+                                  ),
+                                ),
+                              ],
                             ),
-                            onPressed: () {
-                              final baseCal = (nutrition['calories'] as num?)?.toDouble() ?? 450.0;
-                              final baseProt = (nutrition['proteinG'] as num?)?.toDouble() ?? 20.0;
-                              final baseCarbs = (nutrition['carbsG'] as num?)?.toDouble() ?? 50.0;
-                              final baseFat = (nutrition['fatG'] as num?)?.toDouble() ?? 15.0;
-
-                              setDialogState(() {
-                                caloriesController.text = '${(baseCal * scale).round()}';
-                                proteinController.text = '${(baseProt * scale).round()}';
-                                carbsController.text = '${(baseCarbs * scale).round()}';
-                                fatController.text = '${(baseFat * scale).round()}';
-                              });
-                            },
-                            child: Text('${scale}x'),
                           ),
-                        );
-                      }).toList(),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: caloriesController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Calories (kcal)',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                          ),
+                    const SizedBox(height: 12),
+                    // C. Optional manual nutrition entry expandable trigger
+                    InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () {
+                        setDialogState(() {
+                          isManualExpanded = !isManualExpanded;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isManualExpanded ? const Color(0xFFF7FAF8) : Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.cardBorder),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: proteinController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Protein (g)',
-                              border: OutlineInputBorder(),
-                              isDense: true,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.tune_rounded, size: 18, color: AppColors.tealPrimary),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Enter nutrition manually',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Already know the nutrition values? Add them yourself.',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
+                            Icon(
+                              isManualExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                              color: AppColors.textSecondary,
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: carbsController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Carbs (g)',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
+                    // Expandable manual nutrition inputs
+                    if (isManualExpanded)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFBFDFB),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Nutrition details (Optional)',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              TextField(
+                                controller: caloriesController,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: 'Calories (kcal)',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              TextField(
+                                controller: proteinController,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: 'Protein (g)',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              TextField(
+                                controller: carbsController,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: 'Carbs (g)',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              TextField(
+                                controller: fatController,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: 'Fat (g)',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: fatController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Fat (g)',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                          ),
+                      ),
+                    if (errorMessage != null) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFECACA)),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.error_outline_rounded, size: 16, color: Color(0xFFDC2626)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                errorMessage!,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFFB91C1C),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 18),
+                    // D. Primary Action: Save Meal
                     SizedBox(
                       width: double.infinity,
-                      height: 44,
+                      height: 46,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.tealPrimary,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
                         ),
-                        onPressed: () {
-                          final updatedCalories = int.tryParse(caloriesController.text) ?? 450;
-                          final updatedProtein = int.tryParse(proteinController.text) ?? 20;
-                          final updatedCarbs = int.tryParse(carbsController.text) ?? 50;
-                          final updatedFat = int.tryParse(fatController.text) ?? 15;
+                        onPressed: isEstimating
+                            ? null
+                            : () async {
+                                final enteredName = nameController.text.trim();
+                                if (enteredName.isEmpty) {
+                                  setDialogState(() {
+                                    errorMessage = 'Meal name is required.';
+                                  });
+                                  return;
+                                }
 
-                          nutrition['calories'] = updatedCalories;
-                          nutrition['proteinG'] = updatedProtein;
-                          nutrition['carbsG'] = updatedCarbs;
-                          nutrition['fatG'] = updatedFat;
-                          nutrition['isEstimate'] = true;
+                                final cText = caloriesController.text.trim();
+                                final pText = proteinController.text.trim();
+                                final cbText = carbsController.text.trim();
+                                final fText = fatController.text.trim();
 
-                          meal['name'] = nameController.text.trim();
-                          meal['mealType'] = mealType;
-                          meal['nutrition'] = nutrition;
+                                final anyManual = cText.isNotEmpty || pText.isNotEmpty || cbText.isNotEmpty || fText.isNotEmpty;
+                                final allManual = cText.isNotEmpty && pText.isNotEmpty && cbText.isNotEmpty && fText.isNotEmpty;
 
-                          final idx = _messages.indexWhere((m) => m.id == message.id);
-                          if (idx != -1) {
-                            setState(() {
-                              _messages[idx] = _messages[idx].copyWith(meal: meal);
-                              _syncSession();
-                            });
-                          }
-                          Navigator.of(sheetContext).pop();
-                        },
-                        child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.w700)),
+                                // Partial manual nutrition entry check
+                                if (anyManual && !allManual) {
+                                  setDialogState(() {
+                                    errorMessage = 'Please enter all 4 nutrition values, or leave them empty for AI estimation.';
+                                    if (!isManualExpanded) isManualExpanded = true;
+                                  });
+                                  return;
+                                }
+
+                                // Manual nutrition entry completely filled
+                                if (allManual) {
+                                  final cal = int.tryParse(cText);
+                                  final prot = int.tryParse(pText);
+                                  final carb = int.tryParse(cbText);
+                                  final fat = int.tryParse(fText);
+
+                                  if (cal == null || prot == null || carb == null || fat == null || cal < 0 || prot < 0 || carb < 0 || fat < 0) {
+                                    setDialogState(() {
+                                      errorMessage = 'Please enter valid non-negative numbers for nutrition.';
+                                    });
+                                    return;
+                                  }
+
+                                  nutrition['calories'] = cal;
+                                  nutrition['proteinG'] = prot;
+                                  nutrition['carbsG'] = carb;
+                                  nutrition['fatG'] = fat;
+                                  nutrition['isManual'] = true;
+                                  nutrition['isEstimate'] = false;
+                                  nutrition.remove('estimateNote');
+
+                                  meal['name'] = enteredName;
+                                  meal['mealType'] = mealType;
+                                  meal['nutrition'] = nutrition;
+
+                                  final idx = _messages.indexWhere((m) => m.id == message.id);
+                                  if (idx != -1) {
+                                    setState(() {
+                                      _messages[idx] = _messages[idx].copyWith(meal: meal);
+                                      _syncSession();
+                                    });
+                                  }
+                                  Navigator.of(sheetContext).pop();
+                                  return;
+                                }
+
+                                // Manual fields left empty -> Use AI Nutrition Estimation as default
+                                final isNameUnchanged = enteredName.toLowerCase() == originalName.toLowerCase();
+                                final hasExistingEstimate = nutrition['calories'] != null && nutrition['isManual'] != true;
+
+                                if (isNameUnchanged && hasExistingEstimate) {
+                                  // Reuse existing AI estimate
+                                  nutrition['isManual'] = false;
+                                  nutrition['isEstimate'] = true;
+                                  meal['name'] = enteredName;
+                                  meal['mealType'] = mealType;
+                                  meal['nutrition'] = nutrition;
+
+                                  final idx = _messages.indexWhere((m) => m.id == message.id);
+                                  if (idx != -1) {
+                                    setState(() {
+                                      _messages[idx] = _messages[idx].copyWith(meal: meal);
+                                      _syncSession();
+                                    });
+                                  }
+                                  Navigator.of(sheetContext).pop();
+                                  return;
+                                }
+
+                                // Meal name has changed -> fetch fresh AI nutrition estimate
+                                setDialogState(() {
+                                  isEstimating = true;
+                                  errorMessage = null;
+                                });
+
+                                final estimate = await AiAssistantService.estimateMealNutrition(
+                                  mealName: enteredName,
+                                  mealType: mealType,
+                                );
+
+                                if (!mounted || !sheetContext.mounted) return;
+
+                                if (estimate != null) {
+                                  nutrition['calories'] = estimate['calories'];
+                                  nutrition['proteinG'] = estimate['proteinG'];
+                                  nutrition['carbsG'] = estimate['carbsG'];
+                                  nutrition['fatG'] = estimate['fatG'];
+                                  nutrition['isEstimate'] = true;
+                                  nutrition['isManual'] = false;
+                                  nutrition['estimateNote'] = estimate['estimateNote'];
+
+                                  meal['name'] = enteredName;
+                                  meal['mealType'] = mealType;
+                                  meal['nutrition'] = nutrition;
+
+                                  final idx = _messages.indexWhere((m) => m.id == message.id);
+                                  if (idx != -1) {
+                                    setState(() {
+                                      _messages[idx] = _messages[idx].copyWith(meal: meal);
+                                      _syncSession();
+                                    });
+                                  }
+                                  Navigator.of(sheetContext).pop();
+                                } else {
+                                  setDialogState(() {
+                                    isEstimating = false;
+                                    errorMessage = 'Could not estimate nutrition for this meal. Please enter nutrition manually or try again.';
+                                  });
+                                }
+                              },
+                        child: isEstimating
+                            ? const FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Estimating nutrition...',
+                                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : const Text('Save Meal', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                       ),
                     ),
                   ],
@@ -822,10 +1079,10 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     final mealType = (meal['mealType'] as String? ?? 'Lunch').toLowerCase();
     final nutrition = meal['nutrition'] as Map? ?? {};
 
-    final calories = (nutrition['calories'] as num?)?.toInt() ?? 450;
-    final protein = (nutrition['proteinG'] as num?)?.toInt() ?? 20;
-    final carbs = (nutrition['carbsG'] as num?)?.toInt() ?? 50;
-    final fat = (nutrition['fatG'] as num?)?.toInt() ?? 15;
+    final calories = (nutrition['calories'] as num?)?.toInt() ?? 0;
+    final protein = (nutrition['proteinG'] as num? ?? nutrition['protein'] as num?)?.toInt() ?? 0;
+    final carbs = (nutrition['carbsG'] as num? ?? nutrition['carbs'] as num?)?.toInt() ?? 0;
+    final fat = (nutrition['fatG'] as num? ?? nutrition['fat'] as num?)?.toInt() ?? 0;
 
     final List<String> ingredients = [];
     if (meal['ingredients'] is List) {
@@ -1555,10 +1812,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     final name = meal['name'] as String? ?? 'Meal';
     final type = (meal['mealType'] as String? ?? 'lunch').toUpperCase();
     final nutrition = meal['nutrition'] as Map? ?? {};
-    final cals = nutrition['calories'] ?? 450;
-    final protein = nutrition['proteinG'] ?? 20;
-    final carbs = nutrition['carbsG'] ?? 50;
-    final fat = nutrition['fatG'] ?? 15;
+    final cals = nutrition['calories'] ?? 0;
+    final protein = nutrition['proteinG'] ?? 0;
+    final carbs = nutrition['carbsG'] ?? 0;
+    final fat = nutrition['fatG'] ?? 0;
+    final isManual = nutrition['isManual'] == true;
 
     final List<dynamic> ingredients = (meal['ingredients'] is List) ? meal['ingredients'] as List : [];
 
@@ -1573,7 +1831,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
                 child: Text(
@@ -1582,27 +1839,61 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.peachLight,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  type,
-                  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.peachPrimary),
-                ),
-              ),
-              if (!message.isConfirmed) ...[
-                const SizedBox(width: 6),
+              if (!message.isConfirmed)
                 IconButton(
                   icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.tealPrimary),
-                  tooltip: 'Edit Portions / Nutrition',
+                  tooltip: 'Edit Meal & Nutrition',
                   constraints: const BoxConstraints(),
                   padding: const EdgeInsets.all(4),
                   onPressed: () => _showEditMealDialog(message),
                 ),
-              ],
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: isManual ? const Color(0xFFEFF6FF) : const Color(0xFFE8F6F0),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isManual ? const Color(0xFFBFDBFE) : const Color(0xFFA7F3D0),
+                    width: 0.8,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isManual ? Icons.edit_note_rounded : Icons.auto_awesome,
+                      size: 11,
+                      color: isManual ? const Color(0xFF2563EB) : AppColors.tealPrimary,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      isManual ? 'Manual Entry' : 'AI Estimate',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: isManual ? const Color(0xFF1D4ED8) : AppColors.tealPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: AppColors.peachLight,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  type,
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.peachPrimary),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -1615,27 +1906,29 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               Expanded(child: _buildMacroMini('Fat', '${fat}g', const Color(0xFFEC4899))),
             ],
           ),
-          const SizedBox(height: 8),
-          // Sizing uncertainty disclaimer
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF3E0),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.info_outline_rounded, size: 13, color: Color(0xFFD97706)),
-                SizedBox(width: 5),
-                Expanded(
-                  child: Text(
-                    'Estimated nutrition • Sizing approximate, not medical advice.',
-                    style: TextStyle(fontSize: 10.5, color: Color(0xFF92400E), fontWeight: FontWeight.w500),
+          if (!isManual) ...[
+            const SizedBox(height: 8),
+            // Sizing uncertainty disclaimer
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3E0),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 13, color: Color(0xFFD97706)),
+                  SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      'Approximate nutrition • Actual values may vary',
+                      style: TextStyle(fontSize: 10.5, color: Color(0xFF92400E), fontWeight: FontWeight.w500),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+          ],
           // Ingredients deduction section
           if (ingredients.isNotEmpty) ...[
             const SizedBox(height: 12),

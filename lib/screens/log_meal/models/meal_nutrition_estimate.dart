@@ -12,6 +12,9 @@ class MealNutritionEstimate {
   final double sugarsGrams;
   final int sodiumMg;
   final int potassiumMg;
+  final bool isEstimate;
+  final bool isManual;
+  final String? estimateNote;
 
   const MealNutritionEstimate({
     this.calories = 520,
@@ -22,7 +25,35 @@ class MealNutritionEstimate {
     this.sugarsGrams = 4.5,
     this.sodiumMg = 380,
     this.potassiumMg = 410,
+    this.isEstimate = true,
+    this.isManual = false,
+    this.estimateNote,
   });
+
+  factory MealNutritionEstimate.manual({
+    required int calories,
+    required int proteinGrams,
+    required int carbsGrams,
+    required int fatGrams,
+    double fiberGrams = 0,
+    double sugarsGrams = 0,
+    int sodiumMg = 0,
+    int potassiumMg = 0,
+  }) {
+    return MealNutritionEstimate(
+      calories: calories,
+      proteinGrams: proteinGrams,
+      carbsGrams: carbsGrams,
+      fatGrams: fatGrams,
+      fiberGrams: fiberGrams,
+      sugarsGrams: sugarsGrams,
+      sodiumMg: sodiumMg,
+      potassiumMg: potassiumMg,
+      isEstimate: false,
+      isManual: true,
+      estimateNote: null,
+    );
+  }
 
   /// Dynamically estimates nutritional values based on the ingredients list and their portions.
   static MealNutritionEstimate fromIngredients(List<DetectedFoodItem> items) {
@@ -127,6 +158,9 @@ class MealNutritionEstimate {
     double? sugarsGrams,
     int? sodiumMg,
     int? potassiumMg,
+    bool? isEstimate,
+    bool? isManual,
+    String? estimateNote,
   }) {
     return MealNutritionEstimate(
       calories: calories ?? this.calories,
@@ -137,6 +171,9 @@ class MealNutritionEstimate {
       sugarsGrams: sugarsGrams ?? this.sugarsGrams,
       sodiumMg: sodiumMg ?? this.sodiumMg,
       potassiumMg: potassiumMg ?? this.potassiumMg,
+      isEstimate: isEstimate ?? this.isEstimate,
+      isManual: isManual ?? this.isManual,
+      estimateNote: estimateNote ?? this.estimateNote,
     );
   }
 }

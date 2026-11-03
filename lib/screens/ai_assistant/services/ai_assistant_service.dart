@@ -145,4 +145,74 @@ class AiAssistantService {
       };
     }
   }
+
+  /// Requests the AI to estimate nutrition for a given meal name using the existing AI backend.
+  static Future<Map<String, dynamic>?> estimateMealNutrition({
+    required String mealName,
+    String? mealType,
+    List<Map<String, dynamic>> ingredients = const [],
+    String? imageBase64,
+  }) async {
+    final cleanMealName = mealName.trim();
+    if (cleanMealName.isEmpty) return null;
+
+    final prompt = 'Estimate nutrition for meal: "$cleanMealName"';
+    try {
+      final response = await sendRequest(
+        message: prompt,
+        actionHint: 'log_meal',
+        imageBase64: imageBase64,
+      );
+
+      // 1. Check if response has meal object with nutrition
+      if (response['meal'] != null && response['meal'] is Map) {
+        final mealData = response['meal'] as Map;
+        final nut = mealData['nutrition'];
+        if (nut != null && nut is Map) {
+          final cal = (nut['calories'] as num?)?.toInt();
+          final prot = (nut['proteinG'] as num? ?? nut['protein'] as num?)?.toInt();
+          final carbs = (nut['carbsG'] as num? ?? nut['carbs'] as num?)?.toInt();
+          final fat = (nut['fatG'] as num? ?? nut['fat'] as num?)?.toInt();
+
+          if (cal != null && prot != null && carbs != null && fat != null) {
+            return {
+              'calories': cal,
+              'proteinG': prot,
+              'carbsG': carbs,
+              'fatG': fat,
+              'isEstimate': true,
+              'isManual': false,
+              'estimateNote': nut['estimateNote'] as String? ?? 'Approximate nutrition • Actual values may vary',
+            };
+          }
+        }
+      }
+
+      // 2. Check if response has top-level nutrition map
+      if (response['nutrition'] != null && response['nutrition'] is Map) {
+        final nut = response['nutrition'] as Map;
+        final cal = (nut['calories'] as num?)?.toInt();
+        final prot = (nut['proteinG'] as num? ?? nut['protein'] as num?)?.toInt();
+        final carbs = (nut['carbsG'] as num? ?? nut['carbs'] as num?)?.toInt();
+        final fat = (nut['fatG'] as num? ?? nut['fat'] as num?)?.toInt();
+
+        if (cal != null && prot != null && carbs != null && fat != null) {
+          return {
+            'calories': cal,
+            'proteinG': prot,
+            'carbsG': carbs,
+            'fatG': fat,
+            'isEstimate': true,
+            'isManual': false,
+            'estimateNote': nut['estimateNote'] as String? ?? 'Approximate nutrition • Actual values may vary',
+          };
+        }
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('Error estimating meal nutrition: $e');
+      return null;
+    }
+  }
 }

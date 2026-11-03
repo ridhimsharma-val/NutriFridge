@@ -2652,4 +2652,177 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('3 items added to your fridge!'), findsOneWidget);
   });
+
+  testWidgets('AI Assistant - Meal logging simplification and automatic AI nutrition estimation test suite', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      AiAssistantService.mockHandler = null;
+    });
+
+    FridgeCategoryRepository.reset();
+    MockDataRepository.seedSampleDataForTesting();
+
+    int aiEstimateCalls = 0;
+    AiAssistantService.mockHandler = (request) async {
+      final msg = (request['message'] as String? ?? '').toLowerCase();
+      if (msg.contains('estimate nutrition')) {
+        aiEstimateCalls++;
+        if (msg.contains('fail')) {
+          return {'success': false, 'error': 'Could not estimate'};
+        }
+        return {
+          'success': true,
+          'action': 'log_meal',
+          'meal': {
+            'name': 'Paneer Bhurji',
+            'mealType': 'lunch',
+            'nutrition': {
+              'calories': 380,
+              'proteinG': 28,
+              'carbsG': 10,
+              'fatG': 22,
+              'estimateNote': 'Approximate nutrition • Actual values may vary',
+            },
+          },
+        };
+      }
+      return {
+        'success': true,
+        'action': 'log_meal',
+        'assistantMessage': 'I logged your Chicken Salad.',
+        'requiresConfirmation': true,
+        'meal': {
+          'name': 'Chicken Salad',
+          'mealType': 'lunch',
+          'nutrition': {
+            'calories': 320,
+            'proteinG': 30,
+            'carbsG': 15,
+            'fatG': 12,
+            'isEstimate': true,
+            'isManual': false,
+            'estimateNote': 'Approximate nutrition • Actual values may vary',
+          },
+          'ingredients': [
+            {'name': 'Chicken', 'quantity': 150, 'unit': 'g'},
+          ],
+        },
+      };
+    };
+
+    await tester.pumpWidget(const MaterialApp(home: AiAssistantScreen()));
+    await tester.pumpAndSettle();
+
+    // Trigger meal log message
+    await tester.enterText(find.byType(TextField).last, 'I ate chicken salad');
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    // Verify initial proposed meal card shows "AI Estimate" badge and uncertainty note
+    expect(find.text('AI Estimate'), findsOneWidget);
+    expect(find.text('Approximate nutrition • Actual values may vary'), findsOneWidget);
+
+    // Open Edit Meal Dialog
+    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.pumpAndSettle();
+
+    // Test 1: Default view contains only meal name, AI estimation note, expandable manual trigger, and Save Meal button
+    expect(find.text('Edit Meal'), findsOneWidget);
+    expect(find.text('Meal Name *'), findsOneWidget);
+    expect(find.text('NutriFridge AI will estimate the nutrition for your meal.'), findsOneWidget);
+    expect(find.text('You can review the estimated values before logging.'), findsOneWidget);
+    expect(find.text('Enter nutrition manually'), findsOneWidget);
+    expect(find.text('Already know the nutrition values? Add them yourself.'), findsOneWidget);
+    expect(find.text('Save Meal'), findsOneWidget);
+
+    // Test 2: Quick Portion Multiplier is completely removed (0.5x, 1x, 1.5x, 2x)
+    expect(find.text('Quick Portion Multiplier'), findsNothing);
+    expect(find.text('0.5x'), findsNothing);
+    expect(find.text('1.0x'), findsNothing);
+    expect(find.text('1.5x'), findsNothing);
+    expect(find.text('2.0x'), findsNothing);
+
+    // Test 3: Manual nutrition entry is collapsed by default
+    expect(find.text('Nutrition details (Optional)'), findsNothing);
+    expect(find.text('Calories (kcal)'), findsNothing);
+
+    // Test 4: Expanding manual entry shows 4 fields with empty values (no fake demo numbers)
+    await tester.tap(find.text('Enter nutrition manually'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nutrition details (Optional)'), findsOneWidget);
+    expect(find.text('Calories (kcal)'), findsOneWidget);
+    expect(find.text('Protein (g)'), findsOneWidget);
+    expect(find.text('Carbs (g)'), findsOneWidget);
+    expect(find.text('Fat (g)'), findsOneWidget);
+
+    final caloriesField = tester.widget<TextField>(find.widgetWithText(TextField, 'Calories (kcal)'));
+    expect(caloriesField.controller!.text, ''); // Empty by default!
+
+    // Test 5: Partial entry prompts user or prevents invalid submission
+    await tester.enterText(find.widgetWithText(TextField, 'Calories (kcal)'), '400');
+    await tester.ensureVisible(find.text('Save Meal'));
+    await tester.tap(find.text('Save Meal'));
+    await tester.pumpAndSettle();
+    expect(find.text('Please enter all 4 nutrition values, or leave them empty for AI estimation.'), findsOneWidget);
+
+    // Test 6: Leaving manual fields empty and saving meal with unchanged name reuses existing AI estimation
+    await tester.enterText(find.widgetWithText(TextField, 'Calories (kcal)'), '');
+    await tester.ensureVisible(find.text('Save Meal'));
+    await tester.tap(find.text('Save Meal'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit Meal'), findsNothing); // Sheet dismissed
+    expect(aiEstimateCalls, 0); // No redundant API call made!
+    expect(find.text('320 kcal'), findsOneWidget); // Original estimate preserved
+
+    // Test 7: Leaving manual fields empty and changing meal name triggers AI estimation call
+    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Meal Name *'), 'Paneer Bhurji');
+    await tester.ensureVisible(find.text('Save Meal'));
+    await tester.tap(find.text('Save Meal'));
+    await tester.pumpAndSettle();
+    expect(aiEstimateCalls, 1); // AI estimation was called!
+    expect(find.text('Paneer Bhurji'), findsOneWidget);
+    expect(find.text('380 kcal'), findsOneWidget);
+    expect(find.text('28g'), findsOneWidget);
+    expect(find.text('AI Estimate'), findsOneWidget);
+
+    // Test 8: Entering manual nutrition skips AI estimation and uses manual values
+    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Enter nutrition manually'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.widgetWithText(TextField, 'Calories (kcal)'), '500');
+    await tester.enterText(find.widgetWithText(TextField, 'Protein (g)'), '35');
+    await tester.enterText(find.widgetWithText(TextField, 'Carbs (g)'), '45');
+    await tester.enterText(find.widgetWithText(TextField, 'Fat (g)'), '18');
+    await tester.ensureVisible(find.text('Save Meal'));
+    await tester.tap(find.text('Save Meal'));
+    await tester.pumpAndSettle();
+
+    expect(aiEstimateCalls, 1); // Did not increment, manual entry used
+    expect(find.text('500 kcal'), findsOneWidget);
+    expect(find.text('35g'), findsOneWidget);
+    expect(find.text('45g'), findsOneWidget);
+    expect(find.text('18g'), findsOneWidget);
+
+    // Test 9: Nutrition review shows 'Manual Entry' badge, and uncertainty note is NOT shown
+    expect(find.text('Manual Entry'), findsOneWidget);
+    expect(find.text('Approximate nutrition • Actual values may vary'), findsNothing);
+
+    // Test 10: Confirming meal updates MockDataRepository correctly
+    final preConsumed = MockDataRepository.nutrition.consumedCalories;
+    await tester.tap(find.text('Confirm & Log Meal'));
+    await tester.pumpAndSettle();
+    expect(MockDataRepository.nutrition.consumedCalories, preConsumed + 500);
+
+    // Test 11: Deductions safe check
+    expect(find.text('Logged to Today\'s Meals ✓'), findsOneWidget);
+  });
 }
