@@ -157,14 +157,14 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
     final remaining = _availableAmount - usedAmount;
     final successMsg = _formatActionDescription(usedAmount, _unit, _item.name, false);
 
-    if (remaining <= 0) {
-      // Completely consumed - remove item from active inventory
-      FridgeCategoryRepository.removeItem(widget.categoryName, _item.id);
-      NotificationRepository.addNotification(
-        title: 'Inventory update',
-        description: '${_formatAmount(usedAmount, _unit)} ${_item.name} used from fridge.',
-        type: NotificationType.inventoryUpdate,
-      );
+    final result = FridgeCategoryRepository.deductItemQuantity(
+      itemId: _item.id,
+      categoryIdOrName: widget.categoryName,
+      quantity: usedAmount,
+      unit: _unit,
+    );
+
+    if (result.status == DeductionStatus.removed) {
       widget.onRemoveFood?.call();
       widget.onInventoryChanged?.call();
 
@@ -179,16 +179,9 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
       );
 
       Navigator.of(context).pop();
-    } else {
-      // Partially consumed - update existing item in repository
-      final updatedItem = _item.copyWith(
+    } else if (result.status == DeductionStatus.success) {
+      final updatedItem = result.updatedItem ?? _item.copyWith(
         quantity: _formatAmount(remaining, _unit),
-      );
-      FridgeCategoryRepository.updateItem(widget.categoryName, updatedItem);
-      NotificationRepository.addNotification(
-        title: 'Inventory update',
-        description: '${_formatAmount(usedAmount, _unit)} ${_item.name} used from fridge.',
-        type: NotificationType.inventoryUpdate,
       );
       widget.onUseFood?.call(updatedItem);
       widget.onInventoryChanged?.call();
@@ -210,6 +203,12 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
         _selectedAmount = _computeSensibleDefault(remaining, _unit, _step);
         _isProcessing = false;
       });
+    } else {
+      setState(() {
+        _isProcessing = false;
+        _errorMessage = result.message;
+      });
+      return;
     }
   }
 

@@ -164,18 +164,19 @@ class FridgeInventoryService {
         continue;
       }
 
-      final remaining = (currentAmount - deductAmount).round();
-      if (remaining <= 0) {
-        // Entire stock consumed
-        FridgeCategoryRepository.removeItem(status.categoryName!, itemId);
+      final result = FridgeCategoryRepository.deductItemQuantity(
+        itemId: itemId,
+        categoryIdOrName: status.categoryName,
+        quantity: deductAmount,
+        unit: status.ingredient.unit,
+      );
+
+      if (result.status == DeductionStatus.removed) {
         deductionSummaries.add('${status.ingredient.name}: all ${currentItem.quantity} consumed');
-      } else {
-        // Partial stock deducted
-        final updated = currentItem.copyWith(
-          quantity: '$remaining ${status.availableUnit}',
+      } else if (result.status == DeductionStatus.success) {
+        deductionSummaries.add(
+          '${status.ingredient.name}: deducted ${status.ingredient.formattedQuantity} (${result.updatedItem?.quantity ?? '${result.remainingQuantity} ${result.remainingUnit}'} remaining)',
         );
-        FridgeCategoryRepository.updateItem(status.categoryName!, updated);
-        deductionSummaries.add('${status.ingredient.name}: deducted ${status.ingredient.formattedQuantity} ($remaining ${status.availableUnit} remaining)');
       }
     }
 

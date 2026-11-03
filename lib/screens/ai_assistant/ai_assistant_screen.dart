@@ -31,6 +31,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   final List<AiChatMessage> _messages = [];
   bool _isSending = false;
   bool _isConfirmingInventory = false;
+  bool _isRemovingInventory = false;
   String? _selectedImageBase64;
   String? _selectedImageMimeType;
   String? _selectedImageName;
@@ -171,6 +172,39 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               'How much $itemName would you like to add? Please specify the quantity and unit.';
           inventoryItems.clear();
           break;
+        }
+      }
+    }
+
+    // If Gemini proposes removals with missing quantity or over-removal, ask for clarification
+    if ((action == 'remove_inventory_items' || action == 'remove_inventory_item') && inventoryItems.isNotEmpty) {
+      for (final it in inventoryItems) {
+        final rawQty = it['quantity'];
+        final itemName = (it['name'] as String?) ?? 'food item';
+
+        // Check if removal quantity is unspecified or ambiguous (TEST 11)
+        if (it['isFullRemoval'] != true &&
+            (rawQty == null || (rawQty is num && rawQty <= 0) || (rawQty is String && rawQty.trim().isEmpty))) {
+          needsClarification = true;
+          clarifyingQuestion =
+              'Would you like to remove all $itemName or a specific amount? Please specify the quantity and unit.';
+          inventoryItems.clear();
+          break;
+        }
+
+        // Check if removal exceeds available stock (TEST 3: Over-removal)
+        final invItem = FridgeCategoryRepository.findItemByName(itemName);
+        if (invItem != null && rawQty != null && it['isFullRemoval'] != true) {
+          final qty = _parseQuantity(rawQty);
+          final unit = _parseUnit(it['unit']);
+          final check = FridgeCategoryRepository.checkDeduction(item: invItem, quantity: qty, unit: unit);
+          if (check.status == DeductionStatus.overRemoval) {
+            needsClarification = true;
+            clarifyingQuestion =
+                'You only have ${invItem.quantity} in your fridge. Please adjust the quantity.';
+            inventoryItems.clear();
+            break;
+          }
         }
       }
     }
@@ -1021,20 +1055,78 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   }
 
   void _confirmRemoveInventory(AiChatMessage message) {
-    if (message.inventoryItems.isEmpty) return;
+    if (message.inventoryItems.isEmpty || _isRemovingInventory || message.isConfirmed) return;
+
+    // First validate for any over-removal
+    for (final itemJson in message.inventoryItems) {
+      if (itemJson['isFullRemoval'] == true) continue;
+      final rawQty = itemJson['quantity'];
+      if (rawQty != null) {
+        final name = (itemJson['name'] as String?) ?? '';
+        final invItem = FridgeCategoryRepository.findItemByName(name);
+        if (invItem != null) {
+          final qty = _parseQuantity(rawQty);
+          final unit = _parseUnit(itemJson['unit']);
+          final check = FridgeCategoryRepository.checkDeduction(item: invItem, quantity: qty, unit: unit);
+          if (check.status == DeductionStatus.overRemoval) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(check.message),
+                backgroundColor: const Color(0xFFDC2626),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            );
+            return;
+          }
+        }
+      }
+    }
+
+    setState(() {
+      _isRemovingInventory = true;
+    });
 
     int removedCount = 0;
+    int deductedCount = 0;
+    final List<String> deductionMessages = [];
+
     for (final itemJson in message.inventoryItems) {
       final name = itemJson['name'] as String? ?? '';
       final category = itemJson['category'] as String?;
       final id = itemJson['id'] as String? ?? itemJson['matchedInventoryItemId'] as String?;
+      final isFullRemoval = itemJson['isFullRemoval'] == true;
+      final rawQty = itemJson['quantity'];
 
-      if (id != null && id.isNotEmpty) {
-        FridgeCategoryRepository.removeItem(category ?? '', id);
-        removedCount++;
-      } else if (name.isNotEmpty) {
-        if (FridgeCategoryRepository.removeItemByName(name)) {
+      if (isFullRemoval || rawQty == null) {
+        // Full removal
+        if (id != null && id.isNotEmpty) {
+          FridgeCategoryRepository.removeItem(category ?? '', id);
           removedCount++;
+        } else if (name.isNotEmpty) {
+          if (FridgeCategoryRepository.removeItemByName(name)) {
+            removedCount++;
+          }
+        }
+      } else {
+        // Partial deduction
+        final qty = _parseQuantity(rawQty);
+        final unit = _parseUnit(itemJson['unit']);
+        final result = FridgeCategoryRepository.deductItemQuantity(
+          itemId: id,
+          categoryIdOrName: category,
+          name: name.isNotEmpty ? name : null,
+          quantity: qty,
+          unit: unit,
+        );
+
+        if (result.isSuccess) {
+          if (result.status == DeductionStatus.removed) {
+            removedCount++;
+          } else {
+            deductedCount++;
+          }
+          deductionMessages.add(result.message);
         }
       }
     }
@@ -1043,8 +1135,26 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     if (index != -1) {
       setState(() {
         _messages[index] = _messages[index].copyWith(isConfirmed: true);
+        _isRemovingInventory = false;
         _syncSession();
       });
+    } else {
+      setState(() {
+        _isRemovingInventory = false;
+      });
+    }
+
+    String snackText;
+    if (deductedCount > 0 && removedCount == 0) {
+      snackText = deductionMessages.length == 1
+          ? deductionMessages.first
+          : 'Updated $deductedCount items in your fridge inventory!';
+    } else if (removedCount > 0 && deductedCount == 0) {
+      snackText = 'Removed $removedCount items from your fridge inventory!';
+    } else if (deductedCount > 0 && removedCount > 0) {
+      snackText = 'Updated $deductedCount and removed $removedCount items from your fridge!';
+    } else {
+      snackText = 'Removed requested items from your fridge.';
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1055,9 +1165,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                removedCount > 0
-                    ? 'Removed $removedCount items from your fridge inventory!'
-                    : 'Removed requested items from your fridge.',
+                snackText,
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
@@ -1113,8 +1221,40 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     final selectedIngNames = message.selectedDeductionIngredients;
 
     for (final ingName in selectedIngNames) {
-      if (FridgeCategoryRepository.removeItemByName(ingName)) {
-        deductedCount++;
+      // Find ingredient details from meal['ingredients']
+      Map<String, dynamic>? matchedIng;
+      if (meal['ingredients'] is List) {
+        for (final ing in meal['ingredients']) {
+          if (ing is Map && (ing['name'] as String?)?.toLowerCase().trim() == ingName.toLowerCase().trim()) {
+            matchedIng = Map<String, dynamic>.from(ing);
+            break;
+          }
+        }
+      }
+
+      num? qty;
+      String? unit;
+      if (matchedIng != null) {
+        final rawQty = matchedIng['quantity'] ?? matchedIng['amount'];
+        if (rawQty != null) {
+          qty = _parseQuantity(rawQty);
+        }
+        unit = _parseUnit(matchedIng['unit']);
+      }
+
+      if (qty != null && qty > 0) {
+        final result = FridgeCategoryRepository.deductItemQuantityByName(
+          name: ingName,
+          quantity: qty,
+          unit: unit,
+        );
+        if (result.isSuccess) {
+          deductedCount++;
+        }
+      } else {
+        if (FridgeCategoryRepository.removeItemByName(ingName)) {
+          deductedCount++;
+        }
       }
     }
 
@@ -1785,13 +1925,17 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             width: double.infinity,
             height: 40,
             child: ElevatedButton.icon(
-              onPressed: message.isConfirmed ? null : () => _confirmRemoveInventory(message),
+              onPressed: (message.isConfirmed || _isRemovingInventory)
+                  ? null
+                  : () => _confirmRemoveInventory(message),
               icon: Icon(
                 message.isConfirmed ? Icons.check_circle_rounded : Icons.delete_sweep_rounded,
                 size: 18,
               ),
               label: Text(
-                message.isConfirmed ? 'Removed from Fridge ✓' : 'Remove from Fridge',
+                message.isConfirmed
+                    ? 'Removed from Fridge ✓'
+                    : (_isRemovingInventory ? 'Updating...' : 'Remove from Fridge'),
                 style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
               ),
               style: ElevatedButton.styleFrom(

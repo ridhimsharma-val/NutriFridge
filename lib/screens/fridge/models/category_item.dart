@@ -316,6 +316,33 @@ class CategoryData {
   }
 }
 
+enum DeductionStatus {
+  success,
+  removed,
+  overRemoval,
+  incompatibleUnits,
+  notFound,
+  ambiguous,
+}
+
+class DeductionResult {
+  final DeductionStatus status;
+  final String message;
+  final CategoryFoodItem? updatedItem;
+  final num? remainingQuantity;
+  final String? remainingUnit;
+
+  const DeductionResult({
+    required this.status,
+    required this.message,
+    this.updatedItem,
+    this.remainingQuantity,
+    this.remainingUnit,
+  });
+
+  bool get isSuccess => status == DeductionStatus.success || status == DeductionStatus.removed;
+}
+
 /// Mock repository providing food items for categories
 class FridgeCategoryRepository {
   /// Canonical list of exactly the 11 Fridge categories
@@ -676,10 +703,21 @@ class FridgeCategoryRepository {
   /// Find a food item in the fridge inventory by name (case-insensitive substring or exact match)
   static CategoryFoodItem? findItemByName(String name, {bool exact = false}) {
     final lower = name.toLowerCase().trim();
+    // 1. First pass: exact or plural/singular match
+    for (final list in _categoryStore.values) {
+      for (final item in list) {
+        if (isFoodNameMatching(item.name, lower)) {
+          return item;
+        }
+      }
+    }
+    if (exact) return null;
+
+    // 2. Second pass: substring match
     for (final list in _categoryStore.values) {
       for (final item in list) {
         final itemLower = item.name.toLowerCase().trim();
-        if (itemLower == lower || (!exact && (itemLower.contains(lower) || lower.contains(itemLower)))) {
+        if (itemLower.contains(lower) || lower.contains(itemLower)) {
           return item;
         }
       }
@@ -1015,15 +1053,29 @@ class FridgeCategoryRepository {
     _notify();
   }
 
-  /// Remove an item by its name (case-insensitive substring or exact match) across all categories
+  /// Remove an item by its name (exact/plural match first, then substring) across all categories
   static bool removeItemByName(String name) {
     final lower = name.toLowerCase().trim();
+    // 1. Exact or plural/singular match
+    for (final list in _categoryStore.values) {
+      final index = list.indexWhere((it) => isFoodNameMatching(it.name, lower));
+      if (index != -1) {
+        final removedItem = list.removeAt(index);
+        NotificationRepository.addNotification(
+          title: 'Inventory update',
+          description: '${removedItem.name} was removed from your fridge.',
+          type: NotificationType.inventoryUpdate,
+        );
+        _notify();
+        return true;
+      }
+    }
+
+    // 2. Substring fallback
     for (final list in _categoryStore.values) {
       final index = list.indexWhere((it) {
         final itemLower = it.name.toLowerCase().trim();
-        return itemLower == lower ||
-            itemLower.contains(lower) ||
-            lower.contains(itemLower);
+        return itemLower.contains(lower) || lower.contains(itemLower);
       });
       if (index != -1) {
         final removedItem = list.removeAt(index);
@@ -1048,6 +1100,257 @@ class FridgeCategoryRepository {
       }
     }
     return count;
+  }
+
+  /// Validates whether a proposed quantity deduction is permissible without mutating state.
+  static DeductionResult checkDeduction({
+    required CategoryFoodItem item,
+    required num quantity,
+    String? unit,
+  }) {
+    if (quantity <= 0) {
+      return const DeductionResult(
+        status: DeductionStatus.ambiguous,
+        message: 'Invalid deduction quantity. Quantity must be greater than zero.',
+      );
+    }
+
+    final existingUnit = item.unit;
+    final deductUnit = unit != null && unit.trim().isNotEmpty ? unit.trim() : existingUnit;
+
+    if (!areUnitsCompatible(existingUnit, deductUnit)) {
+      return DeductionResult(
+        status: DeductionStatus.incompatibleUnits,
+        message: 'Cannot deduct $quantity $deductUnit from ${item.quantity} due to incompatible units.',
+      );
+    }
+
+    final existingQty = item.decimalAmount;
+    final normExisting = normalizeUnit(existingUnit);
+    final normDeduct = normalizeUnit(deductUnit);
+
+    num deductInExistingUnit;
+    if (normExisting == normDeduct) {
+      deductInExistingUnit = quantity;
+    } else if (normExisting == 'g' && normDeduct == 'kg') {
+      deductInExistingUnit = quantity * 1000;
+    } else if (normExisting == 'kg' && normDeduct == 'g') {
+      deductInExistingUnit = quantity / 1000;
+    } else if (normExisting == 'ml' && normDeduct == 'l') {
+      deductInExistingUnit = quantity * 1000;
+    } else if (normExisting == 'l' && normDeduct == 'ml') {
+      deductInExistingUnit = quantity / 1000;
+    } else {
+      deductInExistingUnit = quantity;
+    }
+
+    final remainingAmount = existingQty - deductInExistingUnit;
+
+    if (remainingAmount < -0.0001) {
+      return DeductionResult(
+        status: DeductionStatus.overRemoval,
+        message: 'You only have ${item.quantity} in your fridge. Please adjust the quantity.',
+        remainingQuantity: remainingAmount,
+      );
+    }
+
+    if (remainingAmount.abs() <= 0.0001 || remainingAmount <= 0) {
+      return DeductionResult(
+        status: DeductionStatus.removed,
+        message: '${item.name} will be completely consumed.',
+        remainingQuantity: 0,
+        remainingUnit: existingUnit,
+      );
+    }
+
+    return DeductionResult(
+      status: DeductionStatus.success,
+      message: 'Can deduct ${formatQuantity(quantity, deductUnit)}.',
+      remainingQuantity: remainingAmount,
+      remainingUnit: existingUnit,
+    );
+  }
+
+  /// Deducts a specified quantity from an item in the fridge inventory.
+  /// If stock remains, updates the item quantity and preserves all other metadata.
+  /// If stock reaches zero, removes the item from the active inventory.
+  /// If requested quantity exceeds available stock, rejects the operation.
+  static DeductionResult deductItemQuantity({
+    String? categoryIdOrName,
+    String? itemId,
+    String? name,
+    required num quantity,
+    String? unit,
+  }) {
+    if (quantity <= 0) {
+      return const DeductionResult(
+        status: DeductionStatus.ambiguous,
+        message: 'Invalid deduction quantity. Quantity must be greater than zero.',
+      );
+    }
+
+    CategoryFoodItem? targetItem;
+    String? targetCategory;
+    List<CategoryFoodItem>? targetList;
+    int targetIndex = -1;
+
+    // 1. Locate by category and itemId
+    if (categoryIdOrName != null && categoryIdOrName.isNotEmpty && itemId != null && itemId.isNotEmpty) {
+      final canon = _canonicalizeCategory(categoryIdOrName);
+      final list = _categoryStore[canon];
+      if (list != null) {
+        final idx = list.indexWhere((it) => it.id == itemId);
+        if (idx != -1) {
+          targetItem = list[idx];
+          targetCategory = canon;
+          targetList = list;
+          targetIndex = idx;
+        }
+      }
+    }
+
+    // 2. Locate by itemId across all categories
+    if (targetItem == null && itemId != null && itemId.isNotEmpty) {
+      for (final entry in _categoryStore.entries) {
+        final idx = entry.value.indexWhere((it) => it.id == itemId);
+        if (idx != -1) {
+          targetItem = entry.value[idx];
+          targetCategory = entry.key;
+          targetList = entry.value;
+          targetIndex = idx;
+          break;
+        }
+      }
+    }
+
+    // 3. Locate by category and food name
+    if (targetItem == null && name != null && name.isNotEmpty) {
+      if (categoryIdOrName != null && categoryIdOrName.isNotEmpty) {
+        final canon = _canonicalizeCategory(categoryIdOrName);
+        final list = _categoryStore[canon];
+        if (list != null) {
+          final idx = list.indexWhere((it) => isFoodNameMatching(it.name, name));
+          if (idx != -1) {
+            targetItem = list[idx];
+            targetCategory = canon;
+            targetList = list;
+            targetIndex = idx;
+          }
+        }
+      }
+
+      // 4. Locate by food name across all categories
+      if (targetItem == null) {
+        for (final entry in _categoryStore.entries) {
+          final idx = entry.value.indexWhere((it) => isFoodNameMatching(it.name, name));
+          if (idx != -1) {
+            targetItem = entry.value[idx];
+            targetCategory = entry.key;
+            targetList = entry.value;
+            targetIndex = idx;
+            break;
+          }
+        }
+      }
+    }
+
+    if (targetItem == null || targetCategory == null || targetList == null || targetIndex == -1) {
+      return DeductionResult(
+        status: DeductionStatus.notFound,
+        message: 'Item "${name ?? itemId ?? 'Unknown'}" was not found in your fridge.',
+      );
+    }
+
+    final existingUnit = targetItem.unit;
+    final deductUnit = unit != null && unit.trim().isNotEmpty ? unit.trim() : existingUnit;
+
+    if (!areUnitsCompatible(existingUnit, deductUnit)) {
+      return DeductionResult(
+        status: DeductionStatus.incompatibleUnits,
+        message: 'Cannot deduct $quantity $deductUnit from ${targetItem.quantity} due to incompatible units.',
+      );
+    }
+
+    final existingQty = targetItem.decimalAmount;
+    final normExisting = normalizeUnit(existingUnit);
+    final normDeduct = normalizeUnit(deductUnit);
+
+    num deductInExistingUnit;
+    if (normExisting == normDeduct) {
+      deductInExistingUnit = quantity;
+    } else if (normExisting == 'g' && normDeduct == 'kg') {
+      deductInExistingUnit = quantity * 1000;
+    } else if (normExisting == 'kg' && normDeduct == 'g') {
+      deductInExistingUnit = quantity / 1000;
+    } else if (normExisting == 'ml' && normDeduct == 'l') {
+      deductInExistingUnit = quantity * 1000;
+    } else if (normExisting == 'l' && normDeduct == 'ml') {
+      deductInExistingUnit = quantity / 1000;
+    } else {
+      deductInExistingUnit = quantity;
+    }
+
+    final remainingAmount = existingQty - deductInExistingUnit;
+
+    // Over-removal check
+    if (remainingAmount < -0.0001) {
+      return DeductionResult(
+        status: DeductionStatus.overRemoval,
+        message: 'You only have ${targetItem.quantity} in your fridge. Please adjust the quantity.',
+        remainingQuantity: remainingAmount,
+      );
+    }
+
+    // Zero remaining: remove completely from active inventory
+    if (remainingAmount.abs() <= 0.0001 || remainingAmount <= 0) {
+      final removed = targetList.removeAt(targetIndex);
+      NotificationRepository.addNotification(
+        title: 'Inventory update',
+        description: '${removed.name} was removed from your fridge.',
+        type: NotificationType.inventoryUpdate,
+      );
+      _notify();
+
+      return DeductionResult(
+        status: DeductionStatus.removed,
+        message: '${targetItem.name} has been completely consumed and removed from your fridge.',
+        remainingQuantity: 0,
+        remainingUnit: existingUnit,
+      );
+    }
+
+    // Partial deduction: subtract quantity and update item in-place
+    final newQtyStr = formatQuantity(remainingAmount, existingUnit);
+    final updatedItem = targetItem.copyWith(quantity: newQtyStr);
+    targetList[targetIndex] = updatedItem;
+
+    NotificationRepository.addNotification(
+      title: 'Inventory update',
+      description: 'Used ${formatQuantity(quantity, deductUnit)} of ${targetItem.name}. $newQtyStr remaining.',
+      type: NotificationType.inventoryUpdate,
+    );
+    _notify();
+
+    return DeductionResult(
+      status: DeductionStatus.success,
+      message: 'Deducted ${formatQuantity(quantity, deductUnit)} of ${targetItem.name}. $newQtyStr remaining.',
+      updatedItem: updatedItem,
+      remainingQuantity: remainingAmount,
+      remainingUnit: existingUnit,
+    );
+  }
+
+  /// Convenience helper to deduct by item name across all categories
+  static DeductionResult deductItemQuantityByName({
+    required String name,
+    required num quantity,
+    String? unit,
+  }) {
+    return deductItemQuantity(
+      name: name,
+      quantity: quantity,
+      unit: unit,
+    );
   }
 
   /// Reset to initial mock state (for tests)

@@ -1891,10 +1891,12 @@ void main() {
             {
               'name': 'Milk',
               'category': 'Dairy Products',
+              'isFullRemoval': true,
             },
             {
               'name': 'Apple',
               'category': 'Fruits',
+              'isFullRemoval': true,
             }
           ],
         };
@@ -2826,5 +2828,301 @@ void main() {
 
     // Test 11: Deductions safe check
     expect(find.text('Logged to Today\'s Meals ✓'), findsOneWidget);
+  });
+
+  group('NUTRIFRIDGE — Partial Food Removal & Inventory Deductions', () {
+    setUp(() {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MockDataRepository.seedSampleDataForTesting();
+    });
+
+    // TEST 1 — PARTIAL APPLE REMOVAL
+    test('Test 1: Partial Apple removal (4 - 2 = 2 remaining)', () {
+      // Setup Apple with 4 pieces in Fruits
+      final fruits = FridgeCategoryRepository.getCategoryData('Fruits');
+      final apple = fruits.items.firstWhere((it) => it.name.toLowerCase() == 'apple');
+      FridgeCategoryRepository.updateItem('Fruits', apple.copyWith(quantity: '4 pieces'));
+
+      final result = FridgeCategoryRepository.deductItemQuantity(
+        itemId: apple.id,
+        categoryIdOrName: 'Fruits',
+        quantity: 2,
+        unit: 'pieces',
+      );
+
+      expect(result.status, DeductionStatus.success);
+      expect(result.remainingQuantity, 2);
+
+      final updatedApple = FridgeCategoryRepository.findItemByName('Apple');
+      expect(updatedApple, isNotNull);
+      expect(updatedApple!.quantity, '2 pieces');
+      expect(FridgeCategoryRepository.getCategoryData('Fruits').items.any((it) => it.id == apple.id), isTrue);
+    });
+
+    // TEST 2 — COMPLETE REMOVAL WHEN ZERO STOCK REACHED
+    test('Test 2: Complete removal when stock reaches 0 (4 - 4 = 0, removed)', () {
+      final fruits = FridgeCategoryRepository.getCategoryData('Fruits');
+      final apple = fruits.items.firstWhere((it) => it.name.toLowerCase() == 'apple');
+      FridgeCategoryRepository.updateItem('Fruits', apple.copyWith(quantity: '4 pieces'));
+
+      final result = FridgeCategoryRepository.deductItemQuantity(
+        itemId: apple.id,
+        categoryIdOrName: 'Fruits',
+        quantity: 4,
+        unit: 'pieces',
+      );
+
+      expect(result.status, DeductionStatus.removed);
+      expect(result.remainingQuantity, 0);
+
+      final updatedApple = FridgeCategoryRepository.findItemByName('Apple', exact: true);
+      expect(updatedApple, isNull);
+      expect(FridgeCategoryRepository.getCategoryData('Fruits').items.any((it) => it.id == apple.id), isFalse);
+    });
+
+    // TEST 3 — OVER-REMOVAL PREVENTED
+    test('Test 3: Over-removal is rejected and inventory is not mutated (4 - 6 rejected)', () {
+      final fruits = FridgeCategoryRepository.getCategoryData('Fruits');
+      final apple = fruits.items.firstWhere((it) => it.name.toLowerCase() == 'apple');
+      FridgeCategoryRepository.updateItem('Fruits', apple.copyWith(quantity: '4 pieces'));
+
+      // Validate checkDeduction
+      final check = FridgeCategoryRepository.checkDeduction(
+        item: apple.copyWith(quantity: '4 pieces'),
+        quantity: 6,
+        unit: 'pieces',
+      );
+      expect(check.status, DeductionStatus.overRemoval);
+      expect(check.message, contains('You only have 4 pieces in your fridge'));
+
+      // Attempt actual deduction
+      final result = FridgeCategoryRepository.deductItemQuantity(
+        itemId: apple.id,
+        categoryIdOrName: 'Fruits',
+        quantity: 6,
+        unit: 'pieces',
+      );
+
+      expect(result.status, DeductionStatus.overRemoval);
+      expect(result.message, contains('You only have 4 pieces in your fridge'));
+
+      // Stock remains exactly 4 pieces
+      final untouchedApple = FridgeCategoryRepository.findItemByName('Apple');
+      expect(untouchedApple, isNotNull);
+      expect(untouchedApple!.quantity, '4 pieces');
+    });
+
+    // TEST 4 — PANEER GRAM DEDUCTION
+    test('Test 4: Paneer gram deduction (500 g - 150 g = 350 g)', () {
+      final dairy = FridgeCategoryRepository.getCategoryData('Dairy Products');
+      final paneer = dairy.items.firstWhere((it) => it.name.toLowerCase() == 'paneer');
+      FridgeCategoryRepository.updateItem('Dairy Products', paneer.copyWith(quantity: '500 g'));
+
+      final result = FridgeCategoryRepository.deductItemQuantityByName(
+        name: 'Paneer',
+        quantity: 150,
+        unit: 'g',
+      );
+
+      expect(result.status, DeductionStatus.success);
+      expect(result.remainingQuantity, 350);
+
+      final updatedPaneer = FridgeCategoryRepository.findItemByName('Paneer');
+      expect(updatedPaneer, isNotNull);
+      expect(updatedPaneer!.quantity, '350 g');
+      expect(FridgeCategoryRepository.getCategoryData('Dairy Products').items.any((it) => it.name == 'Paneer'), isTrue);
+    });
+
+    // TEST 5 — MILK UNIT CONVERSION
+    test('Test 5: Milk unit conversion (2 L - 500 ml = 1.5 L)', () {
+      final dairy = FridgeCategoryRepository.getCategoryData('Dairy Products');
+      final milk = dairy.items.firstWhere((it) => it.name.toLowerCase() == 'milk');
+      FridgeCategoryRepository.updateItem('Dairy Products', milk.copyWith(quantity: '2 L'));
+
+      final result = FridgeCategoryRepository.deductItemQuantityByName(
+        name: 'Milk',
+        quantity: 500,
+        unit: 'ml',
+      );
+
+      expect(result.status, DeductionStatus.success);
+      expect(result.remainingQuantity, 1.5);
+
+      final updatedMilk = FridgeCategoryRepository.findItemByName('Milk');
+      expect(updatedMilk, isNotNull);
+      expect(updatedMilk!.quantity, '1.5 L');
+    });
+
+    // TEST 6 — MEAL INGREDIENT DEDUCTION
+    test('Test 6: Meal ingredient deduction (4 Apples, deduct 2 via meal -> 2 remaining)', () {
+      final fruits = FridgeCategoryRepository.getCategoryData('Fruits');
+      final apple = fruits.items.firstWhere((it) => it.name.toLowerCase() == 'apple');
+      FridgeCategoryRepository.updateItem('Fruits', apple.copyWith(quantity: '4 pieces'));
+
+      final result = FridgeCategoryRepository.deductItemQuantityByName(
+        name: 'Apple',
+        quantity: 2,
+        unit: 'pieces',
+      );
+
+      expect(result.status, DeductionStatus.success);
+      expect(result.remainingQuantity, 2);
+
+      final updatedApple = FridgeCategoryRepository.findItemByName('Apple');
+      expect(updatedApple, isNotNull);
+      expect(updatedApple!.quantity, '2 pieces');
+    });
+
+    // TEST 7 — FOOD DETAILS "USE FOOD"
+    testWidgets('Test 7: Food Details Sheet partial use updates inventory to 150 g', (WidgetTester tester) async {
+      final dairy = FridgeCategoryRepository.getCategoryData('Dairy Products');
+      final paneer = dairy.items.firstWhere((it) => it.name.toLowerCase() == 'paneer');
+      FridgeCategoryRepository.updateItem('Dairy Products', paneer.copyWith(quantity: '250 g'));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (ctx) => FoodDetailsSheet(
+                      item: FridgeCategoryRepository.findItemByName('Paneer')!,
+                      categoryName: 'Dairy Products',
+                    ),
+                  );
+                },
+                child: const Text('Open Sheet'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Sheet'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Paneer'), findsOneWidget);
+      expect(find.text('Available in fridge: 250 g'), findsOneWidget);
+
+      // Default selected amount is 100 g, tap Use Food
+      await tester.tap(find.text('Use Food'));
+      await tester.pumpAndSettle();
+
+      final updatedPaneer = FridgeCategoryRepository.findItemByName('Paneer');
+      expect(updatedPaneer, isNotNull);
+      expect(updatedPaneer!.quantity, '150 g');
+    });
+
+    // TEST 8 — CATEGORY SYNCHRONIZATION
+    test('Test 8: Category synchronization keeps item in correct category', () {
+      final dairy = FridgeCategoryRepository.getCategoryData('Dairy Products');
+      final countBefore = dairy.items.length;
+      final paneer = dairy.items.firstWhere((it) => it.name.toLowerCase() == 'paneer');
+      FridgeCategoryRepository.updateItem('Dairy Products', paneer.copyWith(quantity: '500 g'));
+
+      FridgeCategoryRepository.deductItemQuantityByName(
+        name: 'Paneer',
+        quantity: 200,
+        unit: 'g',
+      );
+
+      final dairyAfter = FridgeCategoryRepository.getCategoryData('Dairy Products');
+      expect(dairyAfter.items.length, countBefore);
+      expect(dairyAfter.items.any((it) => it.name == 'Paneer' && it.quantity == '300 g'), isTrue);
+    });
+
+    // TEST 9 — DUPLICATE CONFIRMATION PREVENTED
+    testWidgets('Test 9: Duplicate confirmation prevented by isConfirmed flag', (WidgetTester tester) async {
+      final fruits = FridgeCategoryRepository.getCategoryData('Fruits');
+      final apple = fruits.items.firstWhere((it) => it.name.toLowerCase() == 'apple');
+      FridgeCategoryRepository.updateItem('Fruits', apple.copyWith(quantity: '4 pieces'));
+
+      AiAssistantService.mockHandler = (req) async {
+        return {
+          'success': true,
+          'action': 'remove_inventory_items',
+          'assistantMessage': 'I will remove 2 apples from your fridge.',
+          'requiresConfirmation': true,
+          'inventoryItems': [
+            {'name': 'Apple', 'category': 'Fruits', 'quantity': 2, 'unit': 'pieces', 'isFullRemoval': false},
+          ],
+        };
+      };
+
+      await tester.pumpWidget(const MaterialApp(home: AiAssistantScreen()));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'Remove 2 apples');
+      await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Remove from Fridge'), findsOneWidget);
+
+      // First click
+      await tester.tap(find.text('Remove from Fridge'));
+      await tester.pumpAndSettle();
+
+      // Verify deduction happened
+      expect(find.text('Removed from Fridge ✓'), findsOneWidget);
+      expect(FridgeCategoryRepository.findItemByName('Apple')!.quantity, '2 pieces');
+
+      // Second click should be disabled (finds nothing with enabled button)
+      expect(find.text('Remove from Fridge'), findsNothing);
+      expect(FridgeCategoryRepository.findItemByName('Apple')!.quantity, '2 pieces');
+    });
+
+    // TEST 10 — ZERO QUANTITY REMOVED FROM ACTIVE CATEGORY
+    test('Test 10: Zero quantity removed from active category and count decremented', () {
+      final fruitsBefore = FridgeCategoryRepository.getCategoryData('Fruits');
+      final countBefore = fruitsBefore.items.length;
+      final apple = fruitsBefore.items.firstWhere((it) => it.name.toLowerCase() == 'apple');
+      FridgeCategoryRepository.updateItem('Fruits', apple.copyWith(quantity: '2 pieces'));
+
+      final result = FridgeCategoryRepository.deductItemQuantityByName(
+        name: 'Apple',
+        quantity: 2,
+        unit: 'pieces',
+      );
+
+      expect(result.status, DeductionStatus.removed);
+      final fruitsAfter = FridgeCategoryRepository.getCategoryData('Fruits');
+      expect(fruitsAfter.items.length, countBefore - 1);
+      expect(fruitsAfter.items.any((it) => it.name.toLowerCase() == 'apple'), isFalse);
+    });
+
+    // TEST 11 — UNSPECIFIED REMOVAL QUANTITY CLARIFICATION
+    testWidgets('Test 11: Ambiguous removal request prompts for clarification', (WidgetTester tester) async {
+      AiAssistantService.mockHandler = (req) async {
+        return {
+          'success': true,
+          'action': 'remove_inventory_items',
+          'assistantMessage': 'I can help with that.',
+          'requiresConfirmation': true,
+          'inventoryItems': [
+            {'name': 'Apple', 'category': 'Fruits'}, // Missing quantity!
+          ],
+        };
+      };
+
+      await tester.pumpWidget(const MaterialApp(home: AiAssistantScreen()));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'Remove apples');
+      await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+      await tester.pumpAndSettle();
+
+      // Should show clarifying question instead of removing
+      expect(
+        find.textContaining('Would you like to remove all Apple or a specific amount?'),
+        findsOneWidget,
+      );
+      expect(find.text('Remove from Fridge'), findsNothing);
+
+      // Verify inventory was NOT touched
+      expect(FridgeCategoryRepository.findItemByName('Apple'), isNotNull);
+    });
   });
 }
