@@ -10,17 +10,14 @@ import 'food_details_sheet.dart';
 ///   and calm pastel expiry badges (soft coral, soft peach, muted green).
 /// - Tapping an item opens the FoodDetailsSheet layered above this category sheet.
 /// - Real-time local state updates when items are used or removed.
-/// - Secondary "+ Add Food" action button at the bottom.
 /// - Keeps the open refrigerator visible in the background via a subtle translucent backdrop.
 class CategoryBottomSheet extends StatefulWidget {
   final CategoryData category;
-  final VoidCallback? onAddFood;
   final ValueChanged<CategoryFoodItem>? onItemTap;
 
   const CategoryBottomSheet({
     super.key,
     required this.category,
-    this.onAddFood,
     this.onItemTap,
   });
 
@@ -28,7 +25,6 @@ class CategoryBottomSheet extends StatefulWidget {
   static Future<T?> show<T>({
     required BuildContext context,
     required CategoryData category,
-    VoidCallback? onAddFood,
     ValueChanged<CategoryFoodItem>? onItemTap,
   }) {
     return showModalBottomSheet<T>(
@@ -40,7 +36,6 @@ class CategoryBottomSheet extends StatefulWidget {
       barrierColor: const Color(0x4D0C1522),
       builder: (sheetContext) => CategoryBottomSheet(
         category: category,
-        onAddFood: onAddFood,
         onItemTap: onItemTap,
       ),
     );
