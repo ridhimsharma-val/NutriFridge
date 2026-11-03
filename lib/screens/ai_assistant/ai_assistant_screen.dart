@@ -588,6 +588,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
     try {
       int addedCount = 0;
+      final List<Map<String, dynamic>> successfullyAddedItems = [];
+
       for (final itemJson in message.inventoryItems) {
         final name = itemJson['name'] as String? ?? 'Food Item';
         final category = itemJson['category'] as String? ?? 'Others';
@@ -605,6 +607,16 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           imageAsset: imageAsset,
         );
         addedCount++;
+        successfullyAddedItems.add({
+          'name': name,
+          'quantity': qty,
+          'unit': unit,
+        });
+      }
+
+      if (addedCount == 0 || successfullyAddedItems.isEmpty) {
+        // Do not display a success message if the inventory update fails
+        return;
       }
 
       final index = _messages.indexWhere((m) => m.id == message.id);
@@ -615,6 +627,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         });
       }
 
+      final successMessage = _generateAdditionSuccessMessage(successfullyAddedItems);
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -623,7 +637,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Added $addedCount ${addedCount == 1 ? 'item' : 'items'} to your fridge!',
+                  successMessage,
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
@@ -635,6 +649,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           duration: const Duration(seconds: 3),
         ),
       );
+    } catch (e) {
+      debugPrint('Error confirming food additions: $e');
+      // Do not display a success message if the inventory update fails
     } finally {
       if (mounted) {
         setState(() {
@@ -642,6 +659,108 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         });
       }
     }
+  }
+
+  static String _generateAdditionSuccessMessage(List<Map<String, dynamic>> items) {
+    if (items.isEmpty) return 'Added to your fridge!';
+
+    if (items.length == 1) {
+      final item = items.first;
+      final rawName = (item['name'] as String? ?? 'Item').trim();
+      final qty = _parseQuantity(item['quantity']);
+      final unit = _parseUnit(item['unit']);
+      final normUnit = FridgeCategoryRepository.normalizeUnit(unit);
+
+      // Countable item (pieces/items/etc.)
+      if (normUnit == 'piece' || normUnit == 'item' || normUnit.isEmpty) {
+        if (qty == 1) {
+          final singular = _capitalizeFirst(_singularFoodName(rawName));
+          return '$singular added to your fridge!';
+        } else {
+          final qtyStr = (qty is int || qty == qty.roundToDouble()) ? '${qty.toInt()}' : '$qty';
+          final plural = _pluralizeFoodName(_singularFoodName(rawName)).toLowerCase();
+          return '$qtyStr $plural added to your fridge!';
+        }
+      }
+
+      // Quantity with measurement unit (e.g. 250 g paneer, 1 L milk)
+      final formattedQty = FridgeCategoryRepository.formatQuantity(qty, unit);
+      return '$formattedQty ${rawName.toLowerCase()} added to your fridge!';
+    }
+
+    if (items.length == 2) {
+      final item1 = items[0];
+      final item2 = items[1];
+      final name1 = (item1['name'] as String? ?? 'Item 1').trim();
+      final name2 = (item2['name'] as String? ?? 'Item 2').trim();
+      final qty1 = _parseQuantity(item1['quantity']);
+      final qty2 = _parseQuantity(item2['quantity']);
+      final unit1 = FridgeCategoryRepository.normalizeUnit(_parseUnit(item1['unit']));
+      final unit2 = FridgeCategoryRepository.normalizeUnit(_parseUnit(item2['unit']));
+
+      String label1 = name1;
+      if (unit1 == 'piece' || unit1 == 'item' || unit1.isEmpty) {
+        label1 = qty1 > 1 ? _pluralizeFoodName(_singularFoodName(name1)) : _capitalizeFirst(_singularFoodName(name1));
+      } else {
+        label1 = _capitalizeFirst(name1);
+      }
+
+      String label2 = name2.toLowerCase();
+      if (unit2 == 'piece' || unit2 == 'item' || unit2.isEmpty) {
+        label2 = qty2 > 1 ? _pluralizeFoodName(_singularFoodName(name2)).toLowerCase() : _singularFoodName(name2).toLowerCase();
+      }
+
+      final combined = '$label1 and $label2';
+      if (combined.length <= 36) {
+        return '$combined added to your fridge!';
+      }
+    }
+
+    // 3 or more items, or 2 items with very long names
+    return '${items.length} items added to your fridge!';
+  }
+
+  static String _capitalizeFirst(String s) {
+    if (s.isEmpty) return s;
+    return s[0].toUpperCase() + s.substring(1);
+  }
+
+  static String _pluralizeFoodName(String name) {
+    final trimmed = name.trim();
+    final lower = trimmed.toLowerCase();
+    if (lower.endsWith('s') || lower.endsWith('sh') || lower.endsWith('ch') || lower.endsWith('x') || lower.endsWith('z')) {
+      if (lower.endsWith('s')) return trimmed;
+      return '${trimmed}es';
+    }
+    if (lower.endsWith('y') && !lower.endsWith('ay') && !lower.endsWith('ey') && !lower.endsWith('oy') && !lower.endsWith('uy')) {
+      return '${trimmed.substring(0, trimmed.length - 1)}ies';
+    }
+    if (lower == 'tomato') return '${trimmed}es';
+    if (lower == 'potato') return '${trimmed}es';
+    return '${trimmed}s';
+  }
+
+  static String _singularFoodName(String name) {
+    final trimmed = name.trim();
+    final lower = trimmed.toLowerCase();
+    if (lower == 'grapes') return 'Grapes';
+    if (lower == 'hummus') return 'Hummus';
+    if (lower.endsWith('ies')) {
+      return '${trimmed.substring(0, trimmed.length - 3)}y';
+    }
+    if (lower.endsWith('tomatoes')) {
+      return trimmed.substring(0, trimmed.length - 2);
+    }
+    if (lower.endsWith('potatoes')) {
+      return trimmed.substring(0, trimmed.length - 2);
+    }
+    if (lower.endsWith('es') && !lower.endsWith('ches') && !lower.endsWith('shes') && !lower.endsWith('xes')) {
+      return trimmed.substring(0, trimmed.length - 2);
+    }
+    if (lower.endsWith('s') && !lower.endsWith('ss')) {
+      return trimmed.substring(0, trimmed.length - 1);
+    }
+    return trimmed;
   }
 
   void _confirmRemoveInventory(AiChatMessage message) {

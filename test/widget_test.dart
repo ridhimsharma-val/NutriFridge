@@ -2539,4 +2539,117 @@ void main() {
     final addBtn = tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Add to Fridge'));
     expect(addBtn.onPressed, isNull);
   });
+
+  testWidgets('AI Assistant - Food addition confirmation message matrix test', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      AiAssistantService.mockHandler = null;
+    });
+
+    FridgeCategoryRepository.reset();
+
+    AiAssistantService.mockHandler = (request) async {
+      final msg = (request['message'] as String? ?? '').toLowerCase();
+      if (msg.contains('one apple')) {
+        return {
+          'success': true,
+          'action': 'add_inventory_items',
+          'assistantMessage': 'Found 1 apple.',
+          'requiresConfirmation': true,
+          'inventoryItems': [
+            {'name': 'Apple', 'category': 'Fruits', 'quantity': 1, 'unit': 'piece', 'expiryDaysEstimate': 5},
+          ],
+        };
+      } else if (msg.contains('four apples')) {
+        return {
+          'success': true,
+          'action': 'add_inventory_items',
+          'assistantMessage': 'Found 4 apples.',
+          'requiresConfirmation': true,
+          'inventoryItems': [
+            {'name': 'Apple', 'category': 'Fruits', 'quantity': 4, 'unit': 'pieces', 'expiryDaysEstimate': 5},
+          ],
+        };
+      } else if (msg.contains('apple and milk')) {
+        return {
+          'success': true,
+          'action': 'add_inventory_items',
+          'assistantMessage': 'Found apple and milk.',
+          'requiresConfirmation': true,
+          'inventoryItems': [
+            {'name': 'Apple', 'category': 'Fruits', 'quantity': 1, 'unit': 'piece', 'expiryDaysEstimate': 5},
+            {'name': 'Milk', 'category': 'Dairy Products', 'quantity': 1, 'unit': 'L', 'expiryDaysEstimate': 3},
+          ],
+        };
+      } else if (msg.contains('three items')) {
+        return {
+          'success': true,
+          'action': 'add_inventory_items',
+          'assistantMessage': 'Found 3 items.',
+          'requiresConfirmation': true,
+          'inventoryItems': [
+            {'name': 'Apple', 'category': 'Fruits', 'quantity': 1, 'unit': 'piece', 'expiryDaysEstimate': 5},
+            {'name': 'Milk', 'category': 'Dairy Products', 'quantity': 1, 'unit': 'L', 'expiryDaysEstimate': 3},
+            {'name': 'Carrot', 'category': 'Vegetables', 'quantity': 2, 'unit': 'pieces', 'expiryDaysEstimate': 6},
+          ],
+        };
+      }
+      return {'success': false, 'action': 'error'};
+    };
+
+    await tester.pumpWidget(const MaterialApp(home: AiAssistantScreen()));
+    await tester.pumpAndSettle();
+
+    // 1. One apple -> "Apple added to your fridge!"
+    await tester.enterText(find.byType(TextField), 'Add one apple');
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Add to Fridge'));
+    await tester.pumpAndSettle();
+    expect(find.text('Apple added to your fridge!'), findsOneWidget);
+
+    // Wait for SnackBar to dismiss
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+
+    // 2. Four apples -> "4 apples added to your fridge!"
+    await tester.enterText(find.byType(TextField), 'Add four apples');
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Add to Fridge'));
+    await tester.pumpAndSettle();
+    expect(find.text('4 apples added to your fridge!'), findsOneWidget);
+
+    // Wait for SnackBar to dismiss
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+
+    // 3. Apple and milk -> "Apple and milk added to your fridge!"
+    await tester.enterText(find.byType(TextField), 'Add apple and milk');
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Add to Fridge'));
+    await tester.pumpAndSettle();
+    expect(find.text('Apple and milk added to your fridge!'), findsOneWidget);
+
+    // Wait for SnackBar to dismiss
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+
+    // 4. Three items -> "3 items added to your fridge!"
+    await tester.enterText(find.byType(TextField), 'Add three items');
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Add to Fridge'));
+    await tester.pumpAndSettle();
+    expect(find.text('3 items added to your fridge!'), findsOneWidget);
+  });
 }
