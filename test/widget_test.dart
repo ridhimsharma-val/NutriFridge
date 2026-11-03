@@ -2722,9 +2722,11 @@ void main() {
     await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
     await tester.pumpAndSettle();
 
-    // Verify initial proposed meal card shows "AI Estimate" badge and uncertainty note
+    // Verify initial proposed meal card shows "AI Estimate" badge, no yellow banner, and no "Will deduct" badge
     expect(find.text('AI Estimate'), findsOneWidget);
-    expect(find.text('Approximate nutrition • Actual values may vary'), findsOneWidget);
+    expect(find.text('Approximate nutrition • Actual values may vary'), findsNothing);
+    expect(find.textContaining('Estimated nutrition • Sizing approximate'), findsNothing);
+    expect(find.text('Will deduct'), findsNothing);
 
     // Open Edit Meal Dialog
     await tester.tap(find.byIcon(Icons.edit_outlined));

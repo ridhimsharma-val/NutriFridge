@@ -1906,29 +1906,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               Expanded(child: _buildMacroMini('Fat', '${fat}g', const Color(0xFFEC4899))),
             ],
           ),
-          if (!isManual) ...[
-            const SizedBox(height: 8),
-            // Sizing uncertainty disclaimer
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF3E0),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.info_outline_rounded, size: 13, color: Color(0xFFD97706)),
-                  SizedBox(width: 5),
-                  Expanded(
-                    child: Text(
-                      'Approximate nutrition • Actual values may vary',
-                      style: TextStyle(fontSize: 10.5, color: Color(0xFF92400E), fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
           // Ingredients deduction section
           if (ingredients.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -2012,22 +1989,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                               ],
                             ),
                           ),
-                          if (isTracked)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: isSelected ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                isSelected ? 'Will deduct' : 'Keep',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: isSelected ? const Color(0xFF166534) : const Color(0xFF64748B),
-                                ),
-                              ),
-                            ),
                         ],
                       ),
                     );
