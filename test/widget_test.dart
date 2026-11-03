@@ -18,6 +18,7 @@ import 'package:nutrifridge/screens/home/widgets/recommendation_card.dart';
 import 'package:nutrifridge/screens/fridge/models/fridge_preferences.dart';
 import 'package:nutrifridge/screens/ai_assistant/ai_assistant_screen.dart';
 import 'package:nutrifridge/screens/ai_assistant/services/ai_assistant_service.dart';
+import 'package:nutrifridge/screens/fridge/widgets/food_details_sheet.dart';
 
 import 'package:nutrifridge/screens/add_food/add_food_page.dart';
 import 'package:nutrifridge/screens/home/home_screen.dart';
@@ -149,22 +150,24 @@ void main() {
     await tester.tap(find.text('Paneer'));
     await tester.pumpAndSettle();
 
-    // Verify Food Details Sheet opens layered above category sheet
-    expect(find.text('Quantity'), findsOneWidget);
+    // Verify Food Details Sheet opens layered above category sheet with distinct available quantity and 2 main actions
+    expect(find.text('Quantity to use or add'), findsOneWidget);
+    expect(find.text('Available in fridge: 250 g'), findsOneWidget);
     expect(find.text('Use Food'), findsOneWidget);
-    expect(find.text('Remove Food'), findsOneWidget);
+    expect(find.text('+ Add Food'), findsOneWidget);
+    expect(find.text('Remove Food'), findsNothing);
 
-    // Tap minus to decrease quantity from 250 g to 200 g, then to 150 g
-    await tester.tap(find.byIcon(Icons.remove_rounded));
-    await tester.pumpAndSettle();
-    expect(find.text('200 g'), findsOneWidget);
+    // Default selected quantity is 100 g (sensible default for 250 g paneer)
+    expect(find.text('100 g'), findsWidgets);
 
-    await tester.tap(find.byIcon(Icons.remove_rounded));
-    await tester.pumpAndSettle();
-    expect(find.text('150 g'), findsOneWidget);
-
-    // Tap "Use Food" to save and return to Category Bottom Sheet
+    // Tap "Use Food" to subtract 100 g from 250 g -> 150 g remaining!
     await tester.tap(find.text('Use Food'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Available in fridge: 150 g'), findsOneWidget);
+
+    // Tap Close button on Food Details Sheet
+    await tester.tap(find.byIcon(Icons.close_rounded).last);
     await tester.pumpAndSettle();
 
     // Verify returned to Category Bottom Sheet and Paneer now displays updated 150 g
@@ -180,7 +183,7 @@ void main() {
     expect(find.text('DAIRY PRODUCTS'), findsOneWidget);
     expect(find.text('VEGETABLES'), findsOneWidget);
 
-    // Reopen Dairy Products sheet to test Remove Food
+    // Reopen Dairy Products sheet to test reaching 0 stock
     await tester.tap(find.text('DAIRY PRODUCTS'));
     await tester.pumpAndSettle();
 
@@ -188,24 +191,18 @@ void main() {
     await tester.tap(find.text('Paneer'));
     await tester.pumpAndSettle();
 
-    // Tap Remove Food to open confirmation dialog
-    await tester.tap(find.text('Remove Food'));
-    await tester.pumpAndSettle();
+    expect(find.text('Available in fridge: 150 g'), findsOneWidget);
 
-    // Verify confirmation dialog
-    expect(find.text('Remove Paneer?'), findsOneWidget);
-    expect(find.text('Cancel'), findsOneWidget);
-    expect(find.text('Remove'), findsOneWidget);
-
-    // Tap Cancel
-    await tester.tap(find.text('Cancel'));
+    // Increase selected amount from 100 g to 150 g (+ 50 g)
+    await tester.tap(find.descendant(
+      of: find.byType(FoodDetailsSheet),
+      matching: find.byIcon(Icons.add_rounded),
+    ));
     await tester.pumpAndSettle();
-    expect(find.text('Remove Paneer?'), findsNothing);
+    expect(find.text('150 g'), findsWidgets);
 
-    // Tap Remove Food again and confirm Remove
-    await tester.tap(find.text('Remove Food'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Remove'));
+    // Tap "Use Food" -> 150 g - 150 g = 0 pieces remaining (removed from inventory!)
+    await tester.tap(find.text('Use Food'));
     await tester.pumpAndSettle();
 
     // Verify item is removed and count updated to 3 items
@@ -2059,5 +2056,196 @@ void main() {
     await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
     await tester.pumpAndSettle();
     expect(find.text('Your food preferences and personal settings.'), findsOneWidget);
+  });
+
+  testWidgets('Food Details Sheet - Quantity Controls and Inventory Actions Test Matrix', (WidgetTester tester) async {
+    FridgeCategoryRepository.reset();
+
+    // 1. Change selector only test & 2. Use Paneer & 3. Add Paneer
+    final paneer = FridgeCategoryRepository.findItemById('dairy_2')!;
+    expect(paneer.quantity, '250 g');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () {
+                FoodDetailsSheet.show(
+                  context: context,
+                  item: FridgeCategoryRepository.findItemById('dairy_2')!,
+                  categoryName: 'Dairy Products',
+                );
+              },
+              child: const Text('Open Paneer Sheet'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open Paneer Sheet'));
+    await tester.pumpAndSettle();
+
+    // Verify initial layout & distinct displays
+    expect(find.text('Available in fridge: 250 g'), findsOneWidget);
+    expect(find.text('Quantity to use or add'), findsOneWidget);
+    expect(find.text('Use Food'), findsOneWidget);
+    expect(find.text('+ Add Food'), findsOneWidget);
+    expect(find.text('Remove Food'), findsNothing);
+
+    // Sensible default for 250 g is 100 g
+    expect(find.text('100 g'), findsWidgets);
+
+    // [Test Matrix 1] Change selector only: tap plus to select 150 g
+    await tester.tap(find.byIcon(Icons.add_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('150 g'), findsWidgets);
+    // Available stock must remain unchanged!
+    expect(find.text('Available in fridge: 250 g'), findsOneWidget);
+    expect(FridgeCategoryRepository.findItemById('dairy_2')?.quantity, '250 g');
+
+    // Tap minus to bring it back to 100 g
+    await tester.tap(find.byIcon(Icons.remove_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('100 g'), findsWidgets);
+
+    // [Test Matrix 2] Use Paneer: 250 g - 100 g = 150 g
+    await tester.tap(find.text('Use Food'));
+    await tester.pumpAndSettle();
+    expect(find.text('Available in fridge: 150 g'), findsOneWidget);
+    expect(FridgeCategoryRepository.findItemById('dairy_2')?.quantity, '150 g');
+
+    // [Test Matrix 3] Add Paneer: 150 g + 200 g = 350 g
+    // Selected amount reset to sensible default (100 g). Increase by 2 steps (50 g each) to 200 g.
+    await tester.tap(find.byIcon(Icons.add_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.add_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('200 g'), findsWidgets);
+
+    await tester.tap(find.text('+ Add Food'));
+    await tester.pumpAndSettle();
+    expect(find.text('Available in fridge: 350 g'), findsOneWidget);
+    expect(FridgeCategoryRepository.findItemById('dairy_2')?.quantity, '350 g');
+
+    // Close sheet
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+
+    // [Test Matrix 4] Insufficient Stock Validation
+    // Set Paneer to 50 g available stock
+    FridgeCategoryRepository.updateItem(
+      'Dairy Products',
+      const CategoryFoodItem(
+        id: 'dairy_2',
+        name: 'Paneer',
+        quantity: '50 g',
+        expiryDays: 3,
+        imageAsset: 'assets/images/foods/paneer.jpg',
+        iconEmoji: '🧀',
+      ),
+    );
+
+    await tester.tap(find.text('Open Paneer Sheet'));
+    await tester.pumpAndSettle();
+    expect(find.text('Available in fridge: 50 g'), findsOneWidget);
+
+    // Default for 50 g is 50 g. Increase to 100 g.
+    await tester.tap(find.byIcon(Icons.add_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('100 g'), findsWidgets);
+
+    // Tap Use Food with 100 g selected while only 50 g available
+    await tester.tap(find.text('Use Food'));
+    await tester.pumpAndSettle();
+
+    // Verify rejection: error message shown, stock unchanged
+    expect(find.text('Cannot use 100 g. Only 50 g available in fridge.'), findsOneWidget);
+    expect(FridgeCategoryRepository.findItemById('dairy_2')?.quantity, '50 g');
+
+    // Close sheet
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+
+    // [Test Matrix 5 & 6] Apples (pieces)
+    FridgeCategoryRepository.updateItem(
+      'Fruits',
+      const CategoryFoodItem(
+        id: 'frt_1',
+        name: 'Apple',
+        quantity: '2 pieces',
+        expiryDays: 6,
+        imageAsset: 'assets/images/foods/apple.jpg',
+        iconEmoji: '🍎',
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () {
+                FoodDetailsSheet.show(
+                  context: context,
+                  item: FridgeCategoryRepository.findItemById('frt_1')!,
+                  categoryName: 'Fruits',
+                );
+              },
+              child: const Text('Open Apple Sheet'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // [Test Matrix 6] Add Apples: 2 pieces + 2 pieces = 4 pieces
+    await tester.tap(find.text('Open Apple Sheet'));
+    await tester.pumpAndSettle();
+    expect(find.text('Available in fridge: 2 pieces'), findsOneWidget);
+    // Default selected for discrete items is 1 piece. Increase to 2 pieces.
+    await tester.tap(find.byIcon(Icons.add_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('2 pieces'), findsWidgets);
+
+    await tester.tap(find.text('+ Add Food'));
+    await tester.pumpAndSettle();
+    expect(find.text('Available in fridge: 4 pieces'), findsOneWidget);
+    expect(FridgeCategoryRepository.findItemById('frt_1')?.quantity, '4 pieces');
+
+    // Close sheet
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+
+    // Reset apple to 2 pieces for [Test Matrix 5]
+    FridgeCategoryRepository.updateItem(
+      'Fruits',
+      const CategoryFoodItem(
+        id: 'frt_1',
+        name: 'Apple',
+        quantity: '2 pieces',
+        expiryDays: 6,
+        imageAsset: 'assets/images/foods/apple.jpg',
+        iconEmoji: '🍎',
+      ),
+    );
+
+    // [Test Matrix 5] Use Apples: 2 pieces - 2 pieces = 0 pieces (removed)
+    await tester.tap(find.text('Open Apple Sheet'));
+    await tester.pumpAndSettle();
+    expect(find.text('Available in fridge: 2 pieces'), findsOneWidget);
+
+    // Increase selected from 1 piece to 2 pieces
+    await tester.tap(find.byIcon(Icons.add_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('2 pieces'), findsWidgets);
+
+    // Tap Use Food
+    await tester.tap(find.text('Use Food'));
+    await tester.pumpAndSettle();
+
+    // Sheet should be popped and item removed from active inventory!
+    expect(FridgeCategoryRepository.findItemById('frt_1'), isNull);
   });
 }

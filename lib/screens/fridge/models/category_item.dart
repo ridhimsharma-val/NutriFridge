@@ -639,6 +639,18 @@ class FridgeCategoryRepository {
     return null;
   }
 
+  /// Find a food item in the fridge inventory by its unique ID
+  static CategoryFoodItem? findItemById(String id) {
+    for (final list in _categoryStore.values) {
+      for (final item in list) {
+        if (item.id == id) {
+          return item;
+        }
+      }
+    }
+    return null;
+  }
+
   /// Number of items expiring soon (expiryDays <= 3)
   static int get expiringSoonCount {
     int count = 0;

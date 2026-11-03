@@ -1,27 +1,35 @@
 import 'package:flutter/material.dart';
+import '../../../../models/notification_data.dart';
 import '../models/category_item.dart';
 
 /// Reusable Food Details Bottom Sheet
 /// Layered directly above the Category Bottom Sheet.
 /// Features:
-/// - Centered realistic food product photograph
+/// - Realistic food product visual
 /// - Food name and subtle expiry status badge
-/// - Interactive Quantity Stepper with circular minus (−) and plus (+) buttons
-/// - Primary teal/green "✓ Use Food" action
-/// - Secondary subtle coral "Remove Food" action with confirmation dialog
-/// - Preserves open fridge and category sheet hierarchy
+/// - Distinct Available Quantity display ("Available in fridge: X")
+/// - Interactive Quantity Stepper for operation quantity ("Quantity to use or add")
+/// - Primary teal/green "Use Food" action (subtracts selected quantity from available stock)
+/// - Secondary outlined "+ Add Food" action (increases available stock by selected quantity)
+/// - Rejects operation with validation feedback if attempting to use more than available
+/// - Removes item from active inventory if remaining quantity reaches zero
+/// - Immediately synchronizes with FridgeCategoryRepository and NotificationRepository
 class FoodDetailsSheet extends StatefulWidget {
   final CategoryFoodItem item;
   final String categoryName;
   final ValueChanged<CategoryFoodItem>? onUseFood;
+  final ValueChanged<CategoryFoodItem>? onAddFood;
   final VoidCallback? onRemoveFood;
+  final VoidCallback? onInventoryChanged;
 
   const FoodDetailsSheet({
     super.key,
     required this.item,
     this.categoryName = 'Fridge',
     this.onUseFood,
+    this.onAddFood,
     this.onRemoveFood,
+    this.onInventoryChanged,
   });
 
   /// Opens the reusable Food Details bottom sheet
@@ -30,20 +38,23 @@ class FoodDetailsSheet extends StatefulWidget {
     required CategoryFoodItem item,
     String categoryName = 'Fridge',
     ValueChanged<CategoryFoodItem>? onUseFood,
+    ValueChanged<CategoryFoodItem>? onAddFood,
     VoidCallback? onRemoveFood,
+    VoidCallback? onInventoryChanged,
   }) {
     return showModalBottomSheet<T>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      // Stronger dimming over the Category Bottom Sheet to create depth
       barrierColor: const Color(0x660B131D),
       builder: (sheetContext) => FoodDetailsSheet(
         item: item,
         categoryName: categoryName,
         onUseFood: onUseFood,
+        onAddFood: onAddFood,
         onRemoveFood: onRemoveFood,
+        onInventoryChanged: onInventoryChanged,
       ),
     );
   }
@@ -53,98 +64,196 @@ class FoodDetailsSheet extends StatefulWidget {
 }
 
 class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
-  late int _currentAmount;
+  late CategoryFoodItem _item;
+  late int _availableAmount;
+  late int _selectedAmount;
   late String _unit;
   late int _step;
+  String? _errorMessage;
+  bool _isProcessing = false;
 
   @override
   void initState() {
     super.initState();
-    _currentAmount = widget.item.numericAmount;
+    _item = widget.item;
+    _availableAmount = widget.item.numericAmount;
     _unit = widget.item.unit;
     _step = widget.item.stepAmount;
+    _selectedAmount = _computeSensibleDefault(_availableAmount, _unit, _step);
+  }
+
+  static int _computeSensibleDefault(int available, String unit, int step) {
+    final u = unit.toLowerCase();
+    if (u == 'g' || u == 'ml') {
+      if (available >= 100) return 100;
+      if (available >= 50) return 50;
+      return available > 0 ? available : 50;
+    }
+    // For pieces, pack, bottle, jar, tub, box, L, etc.:
+    // Never automatically select the entire available stock as the amount to use.
+    if (available > 1) {
+      return 1;
+    }
+    return available > 0 ? 1 : 1;
+  }
+
+  static String _formatAmount(int amount, String unit) {
+    return '$amount $unit'.trim();
+  }
+
+  String _formatActionDescription(int amount, String unit, String name, bool isAdd) {
+    final action = isAdd ? 'added successfully.' : 'used successfully.';
+    final uLower = unit.toLowerCase();
+    if (uLower == 'pieces' || uLower == 'piece') {
+      final displayName = (amount > 1 && !name.toLowerCase().endsWith('s')) ? '${name}s' : name;
+      return '$amount $displayName $action';
+    }
+    return '$amount $unit $name $action';
   }
 
   void _decreaseQuantity() {
-    if (_currentAmount > _step) {
+    if (_selectedAmount > _step) {
       setState(() {
-        _currentAmount -= _step;
+        _selectedAmount -= _step;
+        _errorMessage = null;
       });
     }
   }
 
   void _increaseQuantity() {
     setState(() {
-      _currentAmount += _step;
+      _selectedAmount += _step;
+      _errorMessage = null;
     });
   }
 
-  CategoryFoodItem get _updatedItem {
-    return widget.item.copyWith(
-      quantity: '$_currentAmount $_unit',
-    );
-  }
-
   void _handleUseFood() {
-    widget.onUseFood?.call(_updatedItem);
-    Navigator.of(context).pop();
+    if (_isProcessing) return;
+
+    if (_selectedAmount > _availableAmount) {
+      final msg =
+          'Cannot use ${_formatAmount(_selectedAmount, _unit)}. Only ${_formatAmount(_availableAmount, _unit)} available in fridge.';
+      setState(() {
+        _errorMessage = msg;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isProcessing = true;
+      _errorMessage = null;
+    });
+
+    final usedAmount = _selectedAmount;
+    final remaining = _availableAmount - usedAmount;
+    final successMsg = _formatActionDescription(usedAmount, _unit, _item.name, false);
+
+    if (remaining <= 0) {
+      // Completely consumed - remove item from active inventory
+      FridgeCategoryRepository.removeItem(widget.categoryName, _item.id);
+      NotificationRepository.addNotification(
+        title: 'Inventory update',
+        description: '${_formatAmount(usedAmount, _unit)} ${_item.name} used from fridge.',
+        type: NotificationType.inventoryUpdate,
+      );
+      widget.onRemoveFood?.call();
+      widget.onInventoryChanged?.call();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(successMsg),
+          backgroundColor: const Color(0xFF0D9488),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+
+      Navigator.of(context).pop();
+    } else {
+      // Partially consumed - update existing item in repository
+      final updatedItem = _item.copyWith(
+        quantity: _formatAmount(remaining, _unit),
+      );
+      FridgeCategoryRepository.updateItem(widget.categoryName, updatedItem);
+      NotificationRepository.addNotification(
+        title: 'Inventory update',
+        description: '${_formatAmount(usedAmount, _unit)} ${_item.name} used from fridge.',
+        type: NotificationType.inventoryUpdate,
+      );
+      widget.onUseFood?.call(updatedItem);
+      widget.onInventoryChanged?.call();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(successMsg),
+          backgroundColor: const Color(0xFF0D9488),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+
+      // Update in-place so user immediately sees remaining stock
+      setState(() {
+        _availableAmount = remaining;
+        _item = updatedItem;
+        _selectedAmount = _computeSensibleDefault(remaining, _unit, _step);
+        _isProcessing = false;
+      });
+    }
   }
 
-  void _showRemoveConfirmation() {
-    showDialog<bool>(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        backgroundColor: const Color(0xFFFCFAF7),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: Text(
-          'Remove ${widget.item.name}?',
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF1E293B),
-          ),
-        ),
-        content: Text(
-          'Are you sure you want to remove ${widget.item.name} from ${widget.categoryName}?',
-          style: const TextStyle(
-            fontSize: 14,
-            color: Color(0xFF64748B),
-          ),
-        ),
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(
-                color: Color(0xFF64748B),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFDE8E8),
-              foregroundColor: const Color(0xFFDC2626),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            onPressed: () => Navigator.of(dialogCtx).pop(true),
-            child: const Text(
-              'Remove',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
+  void _handleAddFood() {
+    if (_isProcessing) return;
+
+    setState(() {
+      _isProcessing = true;
+      _errorMessage = null;
+    });
+
+    final addedAmount = _selectedAmount;
+    final newTotal = _availableAmount + addedAmount;
+    final successMsg = _formatActionDescription(addedAmount, _unit, _item.name, true);
+
+    final updatedItem = _item.copyWith(
+      quantity: _formatAmount(newTotal, _unit),
+    );
+
+    FridgeCategoryRepository.updateItem(widget.categoryName, updatedItem);
+    NotificationRepository.addNotification(
+      title: 'Inventory update',
+      description: '${_formatAmount(addedAmount, _unit)} ${_item.name} added to fridge.',
+      type: NotificationType.inventoryUpdate,
+    );
+
+    widget.onAddFood?.call(updatedItem);
+    widget.onInventoryChanged?.call();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(successMsg),
+        backgroundColor: const Color(0xFF0D9488),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 3),
       ),
-    ).then((confirmed) {
-      if (confirmed == true && mounted) {
-        widget.onRemoveFood?.call();
-        Navigator.of(context).pop();
-      }
+    );
+
+    // Update in-place so user immediately sees increased stock
+    setState(() {
+      _availableAmount = newTotal;
+      _item = updatedItem;
+      _isProcessing = false;
     });
   }
 
@@ -228,20 +337,18 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                   ),
                   padding: const EdgeInsets.all(8),
                   child: Center(
-                    child: (widget.item.effectiveImageAsset != null ||
-                            widget.item.imageAsset != null)
+                    child: (_item.effectiveImageAsset != null || _item.imageAsset != null)
                         ? Image.asset(
-                            widget.item.effectiveImageAsset ??
-                                widget.item.imageAsset!,
+                            _item.effectiveImageAsset ?? _item.imageAsset!,
                             fit: BoxFit.contain,
                             filterQuality: FilterQuality.medium,
                             errorBuilder: (context, error, stackTrace) => Text(
-                              widget.item.iconEmoji ?? '🍽️',
+                              _item.iconEmoji ?? '🍽️',
                               style: const TextStyle(fontSize: 44),
                             ),
                           )
                         : Text(
-                            widget.item.iconEmoji ?? '🍽️',
+                            _item.iconEmoji ?? '🍽️',
                             style: const TextStyle(fontSize: 44),
                           ),
                   ),
@@ -253,7 +360,7 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
               // 3. Food Name
               Center(
                 child: Text(
-                  widget.item.name,
+                  _item.name,
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
@@ -273,24 +380,38 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                     vertical: 4.5,
                   ),
                   decoration: BoxDecoration(
-                    color: widget.item.statusBackgroundColor,
+                    color: _item.statusBackgroundColor,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    widget.item.expiryLabel,
+                    _item.expiryLabel,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: widget.item.statusTextColor,
+                      color: _item.statusTextColor,
                       letterSpacing: 0.1,
                     ),
                   ),
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 10),
 
-              // 5. Quantity Stepper Section
+              // 5. Distinct Available Quantity in Fridge Display
+              Center(
+                child: Text(
+                  'Available in fridge: ${_formatAmount(_availableAmount, _unit)}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF475569),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // 6. Quantity Stepper Section (Quantity to use or add)
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -304,12 +425,12 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                 child: Column(
                   children: [
                     const Text(
-                      'Quantity',
+                      'Quantity to use or add',
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF64748B),
-                        letterSpacing: 0.4,
+                        letterSpacing: 0.2,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -318,19 +439,19 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                       children: [
                         // Minus Button
                         Material(
-                          color: _currentAmount > _step
+                          color: _selectedAmount > _step
                               ? const Color(0xFFF1F5F9)
                               : const Color(0xFFF8FAFC),
                           shape: const CircleBorder(),
                           child: InkWell(
                             customBorder: const CircleBorder(),
-                            onTap: _currentAmount > _step ? _decreaseQuantity : null,
+                            onTap: _selectedAmount > _step ? _decreaseQuantity : null,
                             child: Padding(
                               padding: const EdgeInsets.all(9.0),
                               child: Icon(
                                 Icons.remove_rounded,
                                 size: 20,
-                                color: _currentAmount > _step
+                                color: _selectedAmount > _step
                                     ? const Color(0xFF1E293B)
                                     : const Color(0xFFCBD5E1),
                               ),
@@ -338,7 +459,7 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                           ),
                         ),
 
-                        // Animated Quantity Display
+                        // Animated Selected Quantity Display
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 24),
                           child: AnimatedSwitcher(
@@ -348,8 +469,8 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                               child: child,
                             ),
                             child: Text(
-                              '$_currentAmount $_unit',
-                              key: ValueKey<int>(_currentAmount),
+                              _formatAmount(_selectedAmount, _unit),
+                              key: ValueKey<int>(_selectedAmount),
                               style: const TextStyle(
                                 fontSize: 21,
                                 fontWeight: FontWeight.w700,
@@ -383,13 +504,42 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                 ),
               ),
 
+              // Inline Validation Message for Excess Use
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFDE8E8),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFF87171), width: 0.8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline_rounded, size: 16, color: Color(0xFFDC2626)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFDC2626),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               const SizedBox(height: 18),
 
-              // 6. Primary Action: "✓ Use Food" (Teal/Green treatment)
+              // 7. Action 1: Primary "Use Food" (Teal/Green filled button)
               ElevatedButton(
-                onPressed: _handleUseFood,
+                onPressed: _isProcessing ? null : _handleUseFood,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0D9488), // Refined teal/green
+                  backgroundColor: const Color(0xFF0D9488),
                   foregroundColor: Colors.white,
                   elevation: 1,
                   shape: RoundedRectangleBorder(
@@ -397,43 +547,37 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 13),
                 ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.check_rounded, size: 19),
-                    SizedBox(width: 8),
-                    Text(
-                      'Use Food',
-                      style: TextStyle(
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ],
+                child: const Text(
+                  'Use Food',
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
                 ),
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
 
-              // 7. Secondary Action: "Remove Food" (Subtle Coral treatment)
-              TextButton.icon(
-                onPressed: _showRemoveConfirmation,
-                icon: const Icon(
-                  Icons.delete_outline_rounded,
-                  size: 17,
-                  color: Color(0xFFE11D48),
-                ),
-                label: const Text(
-                  'Remove Food',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFFE11D48), // Soft coral
+              // 8. Action 2: Secondary "+ Add Food" (Outlined button)
+              OutlinedButton(
+                onPressed: _isProcessing ? null : _handleAddFood,
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF0FDF4),
+                  foregroundColor: const Color(0xFF0D9488),
+                  side: const BorderSide(color: Color(0xFF0D9488), width: 1.4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
                   ),
+                  padding: const EdgeInsets.symmetric(vertical: 13),
                 ),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+                child: const Text(
+                  '+ Add Food',
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
                 ),
               ),
             ],
