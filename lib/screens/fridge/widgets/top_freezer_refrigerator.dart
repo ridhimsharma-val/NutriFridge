@@ -22,6 +22,7 @@ class TopFreezerRefrigerator extends StatefulWidget {
   final VoidCallback onFridgeToggle;
   final ValueChanged<String>? onCategoryTap;
   final FridgePreferences? preferences;
+  final String? highlightedCategory;
 
   const TopFreezerRefrigerator({
     super.key,
@@ -31,6 +32,7 @@ class TopFreezerRefrigerator extends StatefulWidget {
     required this.onFridgeToggle,
     this.onCategoryTap,
     this.preferences,
+    this.highlightedCategory,
   });
 
   @override
@@ -329,6 +331,7 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
                   child: FreezerInterior(
                     lightIntensity: t,
                     onCategoryTap: widget.onCategoryTap,
+                    highlightedCategory: widget.highlightedCategory,
                   ),
                 ),
 
@@ -480,6 +483,7 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
                   child: RefrigeratorInterior(
                     lightIntensity: t,
                     onCategoryTap: widget.onCategoryTap,
+                    highlightedCategory: widget.highlightedCategory,
                   ),
                 ),
 

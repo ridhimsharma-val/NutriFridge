@@ -31,7 +31,25 @@ class _FridgePageState extends State<FridgePage> {
   }
 
 
+  bool _isNavigatingCategory = false;
+  String? _highlightedCategory;
+
   void _onCategoryTap(String categoryLabel) async {
+    if (_isNavigatingCategory) return;
+    _isNavigatingCategory = true;
+
+    setState(() {
+      _highlightedCategory = categoryLabel;
+    });
+
+    // Subtle shelf highlight delay (~220ms) before opening sheet
+    await Future.delayed(const Duration(milliseconds: 220));
+
+    if (!mounted) {
+      _isNavigatingCategory = false;
+      return;
+    }
+
     final categoryData =
         FridgeCategoryRepository.getCategoryData(categoryLabel);
     await CategoryBottomSheet.show(
@@ -39,7 +57,12 @@ class _FridgePageState extends State<FridgePage> {
       category: categoryData,
     );
     if (mounted) {
-      setState(() {});
+      setState(() {
+        _highlightedCategory = null;
+        _isNavigatingCategory = false;
+      });
+    } else {
+      _isNavigatingCategory = false;
     }
   }
 
@@ -83,6 +106,7 @@ class _FridgePageState extends State<FridgePage> {
                       onFridgeToggle: _toggleFridge,
                       onCategoryTap: _onCategoryTap,
                       preferences: FridgePreferencesRepository.current,
+                      highlightedCategory: _highlightedCategory,
                     ),
                   ),
                 ),

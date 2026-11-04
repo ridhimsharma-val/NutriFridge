@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/category_item.dart';
+import 'animated_quantity_text.dart';
 import 'food_details_sheet.dart';
 
 /// Large reusable mobile bottom sheet for a food category
@@ -89,6 +90,12 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
       item: item,
       categoryName: _category.name,
       onUseFood: (updatedItem) {
+        FridgeCategoryRepository.updateItem(_category.id, updatedItem);
+        setState(() {
+          _category = FridgeCategoryRepository.getCategoryData(_category.name);
+        });
+      },
+      onAddFood: (updatedItem) {
         FridgeCategoryRepository.updateItem(_category.id, updatedItem);
         setState(() {
           _category = FridgeCategoryRepository.getCategoryData(_category.name);
@@ -292,8 +299,9 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        item.quantity,
+                      AnimatedQuantityText(
+                        value: item.decimalAmount,
+                        unit: item.unit,
                         style: const TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w400,

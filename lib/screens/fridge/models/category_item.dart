@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../models/notification_data.dart';
 
 /// Expiry urgency level with calm, subtle pastel status colors
 enum ExpiryStatus {
-  urgent, // Soft coral
-  expiringSoon, // Soft peach/orange
-  normal, // Subtle muted green
+  expired, // Warning treatment (soft red)
+  urgent, // Soft peach/coral
+  expiringSoon, // Soft peach/coral (AppColors.peachPrimary)
+  normal, // Subtle muted green (Fresh)
+  unknown, // Neutral "Expiry not set"
 }
 
 /// A food/inventory item within a category
@@ -13,7 +16,7 @@ class CategoryFoodItem {
   final String id;
   final String name;
   final String quantity;
-  final int expiryDays;
+  final int? expiryDays;
   final String? imageAsset;
   final String? iconEmoji;
 
@@ -21,20 +24,30 @@ class CategoryFoodItem {
     required this.id,
     required this.name,
     required this.quantity,
-    required this.expiryDays,
+    this.expiryDays,
     this.imageAsset,
     this.iconEmoji,
   });
 
+  bool get isExpired => expiryDays != null && expiryDays! < 0;
+  bool get isExpiringSoon => expiryDays != null && expiryDays! >= 0 && expiryDays! <= 3;
+  bool get isFresh => expiryDays != null && expiryDays! > 3;
+  bool get isExpiryUnknown => expiryDays == null;
+
   ExpiryStatus get status {
-    if (expiryDays < 0) return ExpiryStatus.normal;
-    if (expiryDays <= 2) return ExpiryStatus.urgent;
-    if (expiryDays <= 4) return ExpiryStatus.expiringSoon;
+    if (expiryDays == null) return ExpiryStatus.unknown;
+    if (expiryDays! < 0) return ExpiryStatus.expired;
+    if (expiryDays! <= 2) return ExpiryStatus.urgent;
+    if (expiryDays! <= 3) return ExpiryStatus.expiringSoon;
     return ExpiryStatus.normal;
   }
 
   String get expiryLabel {
-    if (expiryDays < 0) return 'Expiry unspecified';
+    if (expiryDays == null) return 'Expiry not set';
+    if (expiryDays! < 0) {
+      final daysAgo = -expiryDays!;
+      return daysAgo == 1 ? 'Expired 1 day ago' : 'Expired $daysAgo days ago';
+    }
     if (expiryDays == 0) return 'Expires today';
     if (expiryDays == 1) return 'Expires in 1 day';
     return 'Expires in $expiryDays days';
@@ -103,24 +116,60 @@ class CategoryFoodItem {
   /// Soft background color for status tag
   Color get statusBackgroundColor {
     switch (status) {
+      case ExpiryStatus.expired:
+        return const Color(0xFFFEE2E2); // Warning soft red
       case ExpiryStatus.urgent:
-        return const Color(0xFFFDE8E8); // Soft coral
       case ExpiryStatus.expiringSoon:
-        return const Color(0xFFFFF2EB); // Soft peach (AppColors.peachLight)
+        return AppColors.peachLight; // const Color(0xFFFBE7DE)
       case ExpiryStatus.normal:
         return const Color(0xFFEDF7ED); // Muted green
+      case ExpiryStatus.unknown:
+        return const Color(0xFFF1F5F9); // Neutral slate
     }
   }
 
   /// Deep readable foreground color for status tag
   Color get statusTextColor {
     switch (status) {
+      case ExpiryStatus.expired:
+        return const Color(0xFFB91C1C); // Contrasting warning red
       case ExpiryStatus.urgent:
-        return const Color(0xFFD32F2F); // Soft coral red
       case ExpiryStatus.expiringSoon:
-        return const Color(0xFFFF7A5C); // Soft peach/coral (AppColors.peachPrimary)
+        return AppColors.peachText; // const Color(0xFF9E4B33)
       case ExpiryStatus.normal:
         return const Color(0xFF2E7D32); // Subtle green
+      case ExpiryStatus.unknown:
+        return const Color(0xFF64748B); // Slate neutral
+    }
+  }
+
+  /// Subtle border color for status tag
+  Color get statusBorderColor {
+    switch (status) {
+      case ExpiryStatus.expired:
+        return const Color(0xFFFCA5A5);
+      case ExpiryStatus.urgent:
+      case ExpiryStatus.expiringSoon:
+        return AppColors.peachBorder; // const Color(0xFFF2C4B2)
+      case ExpiryStatus.normal:
+        return const Color(0xFFC8E6C9);
+      case ExpiryStatus.unknown:
+        return const Color(0xFFE2E8F0);
+    }
+  }
+
+  /// Distinct accent color for edge indicator or indicator dot
+  Color get statusAccentColor {
+    switch (status) {
+      case ExpiryStatus.expired:
+        return const Color(0xFFDC2626);
+      case ExpiryStatus.urgent:
+      case ExpiryStatus.expiringSoon:
+        return AppColors.peachPrimary; // const Color(0xFFE99A7C)
+      case ExpiryStatus.normal:
+        return AppColors.tealPrimary; // const Color(0xFF176D5C)
+      case ExpiryStatus.unknown:
+        return const Color(0xFF94A3B8);
     }
   }
 }
@@ -742,7 +791,7 @@ class FridgeCategoryRepository {
     int count = 0;
     for (final list in _categoryStore.values) {
       for (final item in list) {
-        if (item.expiryDays >= 0 && item.expiryDays <= 3) {
+        if (item.expiryDays != null && item.expiryDays! >= 0 && item.expiryDays! <= 3) {
           count++;
         }
       }
@@ -992,7 +1041,7 @@ class FridgeCategoryRepository {
       id: 'item_${DateTime.now().millisecondsSinceEpoch}_${name.toLowerCase().replaceAll(RegExp(r'\s+'), '_')}',
       name: name,
       quantity: cleanQtyStr,
-      expiryDays: expiryDays ?? 5,
+      expiryDays: expiryDays,
       imageAsset: resolvedImage,
     );
 

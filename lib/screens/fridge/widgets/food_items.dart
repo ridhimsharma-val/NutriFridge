@@ -8,6 +8,7 @@ class CategoryZone extends StatefulWidget {
   final Widget content;
   final VoidCallback? onTap;
   final EdgeInsetsGeometry padding;
+  final bool isHighlighted;
 
   const CategoryZone({
     super.key,
@@ -15,6 +16,7 @@ class CategoryZone extends StatefulWidget {
     required this.content,
     this.onTap,
     this.padding = EdgeInsets.zero,
+    this.isHighlighted = false,
   });
 
   @override
@@ -72,15 +74,40 @@ class _CategoryZoneState extends State<CategoryZone>
         child: AnimatedBuilder(
           animation: _controller,
           builder: (context, _) {
+            final double baseScale = widget.isHighlighted ? 1.025 : 1.0;
             return Transform.scale(
-              scale: _scaleAnimation.value,
-              child: Container(
+              scale: _scaleAnimation.value * baseScale,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
                 padding: widget.padding,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(6),
-                  color: _isHovered
-                      ? Colors.white.withValues(alpha: 0.28)
-                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  color: widget.isHighlighted
+                      ? const Color(0xFFFBE7DE).withValues(alpha: 0.45)
+                      : (_isHovered
+                          ? Colors.white.withValues(alpha: 0.28)
+                          : Colors.transparent),
+                  border: widget.isHighlighted
+                      ? Border.all(
+                          color: const Color(0xFFE99A7C).withValues(alpha: 0.75),
+                          width: 1.2,
+                        )
+                      : null,
+                  boxShadow: widget.isHighlighted
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFFE99A7C).withValues(alpha: 0.25),
+                            blurRadius: 10,
+                            spreadRadius: 1.5,
+                          ),
+                          BoxShadow(
+                            color: Colors.white.withValues(alpha: 0.4),
+                            blurRadius: 6,
+                            spreadRadius: 0.5,
+                          ),
+                        ]
+                      : null,
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -99,10 +126,12 @@ class _CategoryZoneState extends State<CategoryZone>
                     Text(
                       widget.label,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 7.4,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF2C485C), // Dark muted blue/teal
+                        fontWeight: widget.isHighlighted ? FontWeight.w800 : FontWeight.w700,
+                        color: widget.isHighlighted
+                            ? const Color(0xFF9E4B33)
+                            : const Color(0xFF2C485C), // Dark muted blue/teal
                         letterSpacing: 0.45,
                       ),
                     ),

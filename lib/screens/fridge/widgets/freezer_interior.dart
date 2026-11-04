@@ -15,12 +15,19 @@ import 'food_items.dart';
 class FreezerInterior extends StatelessWidget {
   final double lightIntensity;
   final ValueChanged<String>? onCategoryTap;
+  final String? highlightedCategory;
 
   const FreezerInterior({
     super.key,
     required this.lightIntensity,
     this.onCategoryTap,
+    this.highlightedCategory,
   });
+
+  bool _isCategoryHighlighted(String label) {
+    if (highlightedCategory == null) return false;
+    return highlightedCategory!.trim().toUpperCase() == label.trim().toUpperCase();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -145,6 +152,7 @@ class FreezerInterior extends StatelessWidget {
                     flex: 34,
                     child: CategoryZone(
                       label: 'ICE CREAM',
+                      isHighlighted: _isCategoryHighlighted('ICE CREAM'),
                       onTap: () => onCategoryTap?.call('ICE CREAM'),
                       content: const RealFoodCategoryVisual(
                         imagePath: 'assets/images/categories/ice_cream.png',
@@ -162,6 +170,7 @@ class FreezerInterior extends StatelessWidget {
                     flex: 34,
                     child: CategoryZone(
                       label: 'FROZEN FOOD',
+                      isHighlighted: _isCategoryHighlighted('FROZEN FOOD'),
                       onTap: () => onCategoryTap?.call('FROZEN FOOD'),
                       content: const RealFoodCategoryVisual(
                         imagePath: 'assets/images/categories/frozen_food.png',
@@ -179,6 +188,7 @@ class FreezerInterior extends StatelessWidget {
                     flex: 32,
                     child: CategoryZone(
                       label: 'DRY FRUITS',
+                      isHighlighted: _isCategoryHighlighted('DRY FRUITS'),
                       onTap: () => onCategoryTap?.call('DRY FRUITS'),
                       content: const RealFoodCategoryVisual(
                         imagePath: 'assets/images/categories/dry_fruits.png',

@@ -84,11 +84,15 @@ class NotificationRepository {
     final expiringFood = _findFirstExpiringFood();
     if (expiringFood != null) {
       final days = expiringFood.expiryDays;
-      expiringFoodDesc = days == 0
-          ? 'Your ${expiringFood.name} expires today.'
-          : days == 1
-              ? 'Your ${expiringFood.name} expires in 1 day.'
-              : 'Your ${expiringFood.name} expires in $days days.';
+      if (days == null) {
+        expiringFoodDesc = 'Your ${expiringFood.name} expiry is not set.';
+      } else {
+        expiringFoodDesc = days <= 0
+            ? 'Your ${expiringFood.name} expires today.'
+            : days == 1
+                ? 'Your ${expiringFood.name} expires in 1 day.'
+                : 'Your ${expiringFood.name} expires in $days days.';
+      }
     }
 
     return [
@@ -135,7 +139,7 @@ class NotificationRepository {
     try {
       final dairy = FridgeCategoryRepository.dairyProducts;
       for (final item in dairy.items) {
-        if (item.expiryDays <= 3) return item;
+        if (item.expiryDays != null && item.expiryDays! <= 3) return item;
       }
     } catch (_) {}
     return null;

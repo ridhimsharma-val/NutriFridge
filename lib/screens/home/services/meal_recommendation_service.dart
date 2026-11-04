@@ -754,7 +754,7 @@ class MealRecommendationService {
       int score = availableItems.length * 10;
 
       for (final item in availableItems) {
-        if (item.expiryDays >= 0 && item.expiryDays <= 3) {
+        if (item.isExpiringSoon) {
           score += 6;
         }
       }
@@ -776,7 +776,7 @@ class MealRecommendationService {
     final reasons = <String>[];
     reasons.add('Uses ${bestAvailableItems.length} items from your fridge');
 
-    final expiring = bestAvailableItems.where((it) => it.expiryDays >= 0 && it.expiryDays <= 3).firstOrNull;
+    final expiring = bestAvailableItems.where((it) => it.isExpiringSoon).firstOrNull;
     if (expiring != null) {
       reasons.add('Uses ${expiring.name} (expires in ${expiring.expiryDays}d)');
     } else {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../models/notification_data.dart';
 import '../models/category_item.dart';
+import 'animated_quantity_text.dart';
 
 /// Reusable Food Details Bottom Sheet
 /// Layered directly above the Category Bottom Sheet.
@@ -382,15 +383,33 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                   decoration: BoxDecoration(
                     color: _item.statusBackgroundColor,
                     borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _item.expiryLabel,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _item.statusTextColor,
-                      letterSpacing: 0.1,
+                    border: Border.all(
+                      color: _item.statusBorderColor,
+                      width: 0.8,
                     ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 5.5,
+                        height: 5.5,
+                        margin: const EdgeInsets.only(right: 5.5),
+                        decoration: BoxDecoration(
+                          color: _item.statusAccentColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      Text(
+                        _item.expiryLabel,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _item.statusTextColor,
+                          letterSpacing: 0.1,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -409,8 +428,10 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                       width: 1.0,
                     ),
                   ),
-                  child: Text(
-                    'Available in fridge: ${_formatAmount(_availableAmount, _unit)}',
+                  child: AnimatedQuantityText(
+                    value: _availableAmount,
+                    unit: _unit,
+                    prefix: 'Available in fridge: ',
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,

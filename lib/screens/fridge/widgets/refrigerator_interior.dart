@@ -18,12 +18,19 @@ import 'food_items.dart';
 class RefrigeratorInterior extends StatelessWidget {
   final double lightIntensity;
   final ValueChanged<String>? onCategoryTap;
+  final String? highlightedCategory;
 
   const RefrigeratorInterior({
     super.key,
     required this.lightIntensity,
     this.onCategoryTap,
+    this.highlightedCategory,
   });
+
+  bool _isCategoryHighlighted(String label) {
+    if (highlightedCategory == null) return false;
+    return highlightedCategory!.trim().toUpperCase() == label.trim().toUpperCase();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -223,6 +230,7 @@ class RefrigeratorInterior extends StatelessWidget {
                         Expanded(
                           child: CategoryZone(
                             label: 'DAIRY PRODUCTS',
+                            isHighlighted: _isCategoryHighlighted('DAIRY PRODUCTS'),
                             onTap: () => onCategoryTap?.call('DAIRY PRODUCTS'),
                             content: const RealFoodCategoryVisual(
                               imagePath: 'assets/images/categories/dairy_products.png',
@@ -243,6 +251,7 @@ class RefrigeratorInterior extends StatelessWidget {
                         Expanded(
                           child: CategoryZone(
                             label: 'OTHERS',
+                            isHighlighted: _isCategoryHighlighted('OTHERS'),
                             onTap: () => onCategoryTap?.call('OTHERS'),
                             content: const RealFoodCategoryVisual(
                               imagePath: 'assets/images/categories/others.png',
@@ -268,6 +277,7 @@ class RefrigeratorInterior extends StatelessWidget {
                         Expanded(
                           child: CategoryZone(
                             label: 'NON-VEG',
+                            isHighlighted: _isCategoryHighlighted('NON-VEG'),
                             onTap: () => onCategoryTap?.call('NON-VEG'),
                             content: const RealFoodCategoryVisual(
                               imagePath: 'assets/images/categories/non_veg.png',
@@ -288,6 +298,7 @@ class RefrigeratorInterior extends StatelessWidget {
                         Expanded(
                           child: CategoryZone(
                             label: 'MEALS & LEFTOVERS',
+                            isHighlighted: _isCategoryHighlighted('MEALS & LEFTOVERS'),
                             onTap: () => onCategoryTap?.call('MEALS & LEFTOVERS'),
                             content: const RealFoodCategoryVisual(
                               imagePath: 'assets/images/categories/leftovers.png',
@@ -313,6 +324,7 @@ class RefrigeratorInterior extends StatelessWidget {
                         Expanded(
                           child: CategoryZone(
                             label: 'PACKAGED FOOD',
+                            isHighlighted: _isCategoryHighlighted('PACKAGED FOOD'),
                             onTap: () => onCategoryTap?.call('PACKAGED FOOD'),
                             content: const RealFoodCategoryVisual(
                               imagePath: 'assets/images/categories/packaged_food.png',
@@ -333,6 +345,7 @@ class RefrigeratorInterior extends StatelessWidget {
                         Expanded(
                           child: CategoryZone(
                             label: 'DRINKS & JUICES',
+                            isHighlighted: _isCategoryHighlighted('DRINKS & JUICES'),
                             onTap: () => onCategoryTap?.call('DRINKS & JUICES'),
                             content: const RealFoodCategoryVisual(
                               imagePath: 'assets/images/categories/juices.png',
@@ -360,6 +373,7 @@ class RefrigeratorInterior extends StatelessWidget {
                         Expanded(
                           child: _CrisperDrawerWidget(
                             label: 'VEGETABLES',
+                            isHighlighted: _isCategoryHighlighted('VEGETABLES'),
                             imageAsset: 'assets/images/categories/vegetables.png',
                             imageHeight: 44,
                             onTap: () => onCategoryTap?.call('VEGETABLES'),
@@ -370,6 +384,7 @@ class RefrigeratorInterior extends StatelessWidget {
                         Expanded(
                           child: _CrisperDrawerWidget(
                             label: 'FRUITS',
+                            isHighlighted: _isCategoryHighlighted('FRUITS'),
                             imageAsset: 'assets/images/categories/fruits.png',
                             imageHeight: 44,
                             onTap: () => onCategoryTap?.call('FRUITS'),
@@ -572,12 +587,14 @@ class _CrisperDrawerWidget extends StatefulWidget {
   final String imageAsset;
   final double imageHeight;
   final VoidCallback? onTap;
+  final bool isHighlighted;
 
   const _CrisperDrawerWidget({
     required this.label,
     required this.imageAsset,
     required this.imageHeight,
     this.onTap,
+    this.isHighlighted = false,
   });
 
   @override
@@ -623,36 +640,57 @@ class _CrisperDrawerWidgetState extends State<_CrisperDrawerWidget>
         child: AnimatedBuilder(
           animation: _animController,
           builder: (context, _) {
+            final double baseScale = widget.isHighlighted ? 1.025 : 1.0;
             return Transform.scale(
-              scale: _scaleAnimation.value,
-              child: Container(
+              scale: _scaleAnimation.value * baseScale,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      _isHovered
-                          ? Colors.white.withValues(alpha: 0.78)
-                          : Colors.white.withValues(alpha: 0.65),
-                      _isHovered
-                          ? const Color(0xFFE4F0F8).withValues(alpha: 0.92)
-                          : const Color(0xFFDFEAF2).withValues(alpha: 0.88),
+                      widget.isHighlighted
+                          ? const Color(0xFFFBE7DE).withValues(alpha: 0.90)
+                          : (_isHovered
+                              ? Colors.white.withValues(alpha: 0.78)
+                              : Colors.white.withValues(alpha: 0.65)),
+                      widget.isHighlighted
+                          ? const Color(0xFFF5D1C1).withValues(alpha: 0.85)
+                          : (_isHovered
+                              ? const Color(0xFFE4F0F8).withValues(alpha: 0.92)
+                              : const Color(0xFFDFEAF2).withValues(alpha: 0.88)),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(5),
                   border: Border.all(
-                    color: _isHovered
-                        ? const Color(0xFF8BB5CC)
-                        : const Color(0xFFB2C8DA),
-                    width: 1.2,
+                    color: widget.isHighlighted
+                        ? const Color(0xFFE99A7C).withValues(alpha: 0.85)
+                        : (_isHovered
+                            ? const Color(0xFF8BB5CC)
+                            : const Color(0xFFB2C8DA)),
+                    width: widget.isHighlighted ? 1.5 : 1.2,
                   ),
                   boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF1E3544).withValues(alpha: 0.08),
-                      blurRadius: 3,
-                      offset: const Offset(0, 1.5),
-                    ),
+                    if (widget.isHighlighted) ...[
+                      BoxShadow(
+                        color: const Color(0xFFE99A7C).withValues(alpha: 0.28),
+                        blurRadius: 10,
+                        spreadRadius: 1.5,
+                      ),
+                      BoxShadow(
+                        color: Colors.white.withValues(alpha: 0.4),
+                        blurRadius: 6,
+                        spreadRadius: 0.5,
+                      ),
+                    ] else
+                      BoxShadow(
+                        color: const Color(0xFF1E3544).withValues(alpha: 0.08),
+                        blurRadius: 3,
+                        offset: const Offset(0, 1.5),
+                      ),
                   ],
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
@@ -690,10 +728,12 @@ class _CrisperDrawerWidgetState extends State<_CrisperDrawerWidget>
                         padding: const EdgeInsets.only(bottom: 1),
                         child: Text(
                           widget.label,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 7.4,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF2C485C), // Dark muted blue/teal
+                            fontWeight: widget.isHighlighted ? FontWeight.w800 : FontWeight.w700,
+                            color: widget.isHighlighted
+                                ? const Color(0xFF9E4B33)
+                                : const Color(0xFF2C485C), // Dark muted blue/teal
                             letterSpacing: 0.5,
                           ),
                         ),
