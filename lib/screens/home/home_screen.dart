@@ -27,8 +27,21 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    MealRecommendationService.ensureInitialized();
-    MealRecommendationService.fetchRecommendation();
+    _initializeMealRecommendations();
+  }
+
+  void _initializeMealRecommendations() {
+    try {
+      MealRecommendationService.ensureInitialized().then((_) {
+        if (mounted) {
+          MealRecommendationService.fetchRecommendation();
+        }
+      }).catchError((e) {
+        debugPrint('MealRecommendationService initialization error: $e');
+      });
+    } catch (e) {
+      debugPrint('MealRecommendationService synchronous initialization error: $e');
+    }
   }
 
   @override

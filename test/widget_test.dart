@@ -3575,5 +3575,36 @@ void main() {
       // Only 1 backend call made
       expect(backendCalls, 1);
     });
+
+    test('MealRecommendationService initialization safety & singleton integrity', () async {
+      // Test instance reuse
+      final instance1 = MealRecommendationService.instance;
+      final instance2 = MealRecommendationService();
+      expect(identical(instance1, instance2), isTrue);
+
+      // Test ensureInitialized can be called repeatedly without errors
+      await MealRecommendationService.ensureInitialized();
+      await MealRecommendationService.ensureInitialized();
+      await instance1.init();
+      expect(MealRecommendationService.isInitialized, isTrue);
+
+      // Verify repository wireup
+      expect(MockDataRepository.recommendationStatusProvider, isNotNull);
+      expect(MockDataRepository.recommendationProvider, isNotNull);
+    });
+
+    testWidgets('HomeScreen mounts and initializes recommendation service without crash', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      MealRecommendationService.reset();
+      FridgeCategoryRepository.reset();
+
+      await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(HomeScreen), findsOneWidget);
+    });
   });
 }

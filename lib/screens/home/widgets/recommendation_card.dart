@@ -3,7 +3,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../models/nutrition_data.dart';
 import '../../fridge/models/category_item.dart';
-import '../services/meal_recommendation_service.dart';
 
 class RecommendationCard extends StatelessWidget {
   final RecipeRecommendation? recommendation;

@@ -1,7 +1,15 @@
 import 'package:flutter/foundation.dart';
-import '../screens/home/services/meal_recommendation_service.dart';
 import '../screens/profile/models/user_profile_data.dart';
 import 'notification_data.dart';
+
+/// Supported recommendation lifecycle states.
+enum RecommendationStatus {
+  empty, // Fridge has zero items
+  loading, // Fetching recommendation asynchronously
+  loaded, // Valid recommendation available
+  noMatch, // Items in fridge, but no reasonable recipe match found
+  error, // Backend or network error (retry state)
+}
 
 class UserProfile {
   final String name;
@@ -13,6 +21,83 @@ class UserProfile {
     required this.greeting,
     required this.subtitle,
   });
+}
+
+/// Centralized registry mapping recipe identities and meal names to photographic food assets.
+class MealImageRegistry {
+  static const Map<String, String> _imageMap = {
+    'paneer_rice_bowl': 'assets/images/paneer_rice_bowl.jpg',
+    'dal_rice': 'assets/images/foods/dal_rice.jpg',
+    'vegetable_pulao': 'assets/images/foods/dal_rice.jpg',
+    'vegetable_khichdi': 'assets/images/foods/dal_rice.jpg',
+    'paneer_curry': 'assets/images/foods/paneer_curry.jpg',
+    'paneer_capsicum_curry': 'assets/images/foods/paneer_curry.jpg',
+    'stir_fried_veggies': 'assets/images/foods/paneer_curry.jpg',
+    'pasta': 'assets/images/foods/pasta.jpg',
+    'veggie_pasta': 'assets/images/foods/pasta.jpg',
+    'hearty_vegetable_pasta': 'assets/images/foods/pasta.jpg',
+    'chicken': 'assets/images/foods/chicken.jpg',
+    'grilled_chicken': 'assets/images/foods/chicken.jpg',
+    'chicken_salad': 'assets/images/foods/chicken.jpg',
+    'fish': 'assets/images/foods/fish.jpg',
+    'pan_seared_fish': 'assets/images/foods/fish.jpg',
+    'eggs': 'assets/images/foods/eggs.jpg',
+    'egg_toast': 'assets/images/foods/eggs.jpg',
+    'scrambled_eggs': 'assets/images/foods/eggs.jpg',
+    'banana': 'assets/images/foods/banana.jpg',
+    'banana_smoothie': 'assets/images/foods/banana.jpg',
+    'banana_oat_smoothie': 'assets/images/foods/banana.jpg',
+    'oats_banana': 'assets/images/foods/banana.jpg',
+    'fruit_bowl': 'assets/images/foods/apple.jpg',
+    'apple_slices': 'assets/images/foods/apple.jpg',
+    'peanut_butter_apple': 'assets/images/foods/peanut_butter.jpg',
+    'vegetable_sandwich': 'assets/images/foods/bread.jpg',
+    'toast': 'assets/images/foods/bread.jpg',
+    'yogurt_bowl': 'assets/images/foods/curd.png',
+    'fruit_yogurt_bowl': 'assets/images/foods/curd.png',
+    'energy_mix': 'assets/images/foods/dry_fruits_mix.jpg',
+    'nut_dry_fruit_mix': 'assets/images/foods/dry_fruits_mix.jpg',
+  };
+
+  static String resolveImage({
+    String? imageKey,
+    String? mealName,
+    String? providedUrl,
+  }) {
+    if (providedUrl != null && providedUrl.isNotEmpty) {
+      if (providedUrl.startsWith('assets/')) return providedUrl;
+    }
+    if (imageKey != null && imageKey.isNotEmpty) {
+      final clean = imageKey.toLowerCase().trim().replaceAll('-', '_');
+      if (_imageMap.containsKey(clean)) return _imageMap[clean]!;
+      if (clean.startsWith('assets/')) return imageKey;
+    }
+    final name = (mealName ?? '').toLowerCase();
+    if (name.contains('rice') && name.contains('paneer')) return 'assets/images/paneer_rice_bowl.jpg';
+    if (name.contains('dal') || name.contains('pulao') || name.contains('khichdi')) {
+      return 'assets/images/foods/dal_rice.jpg';
+    }
+    if (name.contains('curry') || name.contains('stir-fried') || name.contains('paneer')) {
+      return 'assets/images/foods/paneer_curry.jpg';
+    }
+    if (name.contains('pasta')) return 'assets/images/foods/pasta.jpg';
+    if (name.contains('chicken')) return 'assets/images/foods/chicken.jpg';
+    if (name.contains('fish')) return 'assets/images/foods/fish.jpg';
+    if (name.contains('egg') || name.contains('scramble') || name.contains('omelet')) {
+      return 'assets/images/foods/eggs.jpg';
+    }
+    if (name.contains('smoothie') || name.contains('banana') || name.contains('oat')) {
+      return 'assets/images/foods/banana.jpg';
+    }
+    if (name.contains('peanut butter')) return 'assets/images/foods/peanut_butter.jpg';
+    if (name.contains('fruit') || name.contains('apple')) return 'assets/images/foods/apple.jpg';
+    if (name.contains('sandwich') || name.contains('bread') || name.contains('toast')) {
+      return 'assets/images/foods/bread.jpg';
+    }
+    if (name.contains('yogurt') || name.contains('curd')) return 'assets/images/foods/curd.png';
+    if (name.contains('nut') || name.contains('dry fruit')) return 'assets/images/foods/dry_fruits_mix.jpg';
+    return 'assets/images/paneer_rice_bowl.jpg';
+  }
 }
 
 class RecipeRecommendation {
@@ -300,13 +385,17 @@ class MockDataRepository {
     subtitle: 'Ready for a healthier day?',
   );
 
+  static RecipeRecommendation? Function()? recommendationProvider;
+  static RecommendationStatus Function()? recommendationStatusProvider;
+  static VoidCallback? onResetRecommendation;
+
   static RecipeRecommendation? _explicitRecommendation;
   static RecipeRecommendation? get recommendation =>
       _explicitRecommendation ?? _deriveDynamicRecommendation();
 
   static RecommendationStatus get recommendationStatus {
     if (_explicitRecommendation != null) return RecommendationStatus.loaded;
-    return MealRecommendationService.currentStatus;
+    return recommendationStatusProvider?.call() ?? RecommendationStatus.empty;
   }
 
   static void setRecommendationForTesting(RecipeRecommendation? rec) {
@@ -315,7 +404,7 @@ class MockDataRepository {
   }
 
   static RecipeRecommendation? _deriveDynamicRecommendation() {
-    return MealRecommendationService.getRecommendation();
+    return recommendationProvider?.call();
   }
 
   static WellnessScoreData? _explicitWellness;
@@ -572,7 +661,7 @@ class MockDataRepository {
     );
     _explicitRecommendation = null;
     _explicitWellness = null;
-    MealRecommendationService.reset();
+    onResetRecommendation?.call();
     NotificationRepository.reset();
     _notify();
   }

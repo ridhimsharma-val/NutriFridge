@@ -4,14 +4,7 @@ import '../../ai_assistant/services/ai_assistant_service.dart';
 import '../../fridge/models/category_item.dart';
 import '../../profile/models/user_profile_data.dart';
 
-/// Supported recommendation lifecycle states.
-enum RecommendationStatus {
-  empty, // Fridge has zero items
-  loading, // Fetching recommendation asynchronously
-  loaded, // Valid recommendation available
-  noMatch, // Items in fridge, but no reasonable recipe match found
-  error, // Backend or network error (retry state)
-}
+export '../../../models/nutrition_data.dart' show RecommendationStatus;
 
 /// Supported meal time slots for dynamic recommendations.
 enum MealTimeSlot {
@@ -34,83 +27,6 @@ enum MealTimeSlot {
   }
 
   String get badgeLabel => displayName.toUpperCase();
-}
-
-/// Centralized registry mapping recipe identities and meal names to photographic food assets.
-class MealImageRegistry {
-  static const Map<String, String> _imageMap = {
-    'paneer_rice_bowl': 'assets/images/paneer_rice_bowl.jpg',
-    'dal_rice': 'assets/images/foods/dal_rice.jpg',
-    'vegetable_pulao': 'assets/images/foods/dal_rice.jpg',
-    'vegetable_khichdi': 'assets/images/foods/dal_rice.jpg',
-    'paneer_curry': 'assets/images/foods/paneer_curry.jpg',
-    'paneer_capsicum_curry': 'assets/images/foods/paneer_curry.jpg',
-    'stir_fried_veggies': 'assets/images/foods/paneer_curry.jpg',
-    'pasta': 'assets/images/foods/pasta.jpg',
-    'veggie_pasta': 'assets/images/foods/pasta.jpg',
-    'hearty_vegetable_pasta': 'assets/images/foods/pasta.jpg',
-    'chicken': 'assets/images/foods/chicken.jpg',
-    'grilled_chicken': 'assets/images/foods/chicken.jpg',
-    'chicken_salad': 'assets/images/foods/chicken.jpg',
-    'fish': 'assets/images/foods/fish.jpg',
-    'pan_seared_fish': 'assets/images/foods/fish.jpg',
-    'eggs': 'assets/images/foods/eggs.jpg',
-    'egg_toast': 'assets/images/foods/eggs.jpg',
-    'scrambled_eggs': 'assets/images/foods/eggs.jpg',
-    'banana': 'assets/images/foods/banana.jpg',
-    'banana_smoothie': 'assets/images/foods/banana.jpg',
-    'banana_oat_smoothie': 'assets/images/foods/banana.jpg',
-    'oats_banana': 'assets/images/foods/banana.jpg',
-    'fruit_bowl': 'assets/images/foods/apple.jpg',
-    'apple_slices': 'assets/images/foods/apple.jpg',
-    'peanut_butter_apple': 'assets/images/foods/peanut_butter.jpg',
-    'vegetable_sandwich': 'assets/images/foods/bread.jpg',
-    'toast': 'assets/images/foods/bread.jpg',
-    'yogurt_bowl': 'assets/images/foods/curd.png',
-    'fruit_yogurt_bowl': 'assets/images/foods/curd.png',
-    'energy_mix': 'assets/images/foods/dry_fruits_mix.jpg',
-    'nut_dry_fruit_mix': 'assets/images/foods/dry_fruits_mix.jpg',
-  };
-
-  static String resolveImage({
-    String? imageKey,
-    String? mealName,
-    String? providedUrl,
-  }) {
-    if (providedUrl != null && providedUrl.isNotEmpty) {
-      if (providedUrl.startsWith('assets/')) return providedUrl;
-    }
-    if (imageKey != null && imageKey.isNotEmpty) {
-      final clean = imageKey.toLowerCase().trim().replaceAll('-', '_');
-      if (_imageMap.containsKey(clean)) return _imageMap[clean]!;
-      if (clean.startsWith('assets/')) return imageKey;
-    }
-    final name = (mealName ?? '').toLowerCase();
-    if (name.contains('rice') && name.contains('paneer')) return 'assets/images/paneer_rice_bowl.jpg';
-    if (name.contains('dal') || name.contains('pulao') || name.contains('khichdi')) {
-      return 'assets/images/foods/dal_rice.jpg';
-    }
-    if (name.contains('curry') || name.contains('stir-fried') || name.contains('paneer')) {
-      return 'assets/images/foods/paneer_curry.jpg';
-    }
-    if (name.contains('pasta')) return 'assets/images/foods/pasta.jpg';
-    if (name.contains('chicken')) return 'assets/images/foods/chicken.jpg';
-    if (name.contains('fish')) return 'assets/images/foods/fish.jpg';
-    if (name.contains('egg') || name.contains('scramble') || name.contains('omelet')) {
-      return 'assets/images/foods/eggs.jpg';
-    }
-    if (name.contains('smoothie') || name.contains('banana') || name.contains('oat')) {
-      return 'assets/images/foods/banana.jpg';
-    }
-    if (name.contains('peanut butter')) return 'assets/images/foods/peanut_butter.jpg';
-    if (name.contains('fruit') || name.contains('apple')) return 'assets/images/foods/apple.jpg';
-    if (name.contains('sandwich') || name.contains('bread') || name.contains('toast')) {
-      return 'assets/images/foods/bread.jpg';
-    }
-    if (name.contains('yogurt') || name.contains('curd')) return 'assets/images/foods/curd.png';
-    if (name.contains('nut') || name.contains('dry fruit')) return 'assets/images/foods/dry_fruits_mix.jpg';
-    return 'assets/images/paneer_rice_bowl.jpg';
-  }
 }
 
 /// Definition of a recipe available for inventory-aware dynamic recommendations.
@@ -152,6 +68,14 @@ class MealRecipeDefinition {
 
 /// Dynamic, time-aware and inventory-aware meal recommendation service.
 class MealRecommendationService {
+  MealRecommendationService._internal() {
+    _wireRepositories();
+  }
+
+  static final MealRecommendationService _instance = MealRecommendationService._internal();
+  static MealRecommendationService get instance => _instance;
+  factory MealRecommendationService() => _instance;
+
   /// Testable clock provider allowing controlled time injection in tests.
   static DateTime Function() currentTimeProvider = DateTime.now;
 
@@ -186,13 +110,58 @@ class MealRecommendationService {
   static String? _cachedProfileFingerprint;
 
   static bool _inventoryListenerAttached = false;
+  static bool _isInitialized = false;
+  static Future<void>? _initFuture;
 
-  /// Attaches listener to FridgeCategoryRepository to invalidate cache and refresh on inventory changes
-  static void ensureInitialized() {
-    if (!_inventoryListenerAttached) {
-      _inventoryListenerAttached = true;
-      FridgeCategoryRepository.notifier.addListener(_onInventoryChanged);
+  /// Indicates whether the service has been initialized
+  static bool get isInitialized => _isInitialized;
+
+  /// Static initialization hook. Safe to call repeatedly; avoids duplicate
+  /// simultaneous requests and handles initialization errors gracefully.
+  static Future<void> ensureInitialized() => _instance.init();
+
+  /// Alias for ensureInitialized
+  static Future<void> initialize() => _instance.init();
+
+  /// Instance method for initialization
+  Future<void> init() async {
+    _wireRepositories();
+    if (_isInitialized) return;
+    if (_initFuture != null) {
+      await _initFuture;
+      return;
     }
+
+    _initFuture = _performInitialization();
+    try {
+      await _initFuture;
+    } finally {
+      _initFuture = null;
+    }
+  }
+
+  /// Instance alias matching ensureInitialized
+  Future<void> ensureInitializedInstance() => init();
+
+  Future<void> _performInitialization() async {
+    try {
+      _wireRepositories();
+      if (!_inventoryListenerAttached) {
+        _inventoryListenerAttached = true;
+        FridgeCategoryRepository.notifier.addListener(_onInventoryChanged);
+      }
+      _isInitialized = true;
+    } catch (e, st) {
+      debugPrint('Error during MealRecommendationService initialization: $e\n$st');
+      _isInitialized = false;
+      _inventoryListenerAttached = false;
+    }
+  }
+
+  static void _wireRepositories() {
+    MockDataRepository.recommendationProvider = () => _currentRecommendation ?? getRecommendation();
+    MockDataRepository.recommendationStatusProvider = () => currentStatus;
+    MockDataRepository.onResetRecommendation = () => reset();
   }
 
   static void _onInventoryChanged() {
@@ -456,6 +425,7 @@ class MealRecommendationService {
     statusNotifier.value = _currentStatus;
     recommendationNotifier.value = null;
     resetClock();
+    _wireRepositories();
   }
 
   // --- Dynamic Recipe Catalog & Scorer ---
