@@ -39,6 +39,109 @@ void main() {
       final message = (request['message'] as String? ?? '').toLowerCase();
       final hasImage = request['imageBase64'] != null;
 
+      if (request['actionHint'] == 'meal_recommendation') {
+        final slot = (request['currentMealPeriod'] as String? ?? 'Lunch').toLowerCase();
+        if (slot.contains('breakfast')) {
+          return {
+            'ok': true,
+            'action': 'meal_recommendation',
+            'meal': {
+              'id': 'rec_banana_smoothie',
+              'name': 'Banana Oat Smoothie',
+              'mealType': 'breakfast',
+              'description': 'A nutritious energy smoothie with banana and milk.',
+              'calories': 320,
+              'proteinG': 12,
+              'carbsG': 58,
+              'fatG': 6,
+              'preparationTimeMinutes': 5,
+              'ingredients': [
+                {'name': 'Banana', 'quantity': 2, 'unit': 'pieces', 'availableInFridge': true},
+                {'name': 'Milk', 'quantity': 250, 'unit': 'ml', 'availableInFridge': true},
+              ],
+              'missingIngredients': [],
+              'availableIngredientCount': 2,
+              'reason': 'Uses banana and milk from your fridge.',
+              'imageKey': 'banana_smoothie',
+            },
+          };
+        } else if (slot.contains('snack')) {
+          return {
+            'ok': true,
+            'action': 'meal_recommendation',
+            'meal': {
+              'id': 'rec_pb_apple_slices',
+              'name': 'Peanut Butter Apple Slices',
+              'mealType': 'snack',
+              'description': 'Crisp apple slices with rich peanut butter.',
+              'calories': 220,
+              'proteinG': 8,
+              'carbsG': 28,
+              'fatG': 10,
+              'preparationTimeMinutes': 3,
+              'ingredients': [
+                {'name': 'Apple', 'quantity': 1, 'unit': 'piece', 'availableInFridge': true},
+                {'name': 'Peanut Butter', 'quantity': 30, 'unit': 'g', 'availableInFridge': true},
+              ],
+              'missingIngredients': [],
+              'availableIngredientCount': 2,
+              'reason': 'Uses apple from your fridge.',
+              'imageKey': 'peanut_butter_apple',
+            },
+          };
+        } else if (slot.contains('dinner')) {
+          return {
+            'ok': true,
+            'action': 'meal_recommendation',
+            'meal': {
+              'id': 'rec_veg_pasta',
+              'name': 'Hearty Vegetable Pasta',
+              'mealType': 'dinner',
+              'description': 'Warm pasta with fresh tomatoes and broccoli.',
+              'calories': 480,
+              'proteinG': 16,
+              'carbsG': 76,
+              'fatG': 12,
+              'preparationTimeMinutes': 20,
+              'ingredients': [
+                {'name': 'Pasta', 'quantity': 100, 'unit': 'g', 'availableInFridge': false},
+                {'name': 'Tomato', 'quantity': 2, 'unit': 'pieces', 'availableInFridge': true},
+                {'name': 'Broccoli', 'quantity': 1, 'unit': 'piece', 'availableInFridge': true},
+              ],
+              'missingIngredients': ['Pasta'],
+              'availableIngredientCount': 2,
+              'reason': 'Uses fresh veggies from your fridge.',
+              'imageKey': 'hearty_vegetable_pasta',
+            },
+          };
+        } else {
+          return {
+            'ok': true,
+            'action': 'meal_recommendation',
+            'meal': {
+              'id': 'rec_paneer_rice_bowl',
+              'name': 'Paneer Rice Bowl',
+              'mealType': 'lunch',
+              'description': 'A balanced rice bowl with paneer and vegetables.',
+              'calories': 520,
+              'proteinG': 24,
+              'carbsG': 62,
+              'fatG': 18,
+              'preparationTimeMinutes': 20,
+              'ingredients': [
+                {'name': 'Paneer', 'quantity': 100, 'unit': 'g', 'availableInFridge': true},
+                {'name': 'Rice', 'quantity': 150, 'unit': 'g', 'availableInFridge': true},
+                {'name': 'Capsicum', 'quantity': 50, 'unit': 'g', 'availableInFridge': true},
+              ],
+              'missingIngredients': [],
+              'availableIngredientCount': 3,
+              'reason': 'Uses ingredients currently available in your fridge.',
+              'imageKey': 'paneer_rice_bowl',
+            },
+          };
+        }
+      }
+
       if (message.contains('receipt') || message.contains('grocery')) {
         return {
           'success': true,
@@ -3167,117 +3270,38 @@ void main() {
     setUp(() {
       FridgeCategoryRepository.reset();
       MockDataRepository.reset();
+      MealRecommendationService.reset();
       MealRecommendationService.resetClock();
     });
 
-    test('Meal slot determination across 24-hour cycle', () {
+    test('TEST 1 & Meal slot determination across 24-hour cycle including late-night', () {
       // Breakfast: 05:00 - 10:59
       expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 5, 0)), MealTimeSlot.breakfast);
       expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 8, 30)), MealTimeSlot.breakfast);
       expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 10, 59)), MealTimeSlot.breakfast);
 
-      // Lunch: 11:00 - 15:59
+      // Lunch: 11:00 - 14:59
       expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 11, 0)), MealTimeSlot.lunch);
       expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 13, 0)), MealTimeSlot.lunch);
-      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 15, 59)), MealTimeSlot.lunch);
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 14, 59)), MealTimeSlot.lunch);
 
-      // Snack: 16:00 - 18:59
-      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 16, 0)), MealTimeSlot.snack);
-      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 17, 30)), MealTimeSlot.snack);
-      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 18, 59)), MealTimeSlot.snack);
+      // Snack: 15:00 - 18:29
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 15, 0)), MealTimeSlot.snack);
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 17, 0)), MealTimeSlot.snack);
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 18, 29)), MealTimeSlot.snack);
 
-      // Dinner: 19:00 - 04:59 (including late night)
-      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 19, 0)), MealTimeSlot.dinner);
-      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 21, 30)), MealTimeSlot.dinner);
-      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 23, 59)), MealTimeSlot.dinner);
-      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 1, 30)), MealTimeSlot.dinner);
-      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 4, 59)), MealTimeSlot.dinner);
+      // Dinner: 18:30 - 22:59
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 18, 30)), MealTimeSlot.dinner);
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 20, 0)), MealTimeSlot.dinner);
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 22, 59)), MealTimeSlot.dinner);
+
+      // Late night (23:00 - 04:59): Upcoming breakfast
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 23, 0)), MealTimeSlot.breakfast);
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 1, 0)), MealTimeSlot.breakfast);
+      expect(MealRecommendationService.determineMealSlot(DateTime(2026, 11, 4, 4, 59)), MealTimeSlot.breakfast);
     });
 
-    test('Empty fridge returns null recommendation', () {
-      FridgeCategoryRepository.reset();
-      expect(FridgeCategoryRepository.totalFridgeItems, 0);
-      final rec = MealRecommendationService.getRecommendation();
-      expect(rec, isNull);
-    });
-
-    test('Time slot selection generates matching meal type and high-quality photo asset', () {
-      FridgeCategoryRepository.seedSampleDataForTesting();
-
-      // 1. Morning Breakfast
-      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 8, 0);
-      final bRec = MealRecommendationService.getRecommendation();
-      expect(bRec, isNotNull);
-      expect(bRec!.mealType, 'BREAKFAST');
-      expect(bRec.imageUrl, startsWith('assets/images/'));
-
-      // 2. Afternoon Lunch
-      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 13, 0);
-      final lRec = MealRecommendationService.getRecommendation();
-      expect(lRec, isNotNull);
-      expect(lRec!.mealType, 'LUNCH');
-      expect(lRec.imageUrl, startsWith('assets/images/'));
-
-      // 3. Evening Snack
-      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 17, 0);
-      final sRec = MealRecommendationService.getRecommendation();
-      expect(sRec, isNotNull);
-      expect(sRec!.mealType, 'SNACK');
-      expect(sRec.imageUrl, startsWith('assets/images/'));
-
-      // 4. Night Dinner
-      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 20, 0);
-      final dRec = MealRecommendationService.getRecommendation();
-      expect(dRec, isNotNull);
-      expect(dRec!.mealType, 'DINNER');
-      expect(dRec.imageUrl, startsWith('assets/images/'));
-    });
-
-    test('Dietary preferences and allergy restrictions are strictly enforced', () {
-      FridgeCategoryRepository.seedSampleDataForTesting();
-      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 13, 0);
-
-      // Vegetarian profile rejects non-veg dishes
-      MockDataRepository.updateProfile(
-        const UserProfileData(
-          displayName: 'Test Veg',
-          dietaryPreference: 'Vegetarian',
-          nutritionGoal: null,
-          dailyCalorieTarget: null,
-          allergies: {},
-          avoidedFoods: {},
-          customRestrictions: [],
-          mealRemindersEnabled: false,
-          expiryAlertsEnabled: false,
-        ),
-      );
-      final vegRec = MealRecommendationService.getRecommendation();
-      expect(vegRec, isNotNull);
-      expect(vegRec!.title, isNot('Grilled Chicken Salad'));
-      expect(vegRec.title, isNot('Pan-Seared Fish with Greens'));
-
-      // Nut allergy rejects nut-containing meals
-      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 17, 0);
-      MockDataRepository.updateProfile(
-        const UserProfileData(
-          displayName: 'Test Allergy',
-          dietaryPreference: null,
-          nutritionGoal: null,
-          dailyCalorieTarget: null,
-          allergies: {'Peanuts'},
-          avoidedFoods: {},
-          customRestrictions: [],
-          mealRemindersEnabled: false,
-          expiryAlertsEnabled: false,
-        ),
-      );
-      final allergyRec = MealRecommendationService.getRecommendation();
-      expect(allergyRec, isNotNull);
-      expect(allergyRec!.title, isNot('Peanut Butter Apple Slices'));
-      expect(allergyRec.title, isNot('Nut & Dry Fruit Energy Mix'));
-    });
-
-    testWidgets('Empty fridge inventory shows empty state card on Dashboard', (WidgetTester tester) async {
+    testWidgets('TEST 1 — Empty fridge inventory shows empty state card on Dashboard', (WidgetTester tester) async {
       tester.view.physicalSize = const Size(390 * 3, 844 * 3);
       tester.view.devicePixelRatio = 3.0;
       addTearDown(() {
@@ -3292,12 +3316,63 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Suggested for you'), findsOneWidget);
+      expect(find.text('Your fridge is waiting for its first ingredients.'), findsOneWidget);
       expect(find.text('Your next meal starts with your fridge.'), findsOneWidget);
       expect(find.text('Add a few ingredients and NutriFridge AI can help you decide what to cook.'), findsOneWidget);
       expect(find.text('Ask NutriFridge AI'), findsOneWidget);
     });
 
-    testWidgets('Dashboard dynamically updates recommendation when inventory is added', (WidgetTester tester) async {
+    test('TEST 2 — Breakfast recommendation generated at 08:00', () {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 8, 0);
+
+      final rec = MealRecommendationService.getRecommendation();
+      expect(rec, isNotNull);
+      expect(rec!.mealType, 'BREAKFAST');
+      expect(rec.imageUrl, startsWith('assets/images/'));
+    });
+
+    test('TEST 3 — Lunch recommendation generated at 13:00', () {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 13, 0);
+
+      final rec = MealRecommendationService.getRecommendation();
+      expect(rec, isNotNull);
+      expect(rec!.mealType, 'LUNCH');
+      expect(rec.imageUrl, startsWith('assets/images/'));
+    });
+
+    test('TEST 4 — Snack recommendation generated at 17:00', () {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 17, 0);
+
+      final rec = MealRecommendationService.getRecommendation();
+      expect(rec, isNotNull);
+      expect(rec!.mealType, 'SNACK');
+      expect(rec.imageUrl, startsWith('assets/images/'));
+    });
+
+    test('TEST 5 — Dinner recommendation generated at 20:00', () {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 20, 0);
+
+      final rec = MealRecommendationService.getRecommendation();
+      expect(rec, isNotNull);
+      expect(rec!.mealType, 'DINNER');
+      expect(rec.imageUrl, startsWith('assets/images/'));
+    });
+
+    test('TEST 6 — Late night recommendation at 01:00 prepares upcoming breakfast', () {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 1, 0);
+
+      final rec = MealRecommendationService.getRecommendation();
+      expect(rec, isNotNull);
+      expect(rec!.mealType, 'BREAKFAST');
+      expect(MealRecommendationService.isLateNightWindow(DateTime(2026, 11, 4, 1, 0)), isTrue);
+    });
+
+    testWidgets('TEST 7 — Inventory update refreshes recommendation dynamically', (WidgetTester tester) async {
       tester.view.physicalSize = const Size(390 * 3, 844 * 3);
       tester.view.devicePixelRatio = 3.0;
       addTearDown(() {
@@ -3313,7 +3388,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Initially empty state
-      expect(find.text('Your next meal starts with your fridge.'), findsOneWidget);
+      expect(find.text('Your fridge is waiting for its first ingredients.'), findsOneWidget);
       expect(find.text('BREAKFAST'), findsNothing);
 
       // Dynamically add breakfast ingredients to the fridge
@@ -3337,13 +3412,65 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Recommendation card is dynamically rendered with BREAKFAST badge
+      // Recommendation card is dynamically updated with BREAKFAST badge and matching dish
       expect(find.text('BREAKFAST'), findsOneWidget);
       expect(find.text('Banana Oat Smoothie'), findsOneWidget);
-      expect(find.text('Your next meal starts with your fridge.'), findsNothing);
+      expect(find.text('Your fridge is waiting for its first ingredients.'), findsNothing);
     });
 
-    testWidgets('Dynamic recommendation Hero transition and meal detail handoff', (WidgetTester tester) async {
+    test('TEST 8 — Dietary restrictions and allergies are strictly respected', () {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 13, 0);
+
+      // Vegetarian rejects non-veg
+      MockDataRepository.updateProfile(
+        const UserProfileData(
+          displayName: 'Test Veg',
+          dietaryPreference: 'Vegetarian',
+          nutritionGoal: null,
+          dailyCalorieTarget: null,
+          allergies: {},
+          avoidedFoods: {},
+          customRestrictions: [],
+          mealRemindersEnabled: false,
+          expiryAlertsEnabled: false,
+        ),
+      );
+      final vegRec = MealRecommendationService.getRecommendation();
+      expect(vegRec, isNotNull);
+      expect(vegRec!.title, isNot('Grilled Chicken Salad'));
+      expect(vegRec.title, isNot('Pan-Seared Fish with Greens'));
+
+      // Nut allergy rejects peanut butter dish
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 17, 0);
+      MockDataRepository.updateProfile(
+        const UserProfileData(
+          displayName: 'Test Allergy',
+          dietaryPreference: null,
+          nutritionGoal: null,
+          dailyCalorieTarget: null,
+          allergies: {'Peanuts'},
+          avoidedFoods: {},
+          customRestrictions: [],
+          mealRemindersEnabled: false,
+          expiryAlertsEnabled: false,
+        ),
+      );
+      final allergyRec = MealRecommendationService.getRecommendation();
+      expect(allergyRec, isNotNull);
+      expect(allergyRec!.title, isNot('Peanut Butter Apple Slices'));
+      expect(allergyRec.title, isNot('Nut & Dry Fruit Energy Mix'));
+    });
+
+    test('TEST 9 — Photograph matches actual recommended dish', () {
+      expect(MealImageRegistry.resolveImage(mealName: 'Banana Oat Smoothie'), contains('banana.jpg'));
+      expect(MealImageRegistry.resolveImage(mealName: 'Paneer Rice Bowl'), contains('paneer_rice_bowl.jpg'));
+      expect(MealImageRegistry.resolveImage(mealName: 'Comfort Dal Rice'), contains('dal_rice.jpg'));
+      expect(MealImageRegistry.resolveImage(mealName: 'Hearty Vegetable Pasta'), contains('pasta.jpg'));
+      expect(MealImageRegistry.resolveImage(mealName: 'Pan-Seared Fish with Greens'), contains('fish.jpg'));
+    });
+
+    testWidgets('TEST 10 — Original Design 1 Hero Transition opens matching Meal Detail page', (WidgetTester tester) async {
       tester.view.physicalSize = const Size(390 * 3, 844 * 3);
       tester.view.devicePixelRatio = 3.0;
       addTearDown(() {
@@ -3361,11 +3488,18 @@ void main() {
       expect(find.byType(RecommendationCard), findsOneWidget);
       expect(find.text('LUNCH'), findsOneWidget);
 
-      // Tap recommendation card -> navigates to MealDetailScreen
+      // Verify Hero element exists on Dashboard recommendation card
+      final heroFinder = find.byWidgetPredicate(
+        (w) => w is Hero && (w.tag as String).startsWith('meal-hero-image-'),
+      );
+      expect(heroFinder, findsOneWidget);
+
+      // Tap recommendation card -> navigates to MealDetailScreen via Design 1 Hero Transition
       await tester.tap(find.byType(RecommendationCard));
       await tester.pumpAndSettle();
 
-      // Verify MealDetailScreen loaded with dynamic ingredients & AI recipe CTA
+      // Hero image continues to exist on Meal Detail
+      expect(heroFinder, findsOneWidget);
       expect(find.text('Ingredients'), findsOneWidget);
       expect(find.text('Cook it your way'), findsOneWidget);
       expect(find.text('Get AI Recipe'), findsOneWidget);
@@ -3374,6 +3508,72 @@ void main() {
       await tester.tap(find.byIcon(Icons.arrow_back_rounded));
       await tester.pumpAndSettle();
       expect(find.text('Suggested for you'), findsOneWidget);
+    });
+
+    testWidgets('TEST 11 — Backend failure displays clear retry state and no fake meal', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      // Configure mockHandler to return an error before seeding inventory
+      AiAssistantService.mockHandler = (req) async {
+        return {
+          'success': false,
+          'action': 'error',
+          'assistantMessage': 'Backend connection timed out. Tap retry to reconnect.',
+          'error': 'Remote timeout',
+        };
+      };
+
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MockDataRepository.reset();
+      MealRecommendationService.reset();
+
+      await tester.pumpWidget(const NutriFridgeApp());
+      await tester.pumpAndSettle();
+
+      // Verify retry state appears
+      expect(find.text("Couldn't load recommendation"), findsOneWidget);
+      expect(find.text('Tap to retry'), findsOneWidget);
+      // Empty fridge text is NOT shown
+      expect(find.text('Your fridge is waiting for its first ingredients.'), findsNothing);
+    });
+
+    test('TEST 12 — Duplicate requests are prevented during simultaneous rebuilds', () async {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MockDataRepository.reset();
+      MealRecommendationService.reset();
+
+      int backendCalls = 0;
+      AiAssistantService.mockHandler = (req) async {
+        backendCalls++;
+        await Future.delayed(const Duration(milliseconds: 30));
+        return {
+          'ok': true,
+          'action': 'meal_recommendation',
+          'meal': {
+            'name': 'Paneer Rice Bowl',
+            'mealType': 'lunch',
+            'calories': 520,
+            'proteinG': 24,
+            'availableIngredientCount': 4,
+            'imageKey': 'paneer_rice_bowl',
+          },
+        };
+      };
+
+      // Trigger multiple concurrent fetch calls
+      final f1 = MealRecommendationService.fetchRecommendation(forceRefresh: true);
+      final f2 = MealRecommendationService.fetchRecommendation();
+      final f3 = MealRecommendationService.fetchRecommendation();
+
+      await Future.wait([f1, f2, f3]);
+
+      // Only 1 backend call made
+      expect(backendCalls, 1);
     });
   });
 }

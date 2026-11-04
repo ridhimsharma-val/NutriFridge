@@ -5,6 +5,7 @@ import '../../models/nutrition_data.dart';
 import '../ai_assistant/ai_assistant_screen.dart';
 import '../fridge/models/category_item.dart';
 import '../meal_detail/meal_detail_screen.dart';
+import 'services/meal_recommendation_service.dart';
 import 'widgets/dashboard_header.dart';
 import 'widgets/meal_status_card.dart';
 import 'widgets/notification_popover.dart';
@@ -24,15 +25,26 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isNutritionExpanded = false;
 
   @override
+  void initState() {
+    super.initState();
+    MealRecommendationService.ensureInitialized();
+    MealRecommendationService.fetchRecommendation();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: Listenable.merge([
         MockDataRepository.notifier,
         NotificationRepository.notifier,
         FridgeCategoryRepository.notifier,
+        MealRecommendationService.statusNotifier,
+        MealRecommendationService.recommendationNotifier,
       ]),
       builder: (context, _) {
         final recommendation = MockDataRepository.recommendation;
+        final recStatus = MockDataRepository.recommendationStatus;
+        final errorMessage = MealRecommendationService.errorMessage;
         final wellness = MockDataRepository.wellness;
         final nutrition = MockDataRepository.nutrition;
         final meals = MockDataRepository.meals;
@@ -59,6 +71,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   // 2. Suggested For You
                   RecommendationCard(
                     recommendation: recommendation,
+                    status: recStatus,
+                    errorMessage: errorMessage,
+                    onRetry: () =>
+                        MealRecommendationService.fetchRecommendation(forceRefresh: true),
                     onOpenAssistant: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(

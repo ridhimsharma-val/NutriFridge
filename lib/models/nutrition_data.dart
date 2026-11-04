@@ -16,6 +16,7 @@ class UserProfile {
 }
 
 class RecipeRecommendation {
+  final String id;
   final String title;
   final int calories;
   final int proteinGrams;
@@ -26,12 +27,15 @@ class RecipeRecommendation {
   final String tag;
   final String mealType;
   final String imageUrl;
+  final String? imageKey;
+  final bool nutritionIsEstimate;
   final List<String> matchReasons;
   final List<String> requiredIngredients;
   final List<String> missingIngredients;
   final String? explanation;
 
   const RecipeRecommendation({
+    this.id = '',
     required this.title,
     required this.calories,
     required this.proteinGrams,
@@ -42,6 +46,8 @@ class RecipeRecommendation {
     this.tag = 'Picked for your fridge',
     this.mealType = '',
     required this.imageUrl,
+    this.imageKey,
+    this.nutritionIsEstimate = true,
     this.matchReasons = const [
       'Uses items from your fridge',
       "Helps complete today's protein goal",
@@ -50,6 +56,118 @@ class RecipeRecommendation {
     this.missingIngredients = const [],
     this.explanation,
   });
+
+  /// Factory constructor to parse structured backend recommendation response
+  factory RecipeRecommendation.fromJson(Map<String, dynamic> json) {
+    final title = (json['name'] ?? json['title'] ?? 'Chef Special').toString();
+    final mealType = (json['mealType'] ?? '').toString();
+    final imageKey = json['imageKey']?.toString();
+    final imageUrl = MealImageRegistry.resolveImage(
+      imageKey: imageKey,
+      mealName: title,
+      providedUrl: json['imageUrl']?.toString(),
+    );
+
+    final List<String> requiredIngs = [];
+    final List<String> missingIngs = [];
+    int availableCount =
+        (json['availableIngredientCount'] as num? ?? json['fridgeItemsUsed'] as num? ?? 0).toInt();
+
+    if (json['ingredients'] is List) {
+      for (final item in json['ingredients'] as List) {
+        if (item is Map) {
+          final name = (item['name'] ?? '').toString();
+          if (name.isNotEmpty) requiredIngs.add(name);
+          final inFridge = item['availableInFridge'] == true || item['inFridge'] == true;
+          if (!inFridge && name.isNotEmpty) {
+            missingIngs.add(name);
+          }
+        } else if (item is String) {
+          requiredIngs.add(item);
+        }
+      }
+    }
+
+    if (json['missingIngredients'] is List) {
+      for (final m in json['missingIngredients'] as List) {
+        final s = m.toString();
+        if (!missingIngs.contains(s)) missingIngs.add(s);
+      }
+    }
+
+    if (availableCount == 0 && requiredIngs.isNotEmpty) {
+      availableCount = requiredIngs.length - missingIngs.length;
+      if (availableCount < 0) availableCount = 0;
+    }
+
+    final List<String> reasons = [];
+    if (json['reason'] != null) {
+      reasons.add(json['reason'].toString());
+    } else if (json['matchReasons'] is List) {
+      for (final r in json['matchReasons'] as List) {
+        reasons.add(r.toString());
+      }
+    }
+    if (reasons.isEmpty) {
+      reasons.add('Uses $availableCount items from your fridge');
+      reasons.add("Helps support today's protein goal");
+    }
+
+    return RecipeRecommendation(
+      id: (json['id'] ?? '').toString(),
+      title: title,
+      calories: (json['calories'] as num? ?? 450).toInt(),
+      proteinGrams: (json['proteinG'] as num? ??
+              json['proteinGrams'] as num? ??
+              json['protein'] as num? ??
+              20)
+          .toInt(),
+      carbsGrams: (json['carbsG'] as num? ??
+              json['carbsGrams'] as num? ??
+              json['carbs'] as num? ??
+              55)
+          .toInt(),
+      fatGrams: (json['fatG'] as num? ??
+              json['fatGrams'] as num? ??
+              json['fat'] as num? ??
+              14)
+          .toInt(),
+      prepTimeMinutes: (json['preparationTimeMinutes'] as num? ??
+              json['prepTimeMinutes'] as num? ??
+              20)
+          .toInt(),
+      fridgeItemsUsed: availableCount > 0 ? availableCount : requiredIngs.length,
+      mealType: mealType.isNotEmpty ? mealType.toUpperCase() : '',
+      tag: mealType.isNotEmpty ? mealType.toUpperCase() : 'Picked for your fridge',
+      imageUrl: imageUrl,
+      imageKey: imageKey,
+      nutritionIsEstimate: json['nutritionIsEstimate'] as bool? ?? true,
+      matchReasons: reasons,
+      requiredIngredients: requiredIngs,
+      missingIngredients: missingIngs,
+      explanation: (json['description'] ?? json['explanation'] ?? reasons.firstOrNull)?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': title,
+      'mealType': mealType,
+      'imageUrl': imageUrl,
+      'imageKey': imageKey,
+      'calories': calories,
+      'proteinG': proteinGrams,
+      'carbsG': carbsGrams,
+      'fatG': fatGrams,
+      'preparationTimeMinutes': prepTimeMinutes,
+      'fridgeItemsUsed': fridgeItemsUsed,
+      'requiredIngredients': requiredIngredients,
+      'missingIngredients': missingIngredients,
+      'matchReasons': matchReasons,
+      'explanation': explanation,
+    };
+  }
 }
 
 class WellnessScoreData {
@@ -185,6 +303,11 @@ class MockDataRepository {
   static RecipeRecommendation? _explicitRecommendation;
   static RecipeRecommendation? get recommendation =>
       _explicitRecommendation ?? _deriveDynamicRecommendation();
+
+  static RecommendationStatus get recommendationStatus {
+    if (_explicitRecommendation != null) return RecommendationStatus.loaded;
+    return MealRecommendationService.currentStatus;
+  }
 
   static void setRecommendationForTesting(RecipeRecommendation? rec) {
     _explicitRecommendation = rec;
@@ -449,6 +572,7 @@ class MockDataRepository {
     );
     _explicitRecommendation = null;
     _explicitWellness = null;
+    MealRecommendationService.reset();
     NotificationRepository.reset();
     _notify();
   }
