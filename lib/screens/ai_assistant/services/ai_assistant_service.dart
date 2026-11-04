@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -107,34 +108,49 @@ class AiAssistantService {
     };
 
     if (mockHandler != null) {
-      return mockHandler!(payload);
+      final mockResult = await mockHandler!(payload);
+      return _normalizeResponse(mockResult);
     }
 
+    final stopwatch = Stopwatch()..start();
+    http.Response response;
+
     try {
-      final response = await http
+      response = await http
           .post(
             Uri.parse(webhookUrl),
-            headers: const {'Content-Type': 'application/json'},
+            headers: const {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
             body: jsonEncode(payload),
           )
-          .timeout(const Duration(seconds: 15));
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final Map<String, dynamic> data = jsonDecode(response.body) as Map<String, dynamic>;
-        return data;
-      } else {
-        debugPrint('n8n returned status ${response.statusCode}');
-        return {
-          'success': false,
-          'action': 'error',
-          'assistantMessage':
-              'NutriFridge AI is temporarily unavailable (Status ${response.statusCode}). Please check your connection and tap retry.',
-          'error': 'Remote server returned ${response.statusCode}',
-          'requiresConfirmation': false,
-        };
-      }
+          .timeout(const Duration(seconds: 60));
+    } on TimeoutException catch (e) {
+      stopwatch.stop();
+      debugPrint('[AiAssistantService] Request timed out after ${stopwatch.elapsedMilliseconds}ms: $e');
+      return {
+        'success': false,
+        'action': 'error',
+        'assistantMessage':
+            'NutriFridge AI took longer than expected to respond. Please tap retry.',
+        'error': 'TimeoutException: Request exceeded 60s (${stopwatch.elapsedMilliseconds}ms)',
+        'requiresConfirmation': false,
+      };
+    } on http.ClientException catch (e) {
+      stopwatch.stop();
+      debugPrint('[AiAssistantService] Client / CORS / Network error after ${stopwatch.elapsedMilliseconds}ms: $e');
+      return {
+        'success': false,
+        'action': 'error',
+        'assistantMessage':
+            'Unable to connect to NutriFridge AI. Please check your internet connection and tap retry.',
+        'error': 'ClientException: $e',
+        'requiresConfirmation': false,
+      };
     } catch (e) {
-      debugPrint('Error communicating with n8n AI webhook: $e');
+      stopwatch.stop();
+      debugPrint('[AiAssistantService] Unexpected network error after ${stopwatch.elapsedMilliseconds}ms: $e');
       return {
         'success': false,
         'action': 'error',
@@ -144,6 +160,134 @@ class AiAssistantService {
         'requiresConfirmation': false,
       };
     }
+
+    stopwatch.stop();
+    debugPrint('[AiAssistantService] HTTP ${response.statusCode} in ${stopwatch.elapsedMilliseconds}ms');
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      try {
+        final decoded = jsonDecode(response.body);
+        final Map<String, dynamic> data = _normalizeResponse(decoded);
+        return data;
+      } catch (e) {
+        debugPrint('[AiAssistantService] Failed to parse n8n JSON response: $e\nRaw body: ${response.body}');
+        return {
+          'success': false,
+          'action': 'error',
+          'assistantMessage':
+              'Received an invalid response format from NutriFridge AI. Please tap retry.',
+          'error': 'JSON parse error: $e',
+          'requiresConfirmation': false,
+        };
+      }
+    } else if (response.statusCode >= 500) {
+      debugPrint('[AiAssistantService] n8n server error ${response.statusCode}: ${response.body}');
+      return {
+        'success': false,
+        'action': 'error',
+        'assistantMessage':
+            'NutriFridge AI is temporarily experiencing high load (Status ${response.statusCode}). Please tap retry in a moment.',
+        'error': 'Remote server returned status ${response.statusCode}',
+        'requiresConfirmation': false,
+      };
+    } else {
+      debugPrint('[AiAssistantService] n8n client error ${response.statusCode}: ${response.body}');
+      return {
+        'success': false,
+        'action': 'error',
+        'assistantMessage':
+            'NutriFridge AI request could not be completed (Status ${response.statusCode}). Please tap retry.',
+        'error': 'Remote server returned status ${response.statusCode}',
+        'requiresConfirmation': false,
+      };
+    }
+  }
+
+  /// Normalizes variations of n8n response structures (direct JSON, wrapped in body/data/output, or string-encoded)
+  static Map<String, dynamic> _normalizeResponse(dynamic decoded) {
+    if (decoded is List) {
+      if (decoded.isNotEmpty && decoded.first is Map) {
+        return _normalizeResponse(decoded.first);
+      }
+      return {
+        'ok': true,
+        'action': 'assistant_reply',
+        'assistantMessage': 'Received empty response from assistant.',
+      };
+    }
+
+    if (decoded is String) {
+      final trimmed = decoded.trim();
+      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+          (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+        try {
+          final inner = jsonDecode(trimmed);
+          return _normalizeResponse(inner);
+        } catch (_) {}
+      }
+      return {
+        'ok': true,
+        'action': 'assistant_reply',
+        'assistantMessage': decoded,
+      };
+    }
+
+    if (decoded is Map) {
+      final Map<String, dynamic> map = Map<String, dynamic>.from(decoded);
+
+      // 1. Unwrap nested payload wrappers if present
+      if (map.containsKey('body') && map['body'] != null) {
+        return _normalizeResponse(map['body']);
+      }
+      if (map.containsKey('data') && map['data'] != null && map['action'] == null) {
+        return _normalizeResponse(map['data']);
+      }
+      if (map.containsKey('output') && map['action'] == null) {
+        final out = map['output'];
+        if (out is Map || out is List) {
+          return _normalizeResponse(out);
+        } else if (out is String) {
+          final trimmedOut = out.trim();
+          if ((trimmedOut.startsWith('{') && trimmedOut.endsWith('}')) ||
+              (trimmedOut.startsWith('[') && trimmedOut.endsWith(']'))) {
+            try {
+              return _normalizeResponse(jsonDecode(trimmedOut));
+            } catch (_) {}
+          }
+          return {
+            ...map,
+            'ok': true,
+            'action': 'assistant_reply',
+            'assistantMessage': out,
+          };
+        }
+      }
+
+      // 2. Normalize field names and aliases
+      if (map['inventoryItems'] == null && map['items'] is List) {
+        map['inventoryItems'] = map['items'];
+      }
+      if (map['inventoryItems'] == null && map['proposedAdditions'] is List) {
+        map['inventoryItems'] = map['proposedAdditions'];
+      }
+      if (map['assistantMessage'] == null && map['message'] is String) {
+        map['assistantMessage'] = map['message'];
+      }
+      if (map['assistantMessage'] == null && map['reply'] is String) {
+        map['assistantMessage'] = map['reply'];
+      }
+      if (map['assistantMessage'] == null && map['text'] is String) {
+        map['assistantMessage'] = map['text'];
+      }
+
+      return map;
+    }
+
+    return {
+      'ok': true,
+      'action': 'assistant_reply',
+      'assistantMessage': decoded?.toString() ?? '',
+    };
   }
 
   /// Requests the AI to estimate nutrition for a given meal name using the existing AI backend.

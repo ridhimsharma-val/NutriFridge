@@ -123,166 +123,209 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   }
 
   void _retryLastUserMessage() {
+    if (_isSending) return;
+
+    int lastUserIdx = -1;
     for (int i = _messages.length - 1; i >= 0; i--) {
       if (_messages[i].isUser) {
-        final text = _messages[i].text;
-        _handleSend(promptOverride: text);
+        lastUserIdx = i;
         break;
       }
     }
+
+    if (lastUserIdx == -1) return;
+
+    final lastUserMsg = _messages[lastUserIdx];
+    final text = lastUserMsg.text;
+    final image = lastUserMsg.attachedImageBase64;
+
+    // Remove any trailing assistant error message so user does not see duplicate error bubbles
+    setState(() {
+      if (_messages.isNotEmpty && !_messages.last.isUser) {
+        _messages.removeLast();
+      }
+    });
+
+    _handleSend(promptOverride: text, imageOverride: image, isRetry: true);
   }
 
-  Future<void> _handleSend({String? promptOverride}) async {
+  Future<void> _handleSend({
+    String? promptOverride,
+    String? imageOverride,
+    bool isRetry = false,
+  }) async {
+    if (_isSending) return;
+
     final text = (promptOverride ?? _textController.text).trim();
-    if (text.isEmpty && _selectedImageBase64 == null) return;
-
-    final userMessage = AiChatMessage(
-      id: 'msg_user_${DateTime.now().millisecondsSinceEpoch}',
-      text: text,
-      isUser: true,
-      timestamp: DateTime.now(),
-      attachedImageBase64: _selectedImageBase64,
-    );
-
-    final imageToSend = _selectedImageBase64;
+    final imageToSend = imageOverride ?? _selectedImageBase64;
     final mimeToSend = _selectedImageMimeType;
 
+    if (text.isEmpty && imageToSend == null) return;
+
     setState(() {
-      _messages.add(userMessage);
-      _syncSession();
-      _textController.clear();
-      _selectedImageBase64 = null;
-      _selectedImageMimeType = null;
-      _selectedImageName = null;
       _isSending = true;
+      if (!isRetry) {
+        final userMessage = AiChatMessage(
+          id: 'msg_user_${DateTime.now().millisecondsSinceEpoch}',
+          text: text,
+          isUser: true,
+          timestamp: DateTime.now(),
+          attachedImageBase64: imageToSend,
+        );
+        _messages.add(userMessage);
+        _textController.clear();
+        _selectedImageBase64 = null;
+        _selectedImageMimeType = null;
+        _selectedImageName = null;
+      }
+      _syncSession();
     });
 
     _scrollToBottom();
 
-    // Call live n8n backend or intelligent local processing
-    final response = await AiAssistantService.sendRequest(
-      message: text,
-      imageBase64: imageToSend,
-      mimeType: mimeToSend,
-      history: _messages,
-    );
+    try {
+      // Call live n8n backend or intelligent local processing
+      final response = await AiAssistantService.sendRequest(
+        message: text,
+        imageBase64: imageToSend,
+        mimeType: mimeToSend,
+        history: _messages,
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    final String assistantText =
-        (response['assistantMessage'] as String?) ?? 'Processed your request.';
-    final String action = (response['action'] as String?) ?? 'assistant_reply';
-    final bool requiresConfirmation = (response['requiresConfirmation'] as bool?) ?? false;
-    bool needsClarification = (response['needsClarification'] as bool?) ?? false;
-    String? clarifyingQuestion = response['clarifyingQuestion'] as String?;
+      final String assistantText =
+          (response['assistantMessage'] as String?) ?? 'Processed your request.';
+      final String action = (response['action'] as String?) ?? 'assistant_reply';
+      final bool requiresConfirmation = (response['requiresConfirmation'] as bool?) ?? false;
+      bool needsClarification = (response['needsClarification'] as bool?) ?? false;
+      String? clarifyingQuestion = response['clarifyingQuestion'] as String?;
 
-    final List<Map<String, dynamic>> inventoryItems = [];
-    if (response['inventoryItems'] is List) {
-      for (final it in response['inventoryItems']) {
-        if (it is Map) {
-          inventoryItems.add(Map<String, dynamic>.from(it));
+      final List<Map<String, dynamic>> inventoryItems = [];
+      if (response['inventoryItems'] is List) {
+        for (final it in response['inventoryItems']) {
+          if (it is Map) {
+            inventoryItems.add(Map<String, dynamic>.from(it));
+          }
         }
       }
-    }
 
-    // If Gemini proposes items with missing or ambiguous quantity, ask for clarification
-    if (action == 'add_inventory_items' && inventoryItems.isNotEmpty) {
-      for (final it in inventoryItems) {
-        final rawQty = it['quantity'];
-        if (rawQty == null || (rawQty is num && rawQty <= 0) || (rawQty is String && rawQty.trim().isEmpty)) {
-          needsClarification = true;
-          final itemName = (it['name'] as String?) ?? 'food item';
-          clarifyingQuestion =
-              'How much $itemName would you like to add? Please specify the quantity and unit.';
-          inventoryItems.clear();
-          break;
-        }
-      }
-    }
-
-    // If Gemini proposes removals with missing quantity or over-removal, ask for clarification
-    if ((action == 'remove_inventory_items' || action == 'remove_inventory_item') && inventoryItems.isNotEmpty) {
-      for (final it in inventoryItems) {
-        final rawQty = it['quantity'];
-        final itemName = (it['name'] as String?) ?? 'food item';
-
-        // Check if removal quantity is unspecified or ambiguous (TEST 11)
-        if (it['isFullRemoval'] != true &&
-            (rawQty == null || (rawQty is num && rawQty <= 0) || (rawQty is String && rawQty.trim().isEmpty))) {
-          needsClarification = true;
-          clarifyingQuestion =
-              'Would you like to remove all $itemName or a specific amount? Please specify the quantity and unit.';
-          inventoryItems.clear();
-          break;
-        }
-
-        // Check if removal exceeds available stock (TEST 3: Over-removal)
-        final invItem = FridgeCategoryRepository.findItemByName(itemName);
-        if (invItem != null && rawQty != null && it['isFullRemoval'] != true) {
-          final qty = _parseQuantity(rawQty);
-          final unit = _parseUnit(it['unit']);
-          final check = FridgeCategoryRepository.checkDeduction(item: invItem, quantity: qty, unit: unit);
-          if (check.status == DeductionStatus.overRemoval) {
+      // If Gemini proposes items with missing or ambiguous quantity, ask for clarification
+      if (action == 'add_inventory_items' && inventoryItems.isNotEmpty) {
+        for (final it in inventoryItems) {
+          final rawQty = it['quantity'];
+          if (rawQty == null || (rawQty is num && rawQty <= 0) || (rawQty is String && rawQty.trim().isEmpty)) {
             needsClarification = true;
+            final itemName = (it['name'] as String?) ?? 'food item';
             clarifyingQuestion =
-                'You only have ${invItem.quantity} in your fridge. Please adjust the quantity.';
+                'How much $itemName would you like to add? Please specify the quantity and unit.';
             inventoryItems.clear();
             break;
           }
         }
       }
-    }
 
-    Map<String, dynamic>? meal;
-    if (response['meal'] is Map) {
-      meal = Map<String, dynamic>.from(response['meal'] as Map);
-    }
+      // If Gemini proposes removals with missing quantity or over-removal, ask for clarification
+      if ((action == 'remove_inventory_items' || action == 'remove_inventory_item') && inventoryItems.isNotEmpty) {
+        for (final it in inventoryItems) {
+          final rawQty = it['quantity'];
+          final itemName = (it['name'] as String?) ?? 'food item';
 
-    final List<Map<String, dynamic>> suggestedDeductions = [];
-    if (response['suggestedInventoryDeductions'] is List) {
-      for (final d in response['suggestedInventoryDeductions']) {
-        if (d is Map) {
-          suggestedDeductions.add(Map<String, dynamic>.from(d));
-        }
-      }
-    }
+          // Check if removal quantity is unspecified or ambiguous (TEST 11)
+          if (it['isFullRemoval'] != true &&
+              (rawQty == null || (rawQty is num && rawQty <= 0) || (rawQty is String && rawQty.trim().isEmpty))) {
+            needsClarification = true;
+            clarifyingQuestion =
+                'Would you like to remove all $itemName or a specific amount? Please specify the quantity and unit.';
+            inventoryItems.clear();
+            break;
+          }
 
-    // Pre-populate deduction selections for matched fridge items
-    final Set<String> initialSelectedDeductions = {};
-    if (meal != null && meal['ingredients'] is List) {
-      for (final ing in meal['ingredients']) {
-        if (ing is Map && ing['name'] != null) {
-          final ingName = ing['name'] as String;
-          final match = FridgeCategoryRepository.findItemByName(ingName);
-          if (match != null || ing['matchedInventoryItemId'] != null) {
-            initialSelectedDeductions.add(ingName);
+          // Check if removal exceeds available stock (TEST 3: Over-removal)
+          final invItem = FridgeCategoryRepository.findItemByName(itemName);
+          if (invItem != null && rawQty != null && it['isFullRemoval'] != true) {
+            final qty = _parseQuantity(rawQty);
+            final unit = _parseUnit(it['unit']);
+            final check = FridgeCategoryRepository.checkDeduction(item: invItem, quantity: qty, unit: unit);
+            if (check.status == DeductionStatus.overRemoval) {
+              needsClarification = true;
+              clarifyingQuestion =
+                  'You only have ${invItem.quantity} in your fridge. Please adjust the quantity.';
+              inventoryItems.clear();
+              break;
+            }
           }
         }
       }
+
+      Map<String, dynamic>? meal;
+      if (response['meal'] is Map) {
+        meal = Map<String, dynamic>.from(response['meal'] as Map);
+      }
+
+      final List<Map<String, dynamic>> suggestedDeductions = [];
+      if (response['suggestedInventoryDeductions'] is List) {
+        for (final d in response['suggestedInventoryDeductions']) {
+          if (d is Map) {
+            suggestedDeductions.add(Map<String, dynamic>.from(d));
+          }
+        }
+      }
+
+      // Pre-populate deduction selections for matched fridge items
+      final Set<String> initialSelectedDeductions = {};
+      if (meal != null && meal['ingredients'] is List) {
+        for (final ing in meal['ingredients']) {
+          if (ing is Map && ing['name'] != null) {
+            final ingName = ing['name'] as String;
+            final match = FridgeCategoryRepository.findItemByName(ingName);
+            if (match != null || ing['matchedInventoryItemId'] != null) {
+              initialSelectedDeductions.add(ingName);
+            }
+          }
+        }
+      }
+
+      final assistantMessage = AiChatMessage(
+        id: 'msg_ai_${DateTime.now().millisecondsSinceEpoch}',
+        text: assistantText,
+        isUser: false,
+        timestamp: DateTime.now(),
+        action: action,
+        requiresConfirmation: requiresConfirmation,
+        needsClarification: needsClarification,
+        clarifyingQuestion: clarifyingQuestion,
+        inventoryItems: inventoryItems,
+        meal: meal,
+        suggestedDeductions: suggestedDeductions,
+        selectedDeductionIngredients: initialSelectedDeductions,
+      );
+
+      setState(() {
+        _messages.add(assistantMessage);
+      });
+    } catch (e) {
+      debugPrint('[AiAssistantScreen] Error processing send request: $e');
+      if (mounted) {
+        setState(() {
+          _messages.add(AiChatMessage(
+            id: 'msg_ai_${DateTime.now().millisecondsSinceEpoch}',
+            text: 'Unable to reach NutriFridge AI. Please check your internet connection and tap retry.',
+            isUser: false,
+            timestamp: DateTime.now(),
+            action: 'error',
+          ));
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
+        _syncSession();
+        _scrollToBottom();
+      }
     }
-
-    final assistantMessage = AiChatMessage(
-      id: 'msg_ai_${DateTime.now().millisecondsSinceEpoch}',
-      text: assistantText,
-      isUser: false,
-      timestamp: DateTime.now(),
-      action: action,
-      requiresConfirmation: requiresConfirmation,
-      needsClarification: needsClarification,
-      clarifyingQuestion: clarifyingQuestion,
-      inventoryItems: inventoryItems,
-      meal: meal,
-      suggestedDeductions: suggestedDeductions,
-      selectedDeductionIngredients: initialSelectedDeductions,
-    );
-
-    setState(() {
-      _messages.add(assistantMessage);
-      _syncSession();
-      _isSending = false;
-    });
-
-    _scrollToBottom();
   }
 
   static num _parseQuantity(dynamic q) {
@@ -1533,7 +1576,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               if (message.action == 'error') ...[
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
-                  onPressed: _retryLastUserMessage,
+                  onPressed: _isSending ? null : _retryLastUserMessage,
                   icon: const Icon(Icons.refresh_rounded, size: 16, color: AppColors.error),
                   label: const Text(
                     'Retry',
