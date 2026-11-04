@@ -475,10 +475,14 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.tealLight : const Color(0xFFF6F9F7),
+                        color: isSelected
+                            ? (type == 'Snack' ? AppColors.peachLight : AppColors.tealLight)
+                            : const Color(0xFFF6F9F7),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: isSelected ? AppColors.tealPrimary : AppColors.cardBorder,
+                          color: isSelected
+                              ? (type == 'Snack' ? AppColors.peachPrimary : AppColors.tealPrimary)
+                              : AppColors.cardBorder,
                           width: isSelected ? 1.4 : 1,
                         ),
                       ),
@@ -488,7 +492,9 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                          color: isSelected ? AppColors.tealPrimary : AppColors.textPrimary,
+                          color: isSelected
+                              ? (type == 'Snack' ? AppColors.peachPrimary : AppColors.tealPrimary)
+                              : AppColors.textPrimary,
                         ),
                       ),
                     ),
@@ -764,7 +770,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                 child: _buildMacroItem(
                   label: 'Protein',
                   amount: '${nutrition.proteinGrams} g',
-                  accentColor: AppColors.tealPrimary,
+                  accentColor: AppColors.tealAccent,
                   bgColor: const Color(0xFFE8F6F0),
                 ),
               ),
@@ -773,8 +779,8 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                 child: _buildMacroItem(
                   label: 'Carbohydrates',
                   amount: '${nutrition.carbsGrams} g',
-                  accentColor: const Color(0xFFE2843A),
-                  bgColor: const Color(0xFFFEF3EB),
+                  accentColor: AppColors.peachPrimary,
+                  bgColor: AppColors.peachLight,
                 ),
               ),
               const SizedBox(width: 10),
@@ -782,8 +788,8 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                 child: _buildMacroItem(
                   label: 'Fat',
                   amount: '${nutrition.fatGrams} g',
-                  accentColor: const Color(0xFF7E64B8),
-                  bgColor: const Color(0xFFF4EFFD),
+                  accentColor: AppColors.amberPrimary,
+                  bgColor: AppColors.amberLight,
                 ),
               ),
             ],

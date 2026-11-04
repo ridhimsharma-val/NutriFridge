@@ -299,11 +299,11 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: AppColors.cardWhite,
+                      color: AppColors.peachLight,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: const Color(0xFFBCE3D3),
-                        width: 0.8,
+                        color: AppColors.peachBorder,
+                        width: 1.0,
                       ),
                     ),
                     child: Text(
@@ -311,7 +311,7 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
                       style: const TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.tealPrimary,
+                        color: AppColors.peachPrimary,
                       ),
                     ),
                   ),

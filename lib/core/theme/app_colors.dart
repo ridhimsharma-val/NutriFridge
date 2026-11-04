@@ -24,6 +24,13 @@ class AppColors {
   static const Color peachCard = Color(0xFFFFF7F2);
   static const Color peachBorder = Color(0xFFFFE5DA);
 
+  // Semantic Secondary Tokens (Aligned with Peach / Coral Palette)
+  static const Color secondary = peachPrimary;
+  static const Color secondarySurface = peachLight;
+  static const Color secondaryCard = peachCard;
+  static const Color secondaryBorder = peachBorder;
+  static const Color secondaryAccent = peachAccent;
+
   // Amber / Warm Yellow Highlights
   static const Color amberPrimary = Color(0xFFF59E0B);
   static const Color amberLight = Color(0xFFFEF3C7);

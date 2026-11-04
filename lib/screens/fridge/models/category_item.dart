@@ -106,7 +106,7 @@ class CategoryFoodItem {
       case ExpiryStatus.urgent:
         return const Color(0xFFFDE8E8); // Soft coral
       case ExpiryStatus.expiringSoon:
-        return const Color(0xFFFFF0E0); // Soft peach
+        return const Color(0xFFFFF2EB); // Soft peach (AppColors.peachLight)
       case ExpiryStatus.normal:
         return const Color(0xFFEDF7ED); // Muted green
     }
@@ -118,7 +118,7 @@ class CategoryFoodItem {
       case ExpiryStatus.urgent:
         return const Color(0xFFD32F2F); // Soft coral red
       case ExpiryStatus.expiringSoon:
-        return const Color(0xFFD96B27); // Soft warm orange
+        return const Color(0xFFFF7A5C); // Soft peach/coral (AppColors.peachPrimary)
       case ExpiryStatus.normal:
         return const Color(0xFF2E7D32); // Subtle green
     }

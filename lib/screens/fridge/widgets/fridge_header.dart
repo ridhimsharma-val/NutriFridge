@@ -86,10 +86,10 @@ class FridgeHeader extends StatelessWidget {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFF3E0),
+                        color: AppColors.peachLight,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: const Color(0xFFFFCC80),
+                          color: AppColors.peachBorder,
                           width: 1,
                         ),
                       ),
@@ -100,7 +100,7 @@ class FridgeHeader extends StatelessWidget {
                             width: 5,
                             height: 5,
                             decoration: const BoxDecoration(
-                              color: Color(0xFFF57C00),
+                              color: AppColors.peachAccent,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -108,7 +108,7 @@ class FridgeHeader extends StatelessWidget {
                           Text(
                             '$expiringCount expiring soon',
                             style: AppTypography.badgeText.copyWith(
-                              color: const Color(0xFFE65100),
+                              color: AppColors.peachPrimary,
                               fontWeight: FontWeight.w700,
                               fontSize: 9.5,
                             ),

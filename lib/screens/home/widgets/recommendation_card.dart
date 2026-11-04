@@ -464,11 +464,15 @@ class RecommendationCard extends StatelessWidget {
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.94),
+                      color: AppColors.peachLight.withValues(alpha: 0.95),
                       borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppColors.peachBorder,
+                        width: 1.0,
+                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.06),
+                          color: AppColors.peachPrimary.withValues(alpha: 0.12),
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
@@ -479,10 +483,10 @@ class RecommendationCard extends StatelessWidget {
                           ? recommendation.mealType.toUpperCase()
                           : recommendation.tag,
                       style: AppTypography.badgeText.copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
+                        color: AppColors.peachPrimary,
+                        fontWeight: FontWeight.w700,
                         fontSize: 11,
-                        letterSpacing: 0.2,
+                        letterSpacing: 0.3,
                       ),
                     ),
                   ),

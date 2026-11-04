@@ -526,19 +526,19 @@ class _LogMealScreenState extends State<LogMealScreen> {
           height: 50,
           child: OutlinedButton.icon(
             onPressed: () => _pickImage(ImageSource.gallery),
-            icon: const Icon(Icons.photo_library_outlined, size: 19),
+            icon: const Icon(Icons.photo_library_outlined, size: 19, color: AppColors.peachPrimary),
             label: const Text(
               'Choose from Gallery',
               style: TextStyle(
                 fontSize: 15,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
                 letterSpacing: 0.1,
               ),
             ),
             style: OutlinedButton.styleFrom(
-              backgroundColor: AppColors.cardWhite,
-              foregroundColor: AppColors.textPrimary,
-              side: const BorderSide(color: AppColors.cardBorder, width: 1.2),
+              backgroundColor: AppColors.peachLight.withValues(alpha: 0.5),
+              foregroundColor: AppColors.peachPrimary,
+              side: const BorderSide(color: AppColors.peachBorder, width: 1.2),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
               ),

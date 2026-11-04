@@ -178,8 +178,12 @@ class MealDetailScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.92),
+                  color: AppColors.peachLight.withValues(alpha: 0.95),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.peachBorder,
+                    width: 1,
+                  ),
                 ),
                 child: Text(
                   meal.tag,
@@ -187,7 +191,7 @@ class MealDetailScreen extends StatelessWidget {
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.2,
-                    color: AppColors.tealPrimary,
+                    color: AppColors.peachPrimary,
                   ),
                 ),
               ),
@@ -287,7 +291,7 @@ class MealDetailScreen extends StatelessWidget {
                   label: 'Protein',
                   value: '${meal.proteinGrams}',
                   unit: 'g',
-                  accentColor: AppColors.peachPrimary,
+                  accentColor: AppColors.tealAccent,
                 ),
               ),
               Container(width: 1, height: 32, color: const Color(0xFFF0F4F2)),
@@ -296,7 +300,7 @@ class MealDetailScreen extends StatelessWidget {
                   label: 'Carbs',
                   value: '${meal.carbsGrams}',
                   unit: 'g',
-                  accentColor: AppColors.amberPrimary,
+                  accentColor: AppColors.peachPrimary,
                 ),
               ),
               Container(width: 1, height: 32, color: const Color(0xFFF0F4F2)),
@@ -491,7 +495,7 @@ class MealDetailScreen extends StatelessWidget {
         indicatorColor = AppColors.tealPrimary;
         break;
       case IngredientAvailability.partial:
-        indicatorColor = AppColors.amberPrimary;
+        indicatorColor = AppColors.peachPrimary;
         break;
       case IngredientAvailability.notTracked:
         indicatorColor = const Color(0xFFB4C4BC);

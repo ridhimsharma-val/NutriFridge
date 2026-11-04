@@ -245,6 +245,9 @@ class _NutritionPreferencesPopupState extends State<NutritionPreferencesPopup> {
                         label: goal,
                         isSelected: isSelected,
                         onTap: () => _onToggleGoal(goal),
+                        selectedBgColor: AppColors.peachLight,
+                        selectedBorderColor: AppColors.peachPrimary,
+                        selectedTextColor: AppColors.peachPrimary,
                       );
                     }).toList(),
                   ),
@@ -421,7 +424,14 @@ class _NutritionPreferencesPopupState extends State<NutritionPreferencesPopup> {
     required String label,
     required bool isSelected,
     required VoidCallback onTap,
+    Color? selectedBgColor,
+    Color? selectedBorderColor,
+    Color? selectedTextColor,
   }) {
+    final bg = selectedBgColor ?? AppColors.tealPrimary;
+    final border = selectedBorderColor ?? AppColors.tealPrimary;
+    final text = selectedTextColor ?? Colors.white;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -431,10 +441,10 @@ class _NutritionPreferencesPopupState extends State<NutritionPreferencesPopup> {
           duration: const Duration(milliseconds: 160),
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.tealPrimary : const Color(0xFFF6FAF7),
+            color: isSelected ? bg : const Color(0xFFF6FAF7),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isSelected ? AppColors.tealPrimary : const Color(0xFFDFE7E2),
+              color: isSelected ? border : const Color(0xFFDFE7E2),
               width: 1.0,
             ),
           ),
@@ -443,7 +453,7 @@ class _NutritionPreferencesPopupState extends State<NutritionPreferencesPopup> {
             style: TextStyle(
               fontSize: 12.5,
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-              color: isSelected ? Colors.white : AppColors.textPrimary,
+              color: isSelected ? text : AppColors.textPrimary,
             ),
           ),
         ),

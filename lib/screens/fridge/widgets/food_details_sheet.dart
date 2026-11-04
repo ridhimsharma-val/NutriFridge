@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../models/notification_data.dart';
 import '../models/category_item.dart';
 
@@ -562,9 +563,9 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
               OutlinedButton(
                 onPressed: _isProcessing ? null : _handleAddFood,
                 style: OutlinedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF0FDF4),
-                  foregroundColor: const Color(0xFF0D9488),
-                  side: const BorderSide(color: Color(0xFF0D9488), width: 1.4),
+                  backgroundColor: AppColors.peachLight,
+                  foregroundColor: AppColors.peachPrimary,
+                  side: const BorderSide(color: AppColors.peachPrimary, width: 1.4),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(24),
                   ),

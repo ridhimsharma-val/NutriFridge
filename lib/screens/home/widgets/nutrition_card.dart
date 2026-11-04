@@ -196,7 +196,7 @@ class NutritionCard extends StatelessWidget {
                             value:
                                 '${nutritionData.protein.amountGrams} ${nutritionData.protein.unit}',
                             progress: nutritionData.protein.progress,
-                            accentColor: AppColors.peachPrimary,
+                            accentColor: AppColors.tealPrimary,
                           ),
                         ),
                         Container(
@@ -210,7 +210,7 @@ class NutritionCard extends StatelessWidget {
                             value:
                                 '${nutritionData.carbs.amountGrams} ${nutritionData.carbs.unit}',
                             progress: nutritionData.carbs.progress,
-                            accentColor: AppColors.amberPrimary,
+                            accentColor: AppColors.peachPrimary,
                           ),
                         ),
                         Container(
@@ -224,7 +224,7 @@ class NutritionCard extends StatelessWidget {
                             value:
                                 '${nutritionData.fat.amountGrams} ${nutritionData.fat.unit}',
                             progress: nutritionData.fat.progress,
-                            accentColor: const Color(0xFF3B9EBA),
+                            accentColor: AppColors.amberPrimary,
                           ),
                         ),
                       ],
@@ -369,7 +369,7 @@ class NutritionCard extends StatelessWidget {
           consumed: nutritionData.protein.amountGrams,
           target: nutritionData.protein.targetGrams,
           unit: 'g',
-          accentColor: AppColors.peachPrimary,
+          accentColor: AppColors.tealPrimary,
         ),
         const SizedBox(height: 9),
         _buildTargetProgressBar(
@@ -377,7 +377,7 @@ class NutritionCard extends StatelessWidget {
           consumed: nutritionData.carbs.amountGrams,
           target: nutritionData.carbs.targetGrams,
           unit: 'g',
-          accentColor: AppColors.amberPrimary,
+          accentColor: AppColors.peachPrimary,
         ),
         const SizedBox(height: 9),
         _buildTargetProgressBar(
@@ -385,7 +385,7 @@ class NutritionCard extends StatelessWidget {
           consumed: nutritionData.fat.amountGrams,
           target: nutritionData.fat.targetGrams,
           unit: 'g',
-          accentColor: const Color(0xFF3B9EBA),
+          accentColor: AppColors.amberPrimary,
         ),
       ],
     );

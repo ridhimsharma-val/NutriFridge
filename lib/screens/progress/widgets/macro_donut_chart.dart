@@ -31,9 +31,9 @@ class _MacroDonutChartState extends State<MacroDonutChart>
   late AnimationController _animController;
   late Animation<double> _animation;
 
-  static const Color proteinColor = Color(0xFF2A8B74); // Teal / Green
-  static const Color carbsColor = Color(0xFFE07854); // Soft Peach / Coral
-  static const Color fatColor = Color(0xFFD4A343); // Muted Golden Yellow
+  static const Color proteinColor = AppColors.tealAccent; // Teal / Green
+  static const Color carbsColor = AppColors.peachPrimary; // Soft Peach / Coral
+  static const Color fatColor = AppColors.amberPrimary; // Muted Golden Yellow
 
   @override
   void initState() {

@@ -2030,9 +2030,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               Expanded(child: _buildMacroMini('Calories', '$cals kcal', AppColors.tealPrimary)),
-              Expanded(child: _buildMacroMini('Protein', '${protein}g', const Color(0xFF3B82F6))),
-              Expanded(child: _buildMacroMini('Carbs', '${carbs}g', const Color(0xFFF59E0B))),
-              Expanded(child: _buildMacroMini('Fat', '${fat}g', const Color(0xFFEC4899))),
+              Expanded(child: _buildMacroMini('Protein', '${protein}g', AppColors.tealAccent)),
+              Expanded(child: _buildMacroMini('Carbs', '${carbs}g', AppColors.peachPrimary)),
+              Expanded(child: _buildMacroMini('Fat', '${fat}g', AppColors.amberPrimary)),
             ],
           ),
           // Ingredients deduction section
@@ -2234,7 +2234,13 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   Widget _buildSelectedImagePreview() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Colors.white,
+      decoration: const BoxDecoration(
+        color: AppColors.peachCard,
+        border: Border(
+          top: BorderSide(color: AppColors.peachBorder, width: 1),
+          bottom: BorderSide(color: AppColors.peachBorder, width: 0.8),
+        ),
+      ),
       child: Row(
         children: [
           ClipRRect(

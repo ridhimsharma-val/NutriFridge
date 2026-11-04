@@ -104,15 +104,15 @@ class _MealItemCard extends StatelessWidget {
     // Upcoming: soft neutral / peach treatment
     final Color backgroundColor = isCompleted
         ? AppColors.mealCompletedBg
-        : const Color(0xFFFBF8F5);
+        : AppColors.peachCard;
 
     final Color borderColor = isCompleted
         ? const Color(0xFFC7EBDD)
-        : const Color(0xFFEDE7DF);
+        : AppColors.peachBorder.withValues(alpha: 0.7);
 
     final Color checkColor = isCompleted
         ? AppColors.tealAccent
-        : const Color(0xFFAEBAB3);
+        : AppColors.peachPrimary.withValues(alpha: 0.75);
 
     return InkWell(
       onTap: onTap,
@@ -149,7 +149,7 @@ class _MealItemCard extends StatelessWidget {
                 border: Border.all(
                   color: isCompleted
                       ? AppColors.tealAccent.withValues(alpha: 0.5)
-                      : const Color(0xFFD3DCD6),
+                      : AppColors.peachBorder,
                   width: 1.4,
                 ),
               ),
