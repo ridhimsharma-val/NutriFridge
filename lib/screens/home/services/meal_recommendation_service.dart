@@ -296,13 +296,28 @@ class MealRecommendationService {
         'todayNutrition': nutritionContext,
       };
 
-      Map<String, dynamic> response;
-      if (AiAssistantService.mockHandler != null) {
-        response = await AiAssistantService.mockHandler!(requestPayload);
-      } else {
+      Map<String, dynamic> response = await AiAssistantService.sendRequest(
+        message: requestPayload['message'] as String,
+        actionHint: 'meal_recommendation',
+        extraPayload: {
+          'currentMealPeriod': slot.displayName,
+          'clientLocalTime': now.toIso8601String(),
+        },
+      );
+
+      // If n8n backend rejects 'meal_recommendation' with HTTP 400 (e.g. un-updated live deployment),
+      // gracefully fall back to actionHint: 'auto' with recommendation context
+      if (response['error'] != null &&
+          response['error'].toString().contains('400') &&
+          response['action'] == 'error') {
+        debugPrint('[MealRecommendationService] Live n8n rejected meal_recommendation; falling back to actionHint: auto');
         response = await AiAssistantService.sendRequest(
           message: requestPayload['message'] as String,
-          actionHint: 'meal_recommendation',
+          actionHint: 'auto',
+          extraPayload: {
+            'currentMealPeriod': slot.displayName,
+            'clientLocalTime': now.toIso8601String(),
+          },
         );
       }
 

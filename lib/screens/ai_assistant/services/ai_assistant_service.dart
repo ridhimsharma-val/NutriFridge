@@ -80,6 +80,7 @@ class AiAssistantService {
     String? mimeType,
     String actionHint = 'auto',
     List<AiChatMessage> history = const [],
+    Map<String, dynamic>? extraPayload,
   }) async {
     final String source = (imageBase64 != null && message.isNotEmpty)
         ? 'text_image'
@@ -105,6 +106,7 @@ class AiAssistantService {
       'userPreferences': getProfilePreferences(),
       'todayNutrition': getNutritionContext(),
       'locale': 'en-IN',
+      ...?extraPayload,
     };
 
     if (mockHandler != null) {
