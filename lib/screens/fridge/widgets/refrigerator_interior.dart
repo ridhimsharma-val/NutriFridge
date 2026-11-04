@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'cold_mist_effect.dart';
 import 'food_items.dart';
 
 /// Physical Refrigerator Cavity Interior
@@ -19,12 +20,14 @@ class RefrigeratorInterior extends StatelessWidget {
   final double lightIntensity;
   final ValueChanged<String>? onCategoryTap;
   final String? highlightedCategory;
+  final Animation<double>? mistAnimation;
 
   const RefrigeratorInterior({
     super.key,
     required this.lightIntensity,
     this.onCategoryTap,
     this.highlightedCategory,
+    this.mistAnimation,
   });
 
   bool _isCategoryHighlighted(String label) {
@@ -209,6 +212,17 @@ class RefrigeratorInterior extends StatelessWidget {
                 ),
               ),
             ),
+
+            // 4b. Realistic Cold Air Mist (Originates inside cavity, behind food & shelves)
+            if (mistAnimation != null)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: ColdMistEffect(
+                    animation: mistAnimation!,
+                    isFreezer: false,
+                  ),
+                ),
+              ),
 
             // 5. Interior Shelving & Category Levels
             Padding(

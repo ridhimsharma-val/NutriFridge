@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'cold_mist_effect.dart';
 import 'food_items.dart';
 
 /// Top Freezer Cavity Interior
@@ -16,12 +17,14 @@ class FreezerInterior extends StatelessWidget {
   final double lightIntensity;
   final ValueChanged<String>? onCategoryTap;
   final String? highlightedCategory;
+  final Animation<double>? mistAnimation;
 
   const FreezerInterior({
     super.key,
     required this.lightIntensity,
     this.onCategoryTap,
     this.highlightedCategory,
+    this.mistAnimation,
   });
 
   bool _isCategoryHighlighted(String label) {
@@ -140,6 +143,17 @@ class FreezerInterior extends StatelessWidget {
                 ),
               ),
             ),
+
+            // 3b. Realistic Cold Air Mist (Originates inside cavity, behind food & shelves)
+            if (mistAnimation != null)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: ColdMistEffect(
+                    animation: mistAnimation!,
+                    isFreezer: true,
+                  ),
+                ),
+              ),
 
             // 4. Main Freezer Category Zones (3 Horizontal Levels)
             Padding(

@@ -97,6 +97,7 @@ class _FridgePageState extends State<FridgePage> {
               child: Center(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
+                  clipBehavior: Clip.none,
                   padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
                   child: Center(
                     child: TopFreezerRefrigerator(

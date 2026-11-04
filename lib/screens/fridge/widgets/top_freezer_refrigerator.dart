@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../models/fridge_preferences.dart';
+import 'cold_mist_effect.dart';
 import 'freezer_interior.dart';
 import 'refrigerator_interior.dart';
 
@@ -43,9 +44,11 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
     with TickerProviderStateMixin {
   late AnimationController _freezerController;
   late Animation<double> _freezerAnimation;
+  late AnimationController _freezerMistController;
 
   late AnimationController _fridgeController;
   late Animation<double> _fridgeAnimation;
+  late AnimationController _fridgeMistController;
 
   @override
   void initState() {
@@ -71,6 +74,18 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
       curve: Curves.easeInOutCubic,
     );
 
+    // 3. Freezer Cold Mist Controller (~1500ms directional vapor flow)
+    _freezerMistController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+
+    // 4. Main Refrigerator Cold Mist Controller (~1500ms directional vapor flow)
+    _fridgeMistController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+
     if (widget.isFreezerOpen) _freezerController.value = 1.0;
     if (widget.isFridgeOpen) _fridgeController.value = 1.0;
   }
@@ -81,15 +96,27 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
     if (widget.isFreezerOpen != oldWidget.isFreezerOpen) {
       if (widget.isFreezerOpen) {
         _freezerController.forward();
+        _freezerMistController.forward(from: 0.0);
       } else {
         _freezerController.reverse();
+        _freezerMistController.animateTo(
+          0.0,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
       }
     }
     if (widget.isFridgeOpen != oldWidget.isFridgeOpen) {
       if (widget.isFridgeOpen) {
         _fridgeController.forward();
+        _fridgeMistController.forward(from: 0.0);
       } else {
         _fridgeController.reverse();
+        _fridgeMistController.animateTo(
+          0.0,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
       }
     }
   }
@@ -97,7 +124,9 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
   @override
   void dispose() {
     _freezerController.dispose();
+    _freezerMistController.dispose();
     _fridgeController.dispose();
+    _fridgeMistController.dispose();
     super.dispose();
   }
 
@@ -120,13 +149,59 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
     final double bottomCompartmentHeight =
         isFreezerOnTop ? fridgeHeight : freezerHeight;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
+    // ------------------------------------------------------------------------
+    // COORDINATE ALIGNMENT & MIST OVERLAY GEOMETRY
+    // The ambient floor shadow width defines the full Column width (292.0 px)
+    // within the parent Stack. Center-aligned, the 272.0 px cabinet body is inset
+    // by exactly (292.0 - 272.0) / 2 = 10.0 px from the parent Stack's left boundary.
+    // Inside the cabinet, the compartment cavity opening starts at inset 4.0 px.
+    // Therefore, the real cavity opening begins at Stack X = 10.0 + 4.0 = 14.0 px!
+    // ------------------------------------------------------------------------
+    const double parentStackWidth = cabinetWidth + 20.0; // 292.0 px
+    const double cabinetOriginX = (parentStackWidth - cabinetWidth) / 2.0; // 10.0 px
+    const double cabinetInsetX = 4.0;
+    const double openingOriginX = cabinetOriginX + cabinetInsetX; // 14.0 px in Stack
+    const double openingWidth = cabinetWidth - (cabinetInsetX * 2.0); // 264.0 px opening
+
+    // Symmetrical horizontal overflow beyond the compartment opening
+    const double mistOverflowX = 22.0;
+    const double mistOverlayWidth = openingWidth + (mistOverflowX * 2.0); // 308.0 px
+    // Exactly aligns the painter's innerRect.left with the real compartment opening
+    const double overlayLeft = openingOriginX - mistOverflowX; // 14.0 - 22.0 = -8.0 px
+
+    // Vertical Canvas Dimensions:
+    // Upper Compartment Overlay:
+    // When upper is freezer (top-freezer configuration), allow 155px of controlled downward spill
+    // across the pocket seam and down across the lower refrigerator door exterior!
+    const double upperOverflowTop = 20.0;
+    final double upperOverflowBottom =
+        isFreezerOnTop ? (pocketGapHeight + 155.0) : 65.0;
+    final double upperOverlayHeight =
+        topCompartmentHeight + upperOverflowTop + upperOverflowBottom;
+    const double upperOverlayTop = 4.0 - upperOverflowTop;
+
+    // Lower Compartment Overlay:
+    // When lower is freezer (bottom-freezer configuration), allow 140px of downward spill
+    // cascading over the sill toward the leveling feet and floor shadow!
+    final double lowerCompartmentTop =
+        4.0 + topCompartmentHeight + pocketGapHeight;
+    const double lowerOverflowTop = 20.0;
+    final double lowerOverflowBottom = (!isFreezerOnTop) ? 140.0 : 65.0;
+    final double lowerOverlayHeight =
+        bottomCompartmentHeight + lowerOverflowTop + lowerOverflowBottom;
+    final double lowerOverlayTop = lowerCompartmentTop - lowerOverflowTop;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.topCenter,
       children: [
-        // ============================================================
-        // 1. PHYSICAL REFRIGERATOR CABINET BODY
-        // ============================================================
-        Container(
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ============================================================
+            // 1. PHYSICAL REFRIGERATOR CABINET BODY
+            // ============================================================
+            Container(
           width: cabinetWidth,
           height: totalCabinetHeight,
           decoration: BoxDecoration(
@@ -285,7 +360,65 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
           ),
         ),
       ],
-    );
+    ),
+
+    // ============================================================
+    // 4. ESCAPING COLD MIST OVERLAYS (Zone A -> Zone B)
+    // Flows naturally out of the refrigerator across the front opening
+    // and disperses into the space in front of and around the appliance.
+    // ============================================================
+
+    // Upper Compartment Escaping Mist Overlay
+    Positioned(
+      top: upperOverlayTop,
+      left: overlayLeft,
+      width: mistOverlayWidth,
+      height: upperOverlayHeight,
+      child: IgnorePointer(
+        child: ColdMistEffect(
+          animation: isFreezerOnTop
+              ? _freezerMistController
+              : _fridgeMistController,
+          doorAnimation: isFreezerOnTop
+              ? _freezerAnimation
+              : _fridgeAnimation,
+          isFreezer: isFreezerOnTop,
+          innerRect: Rect.fromLTWH(
+            mistOverflowX,
+            upperOverflowTop,
+            openingWidth,
+            topCompartmentHeight,
+          ),
+        ),
+      ),
+    ),
+
+    // Lower Compartment Escaping Mist Overlay
+    Positioned(
+      top: lowerOverlayTop,
+      left: overlayLeft,
+      width: mistOverlayWidth,
+      height: lowerOverlayHeight,
+      child: IgnorePointer(
+        child: ColdMistEffect(
+          animation: isFreezerOnTop
+              ? _fridgeMistController
+              : _freezerMistController,
+          doorAnimation: isFreezerOnTop
+              ? _fridgeAnimation
+              : _freezerAnimation,
+          isFreezer: !isFreezerOnTop,
+          innerRect: Rect.fromLTWH(
+            mistOverflowX,
+            lowerOverflowTop,
+            openingWidth,
+            bottomCompartmentHeight,
+          ),
+        ),
+      ),
+    ),
+  ],
+);
   }
 
   // --------------------------------------------------------------------------

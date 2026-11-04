@@ -18,6 +18,8 @@ import 'package:nutrifridge/screens/home/widgets/recommendation_card.dart';
 import 'package:nutrifridge/screens/fridge/models/fridge_preferences.dart';
 import 'package:nutrifridge/screens/ai_assistant/ai_assistant_screen.dart';
 import 'package:nutrifridge/screens/ai_assistant/services/ai_assistant_service.dart';
+import 'package:nutrifridge/screens/fridge/widgets/cold_mist_effect.dart';
+import 'package:nutrifridge/screens/fridge/widgets/top_freezer_refrigerator.dart';
 import 'package:nutrifridge/screens/fridge/widgets/food_details_sheet.dart';
 import 'package:nutrifridge/screens/home/services/meal_recommendation_service.dart';
 import 'package:nutrifridge/screens/profile/models/user_profile_data.dart';
@@ -3605,6 +3607,162 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.byType(HomeScreen), findsOneWidget);
+    });
+  });
+
+  group('NUTRIFRIDGE — Realistic Cold Mist Opening Animation', () {
+    testWidgets('ColdMistEffect renders organic vapor wisps during animation and shrinks when idle', (WidgetTester tester) async {
+      final controller = AnimationController(
+        vsync: const TestVSync(),
+        duration: const Duration(milliseconds: 1500),
+      );
+      addTearDown(() => controller.dispose());
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 270,
+              height: 380,
+              child: ColdMistEffect(
+                animation: controller,
+                isFreezer: false,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // 1. Idle at 0.0 -> SizedBox.shrink()
+      expect(
+        find.descendant(
+          of: find.byType(ColdMistEffect),
+          matching: find.byType(CustomPaint),
+        ),
+        findsNothing,
+      );
+
+      // 2. Mid-animation at 0.35 -> CustomPaint with _ColdMistPainter active
+      controller.value = 0.35;
+      await tester.pump();
+      expect(
+        find.descendant(
+          of: find.byType(ColdMistEffect),
+          matching: find.byType(CustomPaint),
+        ),
+        findsOneWidget,
+      );
+
+      // 3. Completed at 1.0 -> SizedBox.shrink() (completely clear after finishing)
+      controller.value = 1.0;
+      await tester.pump();
+      expect(
+        find.descendant(
+          of: find.byType(ColdMistEffect),
+          matching: find.byType(CustomPaint),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('Interactive Refrigerator: Opening compartment triggers mist and dissipates smoothly', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(const NutriFridgeApp());
+      await tester.pumpAndSettle();
+
+      // Navigate to Fridge screen
+      await tester.tap(find.byIcon(Icons.kitchen_rounded));
+      await tester.pumpAndSettle();
+
+      // Verify fridge is closed initially
+      expect(find.byKey(const ValueKey('fridge_door_touch_target')), findsOneWidget);
+
+      // 1. Tap to open fridge door
+      await tester.tap(find.byKey(const ValueKey('fridge_door_touch_target')));
+      await tester.pump(); // Start opening transition
+
+      // Advance by 300ms: door is fading, mist is active
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(ColdMistEffect), findsWidgets);
+
+      // Advance to full completion (1200ms)
+      await tester.pumpAndSettle();
+
+      // Food items and shelves are completely clear and accessible
+      expect(find.text('DAIRY PRODUCTS'), findsOneWidget);
+      expect(find.text('VEGETABLES'), findsOneWidget);
+
+      // 2. Tap to close fridge door (quick dissipation)
+      await tester.tap(find.byKey(const ValueKey('fridge_door_touch_target')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+
+      // 3. Tap to open freezer door (freezer mist triggers independently)
+      await tester.tap(find.byKey(const ValueKey('freezer_door_touch_target')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(ColdMistEffect), findsWidgets);
+
+      await tester.pumpAndSettle();
+      expect(find.text('ICE CREAM'), findsOneWidget);
+      expect(find.text('FROZEN FOOD'), findsOneWidget);
+
+      // 4. Rapid open/close interaction safety test
+      await tester.tap(find.byKey(const ValueKey('freezer_door_touch_target')));
+      await tester.pump(const Duration(milliseconds: 80));
+      await tester.tap(find.byKey(const ValueKey('freezer_door_touch_target')));
+      await tester.pump(const Duration(milliseconds: 80));
+      await tester.tap(find.byKey(const ValueKey('freezer_door_touch_target')));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Downward cold mist spill and coordinate alignment geometry test', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: TopFreezerRefrigerator(
+              isFreezerOpen: true,
+              isFridgeOpen: false,
+              onFreezerToggle: () {},
+              onFridgeToggle: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Find the upper ColdMistEffect overlay
+      final mistWidgets = tester.widgetList<ColdMistEffect>(find.byType(ColdMistEffect)).toList();
+      expect(mistWidgets.isNotEmpty, isTrue);
+
+      final freezerMist = mistWidgets.firstWhere((w) => w.isFreezer);
+      expect(freezerMist.innerRect, isNotNull);
+      expect(freezerMist.innerRect!.width, equals(264.0));
+      expect(freezerMist.innerRect!.left, equals(22.0));
+
+      // Verify Positioned ancestor geometry for upper freezer downward spill
+      final positionedWidgets = tester.widgetList<Positioned>(
+        find.ancestor(of: find.byWidget(freezerMist), matching: find.byType(Positioned)),
+      ).toList();
+      expect(positionedWidgets.isNotEmpty, isTrue);
+
+      final overlayPositioned = positionedWidgets.first;
+      expect(overlayPositioned.left, equals(-8.0)); // Aligns innerRect.left (-8 + 22) exactly with openingOriginX (14.0)
+      expect(overlayPositioned.width, equals(308.0)); // 264 + 2 * 22
+      // Canvas height must extend at least 150px below the 164px freezer opening + 14px seam
+      expect(overlayPositioned.height! >= 340.0, isTrue);
+
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
     });
   });
 }
