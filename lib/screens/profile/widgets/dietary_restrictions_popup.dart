@@ -289,10 +289,10 @@ class _DietaryRestrictionsPopupState extends State<DietaryRestrictionsPopup> {
                             bottom: 5,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEEF6F2),
+                            color: AppColors.peachLight,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: AppColors.tealPrimary.withValues(alpha: 0.25),
+                              color: AppColors.peachBorder,
                               width: 1.0,
                             ),
                           ),
@@ -304,7 +304,7 @@ class _DietaryRestrictionsPopupState extends State<DietaryRestrictionsPopup> {
                                 style: const TextStyle(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w600,
-                                  color: AppColors.tealPrimary,
+                                  color: AppColors.peachText,
                                 ),
                               ),
                               const SizedBox(width: 4),
@@ -318,7 +318,7 @@ class _DietaryRestrictionsPopupState extends State<DietaryRestrictionsPopup> {
                                   child: const Icon(
                                     Icons.close_rounded,
                                     size: 14,
-                                    color: AppColors.textSecondary,
+                                    color: AppColors.peachText,
                                   ),
                                 ),
                               ),

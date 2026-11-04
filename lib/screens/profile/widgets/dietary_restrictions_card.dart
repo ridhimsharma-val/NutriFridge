@@ -56,9 +56,9 @@ class DietaryRestrictionsCard extends StatelessWidget {
         child: Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: AppColors.cardWhite,
+            color: AppColors.peachCard,
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppColors.cardBorder, width: 1.2),
+            border: Border.all(color: AppColors.peachBorder, width: 1.2),
             boxShadow: const [AppColors.softShadow],
           ),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -111,7 +111,7 @@ class DietaryRestrictionsCard extends StatelessWidget {
               const Icon(
                 Icons.chevron_right_rounded,
                 size: 22,
-                color: AppColors.textTertiary,
+                color: AppColors.peachPrimary,
               ),
             ],
           ),

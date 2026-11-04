@@ -276,11 +276,11 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF6FAF8),
+                color: AppColors.peachCard,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: AppColors.tealPrimary.withValues(alpha: 0.15),
-                  width: 1,
+                  color: AppColors.peachBorder,
+                  width: 1.2,
                 ),
               ),
               child: Column(

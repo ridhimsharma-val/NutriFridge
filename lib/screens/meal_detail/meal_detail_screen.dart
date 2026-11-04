@@ -260,12 +260,34 @@ class MealDetailScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              Text(
-                '${meal.prepTimeMinutes} mins prep',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.tealPrimary,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.peachLight,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: AppColors.peachBorder,
+                    width: 1.0,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.schedule_rounded,
+                      size: 13,
+                      color: AppColors.peachText,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${meal.prepTimeMinutes} mins prep',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.peachText,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -387,11 +409,11 @@ class MealDetailScreen extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: AppColors.cardCream,
+            color: AppColors.peachCard,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: const Color(0xFFE9F1EC),
-              width: 1,
+              color: AppColors.peachBorder,
+              width: 1.2,
             ),
           ),
           child: Column(
@@ -407,7 +429,7 @@ class MealDetailScreen extends StatelessWidget {
                       width: 5,
                       height: 5,
                       decoration: const BoxDecoration(
-                        color: AppColors.tealPrimary,
+                        color: AppColors.peachPrimary,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -446,12 +468,20 @@ class MealDetailScreen extends StatelessWidget {
               'Ingredients',
               style: AppTypography.sectionTitle.copyWith(fontSize: 16),
             ),
-            Text(
-              '${meal.ingredients.length} items',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textTertiary,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.peachLight,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.peachBorder, width: 0.8),
+              ),
+              child: Text(
+                '${meal.ingredients.length} items',
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.peachText,
+                ),
               ),
             ),
           ],
@@ -545,20 +575,32 @@ class MealDetailScreen extends StatelessWidget {
           ),
           const SizedBox(width: 8),
 
-          // Inventory Status Label (subtle text, not large colored badges)
+          // Inventory Status Label
           Flexible(
-            child: Text(
-              item.statusLabel,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: item.availability == IngredientAvailability.available
-                    ? AppColors.tealPrimary
-                    : (item.availability == IngredientAvailability.partial
-                        ? AppColors.amberPrimary
-                        : AppColors.textTertiary),
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: item.availability == IngredientAvailability.partial ? 6 : 0,
+                vertical: item.availability == IngredientAvailability.partial ? 2 : 0,
               ),
-              overflow: TextOverflow.ellipsis,
+              decoration: item.availability == IngredientAvailability.partial
+                  ? BoxDecoration(
+                      color: AppColors.peachLight,
+                      borderRadius: BorderRadius.circular(6),
+                    )
+                  : null,
+              child: Text(
+                item.statusLabel,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: item.availability == IngredientAvailability.available
+                      ? AppColors.tealPrimary
+                      : (item.availability == IngredientAvailability.partial
+                          ? AppColors.peachText
+                          : AppColors.textTertiary),
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
         ],

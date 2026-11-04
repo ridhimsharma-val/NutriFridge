@@ -399,12 +399,23 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
 
               // 5. Distinct Available Quantity in Fridge Display
               Center(
-                child: Text(
-                  'Available in fridge: ${_formatAmount(_availableAmount, _unit)}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF475569),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.peachCard,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.peachBorder,
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Text(
+                    'Available in fridge: ${_formatAmount(_availableAmount, _unit)}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.peachText,
+                    ),
                   ),
                 ),
               ),

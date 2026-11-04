@@ -159,14 +159,14 @@ class RecommendationCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.tealPrimary,
+                    color: AppColors.peachText,
                   ),
                 ),
                 const SizedBox(width: 4),
                 const Icon(
                   Icons.arrow_forward_rounded,
                   size: 15,
-                  color: AppColors.tealPrimary,
+                  color: AppColors.peachText,
                 ),
               ],
             ),
@@ -306,14 +306,14 @@ class RecommendationCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.tealPrimary,
+                    color: AppColors.peachText,
                   ),
                 ),
                 const SizedBox(width: 4),
                 const Icon(
                   Icons.arrow_forward_rounded,
                   size: 15,
-                  color: AppColors.tealPrimary,
+                  color: AppColors.peachText,
                 ),
               ],
             ),
@@ -528,8 +528,12 @@ class RecommendationCard extends StatelessWidget {
                             vertical: 5,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.tealLight.withValues(alpha: 0.65),
+                            color: AppColors.peachLight.withValues(alpha: 0.7),
                             borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: AppColors.peachBorder,
+                              width: 1.0,
+                            ),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -539,7 +543,7 @@ class RecommendationCard extends StatelessWidget {
                                 Text(
                                   reason,
                                   style: AppTypography.badgeText.copyWith(
-                                    color: AppColors.tealPrimary,
+                                    color: AppColors.peachText,
                                     fontWeight: FontWeight.w600,
                                     fontSize: 11,
                                   ),
@@ -561,18 +565,18 @@ class RecommendationCard extends StatelessWidget {
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: AppColors.cardWhite,
+                      color: AppColors.peachLight,
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: AppColors.peachBorder,
-                        width: 1,
+                        width: 1.2,
                       ),
                       boxShadow: const [AppColors.cardShadow],
                     ),
                     child: const Icon(
                       Icons.arrow_forward_rounded,
                       size: 17,
-                      color: AppColors.tealPrimary,
+                      color: AppColors.peachText,
                     ),
                   ),
                 ],

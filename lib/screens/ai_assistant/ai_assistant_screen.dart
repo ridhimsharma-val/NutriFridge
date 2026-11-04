@@ -1508,6 +1508,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   }
 
   Widget _buildAssistantBubble(AiChatMessage message) {
+    final bool isMealMessage = message.meal != null || message.action == 'log_meal';
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Align(
@@ -1515,14 +1516,17 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         child: Container(
           constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.88),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isMealMessage ? AppColors.peachCard : Colors.white,
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(4),
               topRight: Radius.circular(18),
               bottomLeft: Radius.circular(18),
               bottomRight: Radius.circular(18),
             ),
-            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+            border: Border.all(
+              color: isMealMessage ? AppColors.peachBorder : const Color(0xFFE2E8F0),
+              width: 1.2,
+            ),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x0D000000),
@@ -1992,9 +1996,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBF5),
+        color: AppColors.peachCard,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFFE0B2), width: 1.2),
+        border: Border.all(color: AppColors.peachBorder, width: 1.2),
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -2215,8 +2219,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   Widget _buildClarificationCard(String question) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F4F6),
+        color: AppColors.peachLight,
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.peachBorder, width: 1.0),
       ),
       padding: const EdgeInsets.all(10),
       child: Column(
@@ -2224,11 +2229,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         children: [
           Row(
             children: const [
-              Icon(Icons.help_outline_rounded, size: 15, color: AppColors.textSecondary),
+              Icon(Icons.help_outline_rounded, size: 15, color: AppColors.peachText),
               SizedBox(width: 6),
               Text(
                 'Clarification Needed',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.textSecondary),
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.peachText),
               ),
             ],
           ),
