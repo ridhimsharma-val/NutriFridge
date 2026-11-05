@@ -80,10 +80,19 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
                     children: [
                       // Top Collapsed Summary Row
                       _buildSummaryRow(wellnessData),
-                      if (isExpanded) ...[
-                        const SizedBox(height: 16),
-                        _buildExpandedContent(wellnessData),
-                      ],
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                        child: isExpanded
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 16),
+                                  _buildExpandedContent(wellnessData),
+                                ],
+                              )
+                            : const SizedBox.shrink(),
+                      ),
                     ],
                   )
                 : _buildEmptyState(),
@@ -146,20 +155,36 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                "Today's Wellness",
-                style: AppTypography.cardTitle.copyWith(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      "Today's Wellness",
+                      style: AppTypography.cardTitle.copyWith(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    widget.isExpanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    size: 17,
+                    color: AppColors.tealPrimary.withValues(alpha: 0.7),
+                  ),
+                ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 5),
               Text(
                 wellnessData.statusText,
                 style: AppTypography.scoreSubtitle.copyWith(
                   color: AppColors.tealPrimary,
-                  fontSize: 14.5,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -171,20 +196,43 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.cardWhite.withValues(alpha: 0.88),
+                    color: AppColors.cardWhite.withValues(alpha: 0.9),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: const Color(0xFFBCE3D3),
                       width: 1,
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.tealPrimary.withValues(alpha: 0.05),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
                   ),
-                  child: Text(
-                    '${wellnessData.scoreDiff > 0 ? "+" : ""}${wellnessData.scoreDiff} points from yesterday',
-                    style: AppTypography.badgeText.copyWith(
-                      color: AppColors.tealPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 11,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        wellnessData.scoreDiff > 0
+                            ? Icons.trending_up_rounded
+                            : Icons.trending_down_rounded,
+                        size: 13,
+                        color: AppColors.tealPrimary,
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          '${wellnessData.scoreDiff > 0 ? "+" : ""}${wellnessData.scoreDiff} points from yesterday',
+                          style: AppTypography.badgeText.copyWith(
+                            color: AppColors.tealPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -194,17 +242,17 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
         const SizedBox(width: 14),
         // Right Column: Circular Progress Ring with Score
         SizedBox(
-          width: 86,
-          height: 86,
+          width: 82,
+          height: 82,
           child: Stack(
             alignment: Alignment.center,
             children: [
               Container(
-                width: 78,
-                height: 78,
+                width: 74,
+                height: 74,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.cardWhite.withValues(alpha: 0.9),
+                  color: AppColors.cardWhite.withValues(alpha: 0.95),
                   boxShadow: [
                     BoxShadow(
                       color: AppColors.tealPrimary.withValues(alpha: 0.08),
@@ -230,7 +278,7 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
                   Text(
                     'pts',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.w600,
                       color: AppColors.tealPrimary.withValues(alpha: 0.8),
                     ),
@@ -246,12 +294,12 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
 
   Widget _buildProgressRing(WellnessScoreData wellnessData) {
     return CustomPaint(
-      size: const Size(86, 86),
+      size: const Size(82, 82),
       painter: _ScoreRingPainter(
         progress: (wellnessData.currentScore / wellnessData.maxScore.toDouble()).clamp(0.0, 1.0),
         trackColor: const Color(0xFFD4ECE2),
         progressColor: AppColors.tealAccent,
-        strokeWidth: 6.5,
+        strokeWidth: 6.0,
       ),
     );
   }

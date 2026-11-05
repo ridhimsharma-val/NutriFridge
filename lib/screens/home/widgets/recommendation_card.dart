@@ -447,10 +447,29 @@ class RecommendationCard extends StatelessWidget {
                       topRight: Radius.circular(21),
                     ),
                     child: Container(
-                      height: 138,
+                      height: 152,
                       width: double.infinity,
                       color: const Color(0xFFFFECE2),
-                      child: _buildFoodImage(),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          _buildFoodImage(),
+                          // Subtle bottom scrim gradient for better contrast & depth
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withValues(alpha: 0.28),
+                                ],
+                                stops: const [0.55, 1.0],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -464,7 +483,7 @@ class RecommendationCard extends StatelessWidget {
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.peachLight.withValues(alpha: 0.95),
+                      color: Colors.white.withValues(alpha: 0.94),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: AppColors.peachBorder,
@@ -472,111 +491,200 @@ class RecommendationCard extends StatelessWidget {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.peachPrimary.withValues(alpha: 0.12),
+                          color: Colors.black.withValues(alpha: 0.08),
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
                       ],
                     ),
-                    child: Text(
-                      recommendation.mealType.isNotEmpty
-                          ? recommendation.mealType.toUpperCase()
-                          : recommendation.tag,
-                      style: AppTypography.badgeText.copyWith(
-                        color: AppColors.peachPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            // Bottom content area
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16.0, 11.0, 14.0, 12.0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Meal Title
-                        Text(
-                          recommendation.title,
-                          style: AppTypography.cardTitle.copyWith(
-                            fontSize: 17,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        // Nutrition summary
-                        Text(
-                          '${recommendation.calories} kcal · ${recommendation.proteinGrams}g protein',
-                          style: AppTypography.subtitle.copyWith(
-                            fontSize: 12.5,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        // Explanatory Match Reasons
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: AppColors.peachPrimary,
+                            shape: BoxShape.circle,
                           ),
-                          decoration: BoxDecoration(
-                            color: AppColors.peachLight.withValues(alpha: 0.7),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: AppColors.peachBorder,
-                              width: 1.0,
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              for (final reason in recommendation.matchReasons) ...[
-                                Text(
-                                  reason,
-                                  style: AppTypography.badgeText.copyWith(
-                                    color: AppColors.peachText,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 11,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                if (reason != recommendation.matchReasons.last)
-                                  const SizedBox(height: 3),
-                              ],
-                            ],
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          recommendation.mealType.isNotEmpty
+                              ? recommendation.mealType.toUpperCase()
+                              : recommendation.tag,
+                          style: AppTypography.badgeText.copyWith(
+                            color: AppColors.peachText,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 10.5,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  // Action arrow button
-                  Container(
-                    key: const ValueKey('recommendation_card_arrow'),
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: AppColors.peachLight,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppColors.peachBorder,
-                        width: 1.2,
+                ),
+                // Prep time badge if available
+                if (recommendation.prepTimeMinutes > 0)
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
                       ),
-                      boxShadow: const [AppColors.cardShadow],
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.42),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.timer_outlined,
+                            size: 13,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${recommendation.prepTimeMinutes} min',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.arrow_forward_rounded,
-                      size: 17,
-                      color: AppColors.peachText,
+                  ),
+              ],
+            ),
+
+            // Bottom content area
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16.0, 13.0, 14.0, 14.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Meal Title
+                            Text(
+                              recommendation.title,
+                              style: AppTypography.cardTitle.copyWith(
+                                fontSize: 17.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            // Nutrition & Ingredient summary
+                            Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text:
+                                        '${recommendation.calories} kcal · ${recommendation.proteinGrams}g protein',
+                                    style: AppTypography.subtitle.copyWith(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  if (recommendation.fridgeItemsUsed > 0)
+                                    TextSpan(
+                                      text: ' · ${recommendation.fridgeItemsUsed} in fridge',
+                                      style: AppTypography.subtitle.copyWith(
+                                        fontSize: 12,
+                                        color: AppColors.tealPrimary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      // Action arrow button
+                      Container(
+                        key: const ValueKey('recommendation_card_arrow'),
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.cardWhite,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.peachBorder,
+                            width: 1.2,
+                          ),
+                          boxShadow: const [AppColors.cardShadow],
+                        ),
+                        child: const Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 18,
+                          color: AppColors.peachAccent,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  // Explanatory Match Reasons
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.peachLight.withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(11),
+                      border: Border.all(
+                        color: AppColors.peachBorder.withValues(alpha: 0.8),
+                        width: 1.0,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (final reason in recommendation.matchReasons) ...[
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.check_circle_outline_rounded,
+                                size: 13,
+                                color: AppColors.peachAccent,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  reason,
+                                  style: AppTypography.badgeText.copyWith(
+                                    color: AppColors.peachText,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 11.5,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (reason != recommendation.matchReasons.last)
+                            const SizedBox(height: 3),
+                        ],
+                      ],
                     ),
                   ),
                 ],

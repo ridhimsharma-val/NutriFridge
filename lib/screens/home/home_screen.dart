@@ -69,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
             bottom: false,
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.only(top: 10, bottom: 24),
+              padding: const EdgeInsets.only(top: 12, bottom: 28),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -79,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     onNotificationTap: () => NotificationPopover.show(context),
                   ),
 
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
 
                   // 2. Suggested For You
                   RecommendationCard(
@@ -114,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
 
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
 
                   // 3. Today's Wellness (Interactive Smooth Expandable Card)
                   WellnessScoreCard(
@@ -127,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
 
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
 
                   // 4. Nutrition Today (Interactive Smooth Expandable Card)
                   NutritionCard(
@@ -140,7 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
 
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
 
                   // 5. Today's Meals (Breakfast, Lunch, Snack, Dinner)
                   MealStatusCardSection(
@@ -158,7 +158,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                 ],
               ),
             ),

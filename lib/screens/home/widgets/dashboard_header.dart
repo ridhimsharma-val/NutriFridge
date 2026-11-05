@@ -107,14 +107,25 @@ class DashboardHeader extends StatelessWidget {
                     // Small subtle notification badge dot (visible when unread notifications exist)
                     if (hasUnread)
                       Positioned(
-                        top: 10,
-                        right: 11,
+                        top: 9,
+                        right: 10,
                         child: Container(
-                          width: 7,
-                          height: 7,
-                          decoration: const BoxDecoration(
+                          width: 9,
+                          height: 9,
+                          decoration: BoxDecoration(
                             color: AppColors.peachPrimary,
                             shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.cardWhite,
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.peachPrimary.withValues(alpha: 0.35),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
                           ),
                         ),
                       ),
