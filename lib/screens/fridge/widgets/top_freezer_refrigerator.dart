@@ -74,16 +74,16 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
       curve: Curves.easeInOutCubic,
     );
 
-    // 3. Freezer Cold Mist Controller (~1500ms directional vapor flow)
+    // 3. Freezer Cold Mist Controller (~1400ms cold smoke flowing out)
     _freezerMistController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1400),
     );
 
-    // 4. Main Refrigerator Cold Mist Controller (~1500ms directional vapor flow)
+    // 4. Main Refrigerator Cold Mist Controller (~1400ms cold smoke flowing out)
     _fridgeMistController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1400),
     );
 
     if (widget.isFreezerOpen) _freezerController.value = 1.0;
@@ -99,11 +99,9 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
         _freezerMistController.forward(from: 0.0);
       } else {
         _freezerController.reverse();
-        _freezerMistController.animateTo(
-          0.0,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
-        );
+        // No animation when closing of fridge
+        _freezerMistController.stop();
+        _freezerMistController.value = 0.0;
       }
     }
     if (widget.isFridgeOpen != oldWidget.isFridgeOpen) {
@@ -112,11 +110,9 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
         _fridgeMistController.forward(from: 0.0);
       } else {
         _fridgeController.reverse();
-        _fridgeMistController.animateTo(
-          0.0,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
-        );
+        // No animation when closing of fridge
+        _fridgeMistController.stop();
+        _fridgeMistController.value = 0.0;
       }
     }
   }
@@ -163,30 +159,29 @@ class _TopFreezerRefrigeratorState extends State<TopFreezerRefrigerator>
     const double openingOriginX = cabinetOriginX + cabinetInsetX; // 14.0 px in Stack
     const double openingWidth = cabinetWidth - (cabinetInsetX * 2.0); // 264.0 px opening
 
-    // Symmetrical horizontal overflow beyond the compartment opening
-    const double mistOverflowX = 22.0;
-    const double mistOverlayWidth = openingWidth + (mistOverflowX * 2.0); // 308.0 px
+    // Symmetrical horizontal overflow for smoke billowing out in ALL 4 directions (Left, Right, Down, Up)
+    const double mistOverflowX = 48.0;
+    const double mistOverlayWidth = openingWidth + (mistOverflowX * 2.0); // 360.0 px
     // Exactly aligns the painter's innerRect.left with the real compartment opening
-    const double overlayLeft = openingOriginX - mistOverflowX; // 14.0 - 22.0 = -8.0 px
+    const double overlayLeft = openingOriginX - mistOverflowX; // 14.0 - 48.0 = -34.0 px
 
     // Vertical Canvas Dimensions:
     // Upper Compartment Overlay:
-    // When upper is freezer (top-freezer configuration), allow 155px of controlled downward spill
-    // across the pocket seam and down across the lower refrigerator door exterior!
-    const double upperOverflowTop = 20.0;
+    // Cold smoke billows in all directions: upward above fridge top, sideways, and downward
+    // across the pocket seam and lower refrigerator door!
+    const double upperOverflowTop = 44.0;
     final double upperOverflowBottom =
-        isFreezerOnTop ? (pocketGapHeight + 155.0) : 65.0;
+        isFreezerOnTop ? (pocketGapHeight + 155.0) : 55.0;
     final double upperOverlayHeight =
         topCompartmentHeight + upperOverflowTop + upperOverflowBottom;
     const double upperOverlayTop = 4.0 - upperOverflowTop;
 
     // Lower Compartment Overlay:
-    // When lower is freezer (bottom-freezer configuration), allow 140px of downward spill
-    // cascading over the sill toward the leveling feet and floor shadow!
+    // Cold smoke billows in all directions: upward toward seam, sideways, and rolling downward!
     final double lowerCompartmentTop =
         4.0 + topCompartmentHeight + pocketGapHeight;
-    const double lowerOverflowTop = 20.0;
-    final double lowerOverflowBottom = (!isFreezerOnTop) ? 140.0 : 65.0;
+    const double lowerOverflowTop = 40.0;
+    final double lowerOverflowBottom = (!isFreezerOnTop) ? 140.0 : 50.0;
     final double lowerOverlayHeight =
         bottomCompartmentHeight + lowerOverflowTop + lowerOverflowBottom;
     final double lowerOverlayTop = lowerCompartmentTop - lowerOverflowTop;

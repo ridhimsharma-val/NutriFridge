@@ -3610,13 +3610,20 @@ void main() {
     });
   });
 
-  group('NUTRIFRIDGE — Realistic Cold Mist Opening Animation', () {
-    testWidgets('ColdMistEffect renders organic vapor wisps during animation and shrinks when idle', (WidgetTester tester) async {
+  group('NUTRIFRIDGE — Reference Cold Smoke Flowing Out Animation (No Animation on Closing)', () {
+    testWidgets('ColdMistEffect renders billowing smoke plumes during opening animation and shrinks when idle or closing', (WidgetTester tester) async {
       final controller = AnimationController(
         vsync: const TestVSync(),
-        duration: const Duration(milliseconds: 1500),
+        duration: const Duration(milliseconds: 1400),
       );
-      addTearDown(() => controller.dispose());
+      final doorController = AnimationController(
+        vsync: const TestVSync(),
+        duration: const Duration(milliseconds: 300),
+      );
+      addTearDown(() {
+        controller.dispose();
+        doorController.dispose();
+      });
 
       await tester.pumpWidget(
         MaterialApp(
@@ -3626,6 +3633,7 @@ void main() {
               height: 380,
               child: ColdMistEffect(
                 animation: controller,
+                doorAnimation: doorController,
                 isFreezer: false,
               ),
             ),
@@ -3642,7 +3650,8 @@ void main() {
         findsNothing,
       );
 
-      // 2. Mid-animation at 0.35 -> CustomPaint with _ColdMistPainter active
+      // 2. Mid-animation at 0.35 during opening -> CustomPaint with smoke plumes active
+      doorController.value = 0.5;
       controller.value = 0.35;
       await tester.pump();
       expect(
@@ -3653,7 +3662,7 @@ void main() {
         findsOneWidget,
       );
 
-      // 3. Completed at 1.0 -> SizedBox.shrink() (completely clear after finishing)
+      // 3. Completed at 1.0 -> SizedBox.shrink() (completely dissipated after finishing)
       controller.value = 1.0;
       await tester.pump();
       expect(
@@ -3663,9 +3672,22 @@ void main() {
         ),
         findsNothing,
       );
+
+      // 4. Door closing (reverse) -> strictly NO mist/smoke animation (SizedBox.shrink)
+      controller.value = 0.40;
+      doorController.reverse(from: 1.0);
+      await tester.pump();
+      expect(
+        find.descendant(
+          of: find.byType(ColdMistEffect),
+          matching: find.byType(CustomPaint),
+        ),
+        findsNothing,
+      );
+      await tester.pumpAndSettle();
     });
 
-    testWidgets('Interactive Refrigerator: Opening compartment triggers mist and dissipates smoothly', (WidgetTester tester) async {
+    testWidgets('Interactive Refrigerator: Opening compartment triggers flowing smoke and immediate cancel on close', (WidgetTester tester) async {
       tester.view.physicalSize = const Size(390 * 3, 844 * 3);
       tester.view.devicePixelRatio = 3.0;
       addTearDown(() {
@@ -3687,32 +3709,47 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('fridge_door_touch_target')));
       await tester.pump(); // Start opening transition
 
-      // Advance by 300ms: door is fading, mist is active
-      await tester.pump(const Duration(milliseconds: 300));
+      // Advance by 200ms: door opening, cold smoke flows out
+      await tester.pump(const Duration(milliseconds: 200));
       expect(find.byType(ColdMistEffect), findsWidgets);
 
-      // Advance to full completion (1200ms)
+      // Advance to full completion (1400ms)
       await tester.pumpAndSettle();
 
       // Food items and shelves are completely clear and accessible
       expect(find.text('DAIRY PRODUCTS'), findsOneWidget);
       expect(find.text('VEGETABLES'), findsOneWidget);
 
-      // 2. Tap to close fridge door (quick dissipation)
+      // 2. Tap to close fridge door -> strictly NO animation when closing fridge (immediately reset to 0)
       await tester.tap(find.byKey(const ValueKey('fridge_door_touch_target')));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 250));
+      // On close, smoke is immediately stopped and rendered as SizedBox.shrink
+      expect(
+        find.descendant(
+          of: find.byType(ColdMistEffect),
+          matching: find.byType(CustomPaint),
+        ),
+        findsNothing,
+      );
       await tester.pumpAndSettle();
 
-      // 3. Tap to open freezer door (freezer mist triggers independently)
+      // 3. Tap to open freezer door (freezer cold smoke flows out independently)
       await tester.tap(find.byKey(const ValueKey('freezer_door_touch_target')));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 200));
       expect(find.byType(ColdMistEffect), findsWidgets);
 
+      // Closing freezer also immediately cancels with zero smoke animation
+      await tester.tap(find.byKey(const ValueKey('freezer_door_touch_target')));
+      await tester.pump();
+      expect(
+        find.descendant(
+          of: find.byType(ColdMistEffect),
+          matching: find.byType(CustomPaint),
+        ),
+        findsNothing,
+      );
       await tester.pumpAndSettle();
-      expect(find.text('ICE CREAM'), findsOneWidget);
-      expect(find.text('FROZEN FOOD'), findsOneWidget);
 
       // 4. Rapid open/close interaction safety test
       await tester.tap(find.byKey(const ValueKey('freezer_door_touch_target')));
@@ -3725,7 +3762,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('Downward cold mist spill and coordinate alignment geometry test', (WidgetTester tester) async {
+    testWidgets('Cold smoke alignment and flow geometry test', (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -3738,7 +3775,7 @@ void main() {
           ),
         ),
       );
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 200));
 
       // Find the upper ColdMistEffect overlay
       final mistWidgets = tester.widgetList<ColdMistEffect>(find.byType(ColdMistEffect)).toList();
@@ -3747,19 +3784,18 @@ void main() {
       final freezerMist = mistWidgets.firstWhere((w) => w.isFreezer);
       expect(freezerMist.innerRect, isNotNull);
       expect(freezerMist.innerRect!.width, equals(264.0));
-      expect(freezerMist.innerRect!.left, equals(22.0));
+      expect(freezerMist.innerRect!.left, equals(48.0));
 
-      // Verify Positioned ancestor geometry for upper freezer downward spill
+      // Verify Positioned ancestor geometry for smoke flowing out across the opening in 4 directions
       final positionedWidgets = tester.widgetList<Positioned>(
         find.ancestor(of: find.byWidget(freezerMist), matching: find.byType(Positioned)),
       ).toList();
       expect(positionedWidgets.isNotEmpty, isTrue);
 
       final overlayPositioned = positionedWidgets.first;
-      expect(overlayPositioned.left, equals(-8.0)); // Aligns innerRect.left (-8 + 22) exactly with openingOriginX (14.0)
-      expect(overlayPositioned.width, equals(308.0)); // 264 + 2 * 22
-      // Canvas height must extend at least 150px below the 164px freezer opening + 14px seam
-      expect(overlayPositioned.height! >= 340.0, isTrue);
+      expect(overlayPositioned.left, equals(-34.0)); // Aligns innerRect.left (-34 + 48) exactly with openingOriginX (14.0)
+      expect(overlayPositioned.width, equals(360.0)); // 264 + 2 * 48
+      expect(overlayPositioned.height, equals(377.0)); // 44 + 164 + (14 + 155)
 
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
