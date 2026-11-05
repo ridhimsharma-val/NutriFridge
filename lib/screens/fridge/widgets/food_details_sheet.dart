@@ -364,9 +364,9 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                   _item.name,
                   style: const TextStyle(
                     fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1E293B),
-                    letterSpacing: -0.2,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.neutralCharcoal,
+                    letterSpacing: -0.3,
                   ),
                 ),
               ),
@@ -404,7 +404,7 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                         _item.expiryLabel,
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                           color: _item.statusTextColor,
                           letterSpacing: 0.1,
                         ),
@@ -419,12 +419,12 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
               // 5. Distinct Available Quantity in Fridge Display
               Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6.5),
                   decoration: BoxDecoration(
-                    color: AppColors.peachCard,
+                    color: AppColors.paleMint,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: AppColors.peachBorder,
+                      color: AppColors.sageAccent.withValues(alpha: 0.35),
                       width: 1.0,
                     ),
                   ),
@@ -435,7 +435,7 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.peachText,
+                      color: AppColors.forestGreen,
                     ),
                   ),
                 ),
@@ -447,12 +447,13 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
-                  vertical: 12,
+                  vertical: 14,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFE8E2D9), width: 1),
+                  color: AppColors.cardWhite,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.cardBorder, width: 1),
+                  boxShadow: const [AppColors.softShadow],
                 ),
                 child: Column(
                   children: [
@@ -460,20 +461,20 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                       'Quantity to use or add',
                       style: TextStyle(
                         fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textSecondary,
                         letterSpacing: 0.2,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         // Minus Button
                         Material(
                           color: _selectedAmount > _step
-                              ? const Color(0xFFF1F5F9)
-                              : const Color(0xFFF8FAFC),
+                              ? AppColors.paleMint
+                              : const Color(0xFFF3F5F4),
                           shape: const CircleBorder(),
                           child: InkWell(
                             customBorder: const CircleBorder(),
@@ -484,8 +485,8 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                                 Icons.remove_rounded,
                                 size: 20,
                                 color: _selectedAmount > _step
-                                    ? const Color(0xFF1E293B)
-                                    : const Color(0xFFCBD5E1),
+                                    ? AppColors.forestGreen
+                                    : AppColors.textTertiary,
                               ),
                             ),
                           ),
@@ -504,10 +505,10 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                               _formatAmount(_selectedAmount, _unit),
                               key: ValueKey<int>(_selectedAmount),
                               style: const TextStyle(
-                                fontSize: 21,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF1E293B),
-                                letterSpacing: 0.2,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.neutralCharcoal,
+                                letterSpacing: -0.2,
                               ),
                             ),
                           ),
@@ -515,7 +516,7 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
 
                         // Plus Button
                         Material(
-                          color: const Color(0xFFF1F5F9),
+                          color: AppColors.paleMint,
                           shape: const CircleBorder(),
                           child: InkWell(
                             customBorder: const CircleBorder(),
@@ -525,7 +526,7 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                               child: Icon(
                                 Icons.add_rounded,
                                 size: 20,
-                                color: Color(0xFF1E293B),
+                                color: AppColors.forestGreen,
                               ),
                             ),
                           ),
@@ -571,13 +572,13 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
               ElevatedButton(
                 onPressed: _isProcessing ? null : _handleUseFood,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0D9488),
+                  backgroundColor: AppColors.forestGreen,
                   foregroundColor: Colors.white,
-                  elevation: 1,
+                  elevation: 0,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 child: const Text(
                   'Use Food',
@@ -595,13 +596,16 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
               OutlinedButton(
                 onPressed: _isProcessing ? null : _handleAddFood,
                 style: OutlinedButton.styleFrom(
-                  backgroundColor: AppColors.peachLight,
-                  foregroundColor: AppColors.peachPrimary,
-                  side: const BorderSide(color: AppColors.peachPrimary, width: 1.4),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
+                  backgroundColor: AppColors.sageLight,
+                  foregroundColor: AppColors.forestGreen,
+                  side: BorderSide(
+                    color: AppColors.sageAccent.withValues(alpha: 0.5),
+                    width: 1.2,
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 child: const Text(
                   '+ Add Food',

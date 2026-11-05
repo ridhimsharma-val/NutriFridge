@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
 import '../models/category_item.dart';
 import 'animated_quantity_text.dart';
 import 'food_details_sheet.dart';
@@ -164,9 +165,9 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
                           '${_category.iconEmoji} ${_category.name}',
                           style: const TextStyle(
                             fontSize: 19.5,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1E293B),
-                            letterSpacing: -0.2,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.neutralCharcoal,
+                            letterSpacing: -0.3,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -174,8 +175,8 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
                           '${_category.itemCount} items',
                           style: const TextStyle(
                             fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.forestGreen,
                           ),
                         ),
                       ],
@@ -184,17 +185,22 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
 
                   // Close Button
                   Material(
-                    color: const Color(0xFFEDE8E1),
+                    color: Colors.white,
                     shape: const CircleBorder(),
                     child: InkWell(
                       customBorder: const CircleBorder(),
                       onTap: () => Navigator.of(context).pop(),
-                      child: const Padding(
-                        padding: EdgeInsets.all(7.0),
-                        child: Icon(
+                      child: Container(
+                        padding: const EdgeInsets.all(7.0),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.cardBorder, width: 1.0),
+                          boxShadow: const [AppColors.softShadow],
+                        ),
+                        child: const Icon(
                           Icons.close_rounded,
                           size: 19,
-                          color: Color(0xFF475569),
+                          color: AppColors.neutralCharcoal,
                         ),
                       ),
                     ),
@@ -231,25 +237,19 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
   Widget _buildItemRow(BuildContext context, CategoryFoodItem item) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E2D9), width: 1.0),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
-            blurRadius: 4,
-            offset: const Offset(0, 1.5),
-          ),
-        ],
+        color: AppColors.cardWhite,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.cardBorder, width: 1.0),
+        boxShadow: const [AppColors.softShadow],
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           onTap: () => _handleItemTap(item),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9.5),
             child: Row(
               children: [
                 // Small realistic food visual container (~50px)
@@ -257,10 +257,10 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
                   width: 50,
                   height: 50,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF7F4EF),
-                    borderRadius: BorderRadius.circular(10),
+                    color: const Color(0xFFF7FAF8),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: const Color(0xFFE8E2D9),
+                      color: AppColors.cardBorder,
                       width: 0.8,
                     ),
                   ),
@@ -294,18 +294,19 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
                         item.name,
                         style: const TextStyle(
                           fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF1E293B),
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.neutralCharcoal,
+                          letterSpacing: -0.2,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 3),
                       AnimatedQuantityText(
                         value: item.decimalAmount,
                         unit: item.unit,
                         style: const TextStyle(
                           fontSize: 12.5,
-                          fontWeight: FontWeight.w400,
-                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ],
@@ -315,18 +316,18 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
                 // Expiry Tag Badge with subtle status colors
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8.5,
-                    vertical: 4,
+                    horizontal: 9,
+                    vertical: 4.5,
                   ),
                   decoration: BoxDecoration(
                     color: item.statusBackgroundColor,
-                    borderRadius: BorderRadius.circular(7),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     item.expiryLabel,
                     style: TextStyle(
                       fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: item.statusTextColor,
                       letterSpacing: 0.1,
                     ),
@@ -339,7 +340,7 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
                 const Icon(
                   Icons.chevron_right_rounded,
                   size: 19,
-                  color: Color(0xFFA0AEC0),
+                  color: AppColors.textTertiary,
                 ),
               ],
             ),

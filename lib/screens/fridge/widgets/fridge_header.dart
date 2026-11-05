@@ -36,22 +36,25 @@ class FridgeHeader extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: AppTypography.greeting.copyWith(
-                      fontSize: 19,
+                    style: AppTypography.screenHeading.copyWith(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.neutralCharcoal,
+                      letterSpacing: -0.4,
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 8),
                   // Items count badge pill
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
+                      horizontal: 8,
+                      vertical: 3.5,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.tealLight,
+                      color: AppColors.sageLight,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: const Color(0xFFC7EADB),
+                        color: AppColors.sageAccent.withValues(alpha: 0.35),
                         width: 1,
                       ),
                     ),
@@ -59,37 +62,37 @@ class FridgeHeader extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Container(
-                          width: 5,
-                          height: 5,
+                          width: 5.5,
+                          height: 5.5,
                           decoration: const BoxDecoration(
-                            color: AppColors.tealAccent,
+                            color: AppColors.forestGreen,
                             shape: BoxShape.circle,
                           ),
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 4.5),
                         Text(
                           '$itemCount items',
                           style: AppTypography.badgeText.copyWith(
-                            color: AppColors.tealPrimary,
+                            color: AppColors.forestGreen,
                             fontWeight: FontWeight.w700,
-                            fontSize: 9.5,
+                            fontSize: 10,
                           ),
                         ),
                       ],
                     ),
                   ),
                   if (expiringCount != null && expiringCount! > 0) ...[
-                    const SizedBox(width: 5),
+                    const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 3,
+                        horizontal: 8,
+                        vertical: 3.5,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.peachLight,
+                        color: const Color(0xFFFFF2EB),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: AppColors.peachBorder,
+                          color: AppColors.coralHighlight.withValues(alpha: 0.4),
                           width: 1,
                         ),
                       ),
@@ -97,20 +100,20 @@ class FridgeHeader extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
-                            width: 5,
-                            height: 5,
+                            width: 5.5,
+                            height: 5.5,
                             decoration: const BoxDecoration(
-                              color: AppColors.peachAccent,
+                              color: AppColors.coralHighlight,
                               shape: BoxShape.circle,
                             ),
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 4.5),
                           Text(
                             '$expiringCount expiring soon',
                             style: AppTypography.badgeText.copyWith(
-                              color: AppColors.peachPrimary,
+                              color: const Color(0xFFC85A32),
                               fontWeight: FontWeight.w700,
-                              fontSize: 9.5,
+                              fontSize: 10,
                             ),
                           ),
                         ],

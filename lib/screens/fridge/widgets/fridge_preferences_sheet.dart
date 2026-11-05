@@ -240,16 +240,16 @@ class _FridgePreferencesSheetState extends State<FridgePreferencesSheet> {
                 key: const ValueKey('apply_fridge_preferences_button'),
                 onPressed: _isApplying ? null : _onApply,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.tealPrimary,
+                  backgroundColor: AppColors.forestGreen,
                   foregroundColor: Colors.white,
                   disabledBackgroundColor:
-                      AppColors.tealPrimary.withValues(alpha: 0.6),
+                      AppColors.forestGreen.withValues(alpha: 0.6),
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  shadowColor: AppColors.tealPrimary.withValues(alpha: 0.25),
+                  shadowColor: AppColors.forestGreen.withValues(alpha: 0.25),
                 ),
                 child: const Text(
                   'Apply Changes',
@@ -298,7 +298,7 @@ class _FridgePreferencesSheetState extends State<FridgePreferencesSheet> {
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: isSelected
-                            ? AppColors.tealPrimary
+                            ? AppColors.forestGreen
                             : const Color(0xFFD6DDD7),
                         width: isSelected ? 2.8 : 1.2,
                       ),
@@ -343,7 +343,7 @@ class _FridgePreferencesSheetState extends State<FridgePreferencesSheet> {
                     fontSize: 11,
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                     color: isSelected
-                        ? AppColors.tealPrimary
+                        ? AppColors.forestGreen
                         : AppColors.textPrimary,
                   ),
                   maxLines: 1,
@@ -375,19 +375,19 @@ class _FridgePreferencesSheetState extends State<FridgePreferencesSheet> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.peachLight.withValues(alpha: 0.6)
+              ? AppColors.sageLight
               : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
-                ? AppColors.peachPrimary
+                ? AppColors.forestGreen
                 : const Color(0xFFDEE5E0),
             width: isSelected ? 1.8 : 1.0,
           ),
           boxShadow: [
             BoxShadow(
               color: isSelected
-                  ? AppColors.peachPrimary.withValues(alpha: 0.12)
+                  ? AppColors.forestGreen.withValues(alpha: 0.12)
                   : Colors.black.withValues(alpha: 0.03),
               blurRadius: 8,
               offset: const Offset(0, 2),
@@ -477,7 +477,7 @@ class _FridgePreferencesSheetState extends State<FridgePreferencesSheet> {
                   fontSize: 12.5,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                   color: isSelected
-                      ? AppColors.peachPrimary
+                      ? AppColors.forestGreen
                       : AppColors.textPrimary,
                 ),
                 textAlign: TextAlign.center,
