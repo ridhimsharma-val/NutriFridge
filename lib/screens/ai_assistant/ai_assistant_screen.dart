@@ -114,7 +114,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             ),
           ],
         ),
-        backgroundColor: AppColors.tealPrimary,
+        backgroundColor: AppColors.forestGreen,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         duration: const Duration(seconds: 2),
@@ -572,7 +572,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: AppColors.tealPrimary, width: 1.5),
+                          borderSide: const BorderSide(color: AppColors.forestGreen, width: 1.5),
                         ),
                         isDense: true,
                       ),
@@ -595,7 +595,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.tune_rounded, size: 18, color: AppColors.tealPrimary),
+                            const Icon(Icons.tune_rounded, size: 18, color: AppColors.forestGreen),
                             const SizedBox(width: 10),
                             const Expanded(
                               child: Column(
@@ -730,7 +730,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                       height: 46,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.tealPrimary,
+                          backgroundColor: AppColors.forestGreen,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           elevation: 0,
@@ -960,7 +960,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               ),
             ],
           ),
-          backgroundColor: AppColors.tealPrimary,
+          backgroundColor: AppColors.forestGreen,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           duration: const Duration(seconds: 3),
@@ -1309,7 +1309,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             ),
           ],
         ),
-        backgroundColor: AppColors.tealPrimary,
+        backgroundColor: AppColors.forestGreen,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         duration: const Duration(seconds: 3),
@@ -1320,22 +1320,92 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.warmCream,
       appBar: _buildAppBar(),
       body: SafeArea(
         child: Column(
           children: [
+            // Mode toggle pill (Chat / Voice) centered matching reference
+            Padding(
+              padding: const EdgeInsets.only(top: 6, bottom: 4),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEBE6DE),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.cardWhite,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: const [
+                            BoxShadow(color: Color(0x0C000000), blurRadius: 4, offset: Offset(0, 1)),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.chat_bubble_outline_rounded, size: 13, color: AppColors.forestGreen),
+                            SizedBox(width: 5),
+                            Text(
+                              'Chat',
+                              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.forestGreen),
+                            ),
+                          ],
+                        ),
+                      ),
+                      InkWell(
+                        onTap: _handleVoiceInputPlaceholder,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.graphic_eq_rounded, size: 13, color: AppColors.textSecondary),
+                              SizedBox(width: 5),
+                              Text(
+                                'Voice',
+                                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
             // Messages timeline
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                itemCount: _messages.length + (_isSending ? 1 : 0),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                itemCount: _messages.length + (_isSending ? 1 : 0) + (_messages.length <= 1 ? 1 : 0),
                 itemBuilder: (context, index) {
-                  if (index < _messages.length) {
-                    return _buildMessageItem(_messages[index]);
+                  if (_messages.length <= 1) {
+                    if (index == 0) {
+                      return _buildWelcomeHero();
+                    }
+                    final msgIdx = index - 1;
+                    if (msgIdx < _messages.length) {
+                      return _buildMessageItem(_messages[msgIdx]);
+                    } else {
+                      return _buildTypingIndicator();
+                    }
                   } else {
-                    return _buildTypingIndicator();
+                    if (index < _messages.length) {
+                      return _buildMessageItem(_messages[index]);
+                    } else {
+                      return _buildTypingIndicator();
+                    }
                   }
                 },
               ),
@@ -1354,11 +1424,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.warmCream,
       elevation: 0,
       scrolledUnderElevation: 0.5,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: AppColors.textPrimary),
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: AppColors.neutralCharcoal),
         onPressed: () => Navigator.of(context).pop(),
       ),
       title: Row(
@@ -1367,12 +1437,14 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
+              color: AppColors.cardWhite,
               borderRadius: BorderRadius.circular(10),
-              boxShadow: [
+              border: Border.all(color: AppColors.cardBorder, width: 1),
+              boxShadow: const [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
+                  color: Color(0x0A000000),
                   blurRadius: 4,
-                  offset: const Offset(0, 1),
+                  offset: Offset(0, 1),
                 ),
               ],
             ),
@@ -1388,14 +1460,14 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                   height: 36,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF00796B), Color(0xFF004D40)],
+                      colors: [AppColors.forestGreen, Color(0xFF0F3227)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Center(
-                    child: Icon(Icons.kitchen_rounded, color: Colors.white, size: 18),
+                    child: Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 18),
                   ),
                 ),
               ),
@@ -1410,18 +1482,36 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                 Text(
                   'NutriFridge AI',
                   style: AppTypography.cardTitle.copyWith(
-                    fontSize: 16.5,
+                    fontSize: 16,
                     fontWeight: FontWeight.w700,
+                    color: AppColors.neutralCharcoal,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
-                const Text(
-                  'Primary Assistant & Food Logger',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: AppColors.sageAccent,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    const Flexible(
+                      child: Text(
+                        'AI Companion • Ready',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -1444,6 +1534,106 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     );
   }
 
+  Widget _buildWelcomeHero() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10, bottom: 20),
+      child: Column(
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: AppColors.cardWhite,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.cardBorder, width: 1.2),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x10143D30),
+                  blurRadius: 16,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.auto_awesome_rounded,
+                color: AppColors.sageAccent,
+                size: 26,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Hi there!',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            "What's on your plate today?",
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: AppColors.neutralCharcoal,
+              letterSpacing: -0.3,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              _buildSuggestionPill('🥗 Log my meal', 'I had a grilled chicken salad with avocado'),
+              _buildSuggestionPill('🍎 Add groceries', 'Add 2 apples and 1L milk to fridge'),
+              _buildSuggestionPill('🥑 Recipe ideas', 'What can I cook with ingredients in my fridge?'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuggestionPill(String label, String prompt) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          _textController.text = prompt;
+          _handleSend();
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: AppColors.cardWhite,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x06000000),
+                blurRadius: 6,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.forestGreen,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildMessageItem(AiChatMessage message) {
     if (message.isUser) {
       return _buildUserBubble(message);
@@ -1459,9 +1649,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         alignment: Alignment.centerRight,
         child: Container(
           constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-          decoration: BoxDecoration(
-            color: AppColors.tealPrimary,
-            borderRadius: const BorderRadius.only(
+          decoration: const BoxDecoration(
+            color: AppColors.forestGreen,
+            borderRadius: BorderRadius.only(
               topLeft: Radius.circular(18),
               topRight: Radius.circular(4),
               bottomLeft: Radius.circular(18),
@@ -1469,9 +1659,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.tealPrimary.withValues(alpha: 0.18),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
+                color: Color(0x18143D30),
+                blurRadius: 10,
+                offset: Offset(0, 3),
               ),
             ],
           ),
@@ -1481,12 +1671,18 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             children: [
               if (message.attachedImageBase64 != null) ...[
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.memory(
-                    base64Decode(message.attachedImageBase64!),
-                    width: 160,
-                    height: 120,
-                    fit: BoxFit.cover,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Image.memory(
+                      base64Decode(message.attachedImageBase64!),
+                      width: 170,
+                      height: 125,
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -1516,7 +1712,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         child: Container(
           constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.88),
           decoration: BoxDecoration(
-            color: isMealMessage ? AppColors.peachCard : Colors.white,
+            color: isMealMessage ? const Color(0xFFFFFDF9) : AppColors.cardWhite,
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(4),
               topRight: Radius.circular(18),
@@ -1524,12 +1720,12 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               bottomRight: Radius.circular(18),
             ),
             border: Border.all(
-              color: isMealMessage ? AppColors.peachBorder : const Color(0xFFE2E8F0),
+              color: isMealMessage ? AppColors.peachBorder : const Color(0xFFE5ECE7),
               width: 1.2,
             ),
             boxShadow: const [
               BoxShadow(
-                color: Color(0x0D000000),
+                color: Color(0x0A000000),
                 blurRadius: 10,
                 offset: Offset(0, 3),
               ),
@@ -1539,11 +1735,40 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Assistant Avatar & Identity header indicator
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: AppColors.paleMint,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.auto_awesome_rounded, size: 13, color: AppColors.forestGreen),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'AI Assistant',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.forestGreen,
+                      letterSpacing: 0.1,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
               // Assistant Text
               Text(
                 message.text,
                 style: const TextStyle(
-                  color: AppColors.textPrimary,
+                  color: AppColors.neutralCharcoal,
                   fontSize: 14.5,
                   height: 1.45,
                   fontWeight: FontWeight.w500,
@@ -1606,9 +1831,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.cardCream,
+        color: const Color(0xFFF8FAF8),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFC8E6C9), width: 1),
+        border: Border.all(color: const Color(0xFFD3E7D8), width: 1.2),
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -1616,7 +1841,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.kitchen_rounded, size: 16, color: AppColors.tealPrimary),
+              const Icon(Icons.kitchen_rounded, size: 16, color: AppColors.forestGreen),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -1629,12 +1854,12 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
+                    color: const Color(0xFFE8F5EC),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: const Text(
                     'Review & Confirm',
-                    style: TextStyle(fontSize: 10, color: Color(0xFF2E7D32), fontWeight: FontWeight.w700),
+                    style: TextStyle(fontSize: 10, color: AppColors.forestGreen, fontWeight: FontWeight.w700),
                   ),
                 ),
             ],
@@ -1677,7 +1902,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFE8E2D9), width: 0.8),
+                      border: Border.all(color: const Color(0xFFE2EBE5), width: 0.8),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1690,7 +1915,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                               width: 7,
                               height: 7,
                               decoration: const BoxDecoration(
-                                color: AppColors.tealPrimary,
+                                color: AppColors.forestGreen,
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -1714,12 +1939,12 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFEDF7ED),
+                                color: const Color(0xFFEAF5EE),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
                                 'Expires in $exp d',
-                                style: const TextStyle(fontSize: 10, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600),
+                                style: const TextStyle(fontSize: 10, color: Color(0xFF1B6A45), fontWeight: FontWeight.w600),
                               ),
                             ),
                             if (!message.isConfirmed) ...[
@@ -1764,7 +1989,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                                   style: const TextStyle(
                                     fontSize: 12.5,
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.tealPrimary,
+                                    color: AppColors.forestGreen,
                                   ),
                                 )
                               else
@@ -1865,7 +2090,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                 style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: message.isConfirmed ? Colors.grey.shade400 : AppColors.tealPrimary,
+                backgroundColor: message.isConfirmed ? const Color(0xFFCBD5E1) : AppColors.forestGreen,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 elevation: 0,
@@ -1969,7 +2194,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                 style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: message.isConfirmed ? Colors.grey.shade400 : const Color(0xFFDC2626),
+                backgroundColor: message.isConfirmed ? const Color(0xFFCBD5E1) : const Color(0xFFDC2626),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 elevation: 0,
@@ -1996,9 +2221,16 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.peachCard,
+        color: AppColors.cardWhite,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.peachBorder, width: 1.2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -2015,7 +2247,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               ),
               if (!message.isConfirmed)
                 IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.tealPrimary),
+                  icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.forestGreen),
                   tooltip: 'Edit Meal & Nutrition',
                   constraints: const BoxConstraints(),
                   padding: const EdgeInsets.all(4),
@@ -2076,9 +2308,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              Expanded(child: _buildMacroMini('Calories', '$cals kcal', AppColors.tealPrimary)),
-              Expanded(child: _buildMacroMini('Protein', '${protein}g', AppColors.tealAccent)),
-              Expanded(child: _buildMacroMini('Carbs', '${carbs}g', AppColors.peachPrimary)),
+              Expanded(child: _buildMacroMini('Calories', '$cals kcal', AppColors.forestGreen)),
+              Expanded(child: _buildMacroMini('Protein', '${protein}g', AppColors.sageAccent)),
+              Expanded(child: _buildMacroMini('Carbs', '${carbs}g', AppColors.coralHighlight)),
               Expanded(child: _buildMacroMini('Fat', '${fat}g', AppColors.amberPrimary)),
             ],
           ),
@@ -2087,9 +2319,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             const SizedBox(height: 12),
             const Text(
               'Ingredients & Fridge Deductions',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.neutralCharcoal),
             ),
-            const SizedBox(width: 2),
+            const SizedBox(height: 2),
             const Text(
               'Select which ingredients came from your fridge inventory:',
               style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
@@ -2130,7 +2362,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                               onChanged: message.isConfirmed
                                   ? null
                                   : (_) => _toggleIngredientDeduction(message, ingName),
-                              activeColor: AppColors.tealPrimary,
+                              activeColor: AppColors.forestGreen,
                               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               visualDensity: VisualDensity.compact,
                             ),
@@ -2153,7 +2385,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                                     'In fridge: ${matchedItem.quantity}',
                                     style: const TextStyle(
                                       fontSize: 10.5,
-                                      color: AppColors.tealPrimary,
+                                      color: AppColors.forestGreen,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   )
@@ -2188,7 +2420,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                 style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: message.isConfirmed ? Colors.grey.shade400 : AppColors.peachPrimary,
+                backgroundColor: message.isConfirmed ? const Color(0xFFCBD5E1) : AppColors.forestGreen,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 elevation: 0,
@@ -2201,18 +2433,27 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   }
 
   Widget _buildMacroMini(String label, String value, Color color) {
-    return Column(
-      children: [
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(value, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: color)),
-        ),
-        const SizedBox(height: 2),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-        ),
-      ],
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFBF8F3),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFEDE8E0), width: 0.8),
+      ),
+      child: Column(
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(value, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: color)),
+          ),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(label, style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2258,6 +2499,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [
+              BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2)),
+            ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -2265,7 +2509,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               SizedBox(
                 width: 14,
                 height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.tealPrimary),
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.forestGreen),
               ),
               SizedBox(width: 10),
               Text(
@@ -2283,10 +2527,10 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: const BoxDecoration(
-        color: AppColors.peachCard,
+        color: AppColors.cardWhite,
         border: Border(
-          top: BorderSide(color: AppColors.peachBorder, width: 1),
-          bottom: BorderSide(color: AppColors.peachBorder, width: 0.8),
+          top: BorderSide(color: Color(0xFFE8E5DF), width: 1),
+          bottom: BorderSide(color: Color(0xFFE8E5DF), width: 0.8),
         ),
       ),
       child: Row(
@@ -2304,12 +2548,12 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           Expanded(
             child: Text(
               _selectedImageName ?? 'Attached image',
-              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.neutralCharcoal),
               overflow: TextOverflow.ellipsis,
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.close_rounded, size: 18),
+            icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.textSecondary),
             onPressed: () {
               setState(() {
                 _selectedImageBase64 = null;
@@ -2327,99 +2571,110 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFE2EBE5), width: 1)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // Camera / Gallery Attachment Button
-          PopupMenuButton<ImageSource>(
-            icon: const Icon(Icons.camera_alt_outlined, color: AppColors.tealPrimary),
-            tooltip: 'Attach Food Photo',
-            onSelected: _pickImage,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: ImageSource.camera,
-                child: Row(
-                  children: [
-                    Icon(Icons.photo_camera_rounded, size: 20, color: AppColors.tealPrimary),
-                    SizedBox(width: 10),
-                    Text('Take Photo'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: ImageSource.gallery,
-                child: Row(
-                  children: [
-                    Icon(Icons.photo_library_rounded, size: 20, color: AppColors.tealPrimary),
-                    SizedBox(width: 10),
-                    Text('Choose from Gallery'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          // Microphone Button (Voice Input Placeholder)
-          IconButton(
-            icon: const Icon(Icons.mic_none_rounded, color: AppColors.tealPrimary),
-            tooltip: 'Voice Input',
-            onPressed: _handleVoiceInputPlaceholder,
-          ),
-
-          // Text Field
-          Expanded(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F2),
-                borderRadius: BorderRadius.circular(22),
-              ),
-              child: TextField(
-                controller: _textController,
-                maxLines: 4,
-                minLines: 1,
-                textCapitalization: TextCapitalization.sentences,
-                style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
-                decoration: const InputDecoration(
-                  hintText: 'Ask anything, add food, or log meal...',
-                  hintStyle: TextStyle(fontSize: 13.5, color: Color(0xFF94A3B8)),
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 10),
-                ),
-                onSubmitted: (_) => _handleSend(),
-              ),
-            ),
-          ),
-
-          // Send Button
-          InkWell(
-            onTap: _isSending ? null : () => _handleSend(),
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: _isSending ? Colors.grey.shade300 : AppColors.tealPrimary,
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: _isSending
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 20),
-              ),
-            ),
+        color: AppColors.cardWhite,
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 10,
+            offset: Offset(0, -2),
           ),
         ],
+        border: Border(top: BorderSide(color: Color(0xFFE8E5DF), width: 1)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            // Camera / Gallery Attachment Button
+            PopupMenuButton<ImageSource>(
+              icon: const Icon(Icons.camera_alt_outlined, color: AppColors.forestGreen),
+              tooltip: 'Attach Food Photo',
+              onSelected: _pickImage,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: ImageSource.camera,
+                  child: Row(
+                    children: [
+                      Icon(Icons.photo_camera_rounded, size: 20, color: AppColors.forestGreen),
+                      SizedBox(width: 10),
+                      Text('Take Photo'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: ImageSource.gallery,
+                  child: Row(
+                    children: [
+                      Icon(Icons.photo_library_rounded, size: 20, color: AppColors.forestGreen),
+                      SizedBox(width: 10),
+                      Text('Choose from Gallery'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            // Microphone Button (Voice Input Placeholder)
+            IconButton(
+              icon: const Icon(Icons.mic_none_rounded, color: AppColors.forestGreen),
+              tooltip: 'Voice Input',
+              onPressed: _handleVoiceInputPlaceholder,
+            ),
+
+            // Text Field
+            Expanded(
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F1EA),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: const Color(0xFFE8E5DF), width: 1),
+                ),
+                child: TextField(
+                  controller: _textController,
+                  maxLines: 4,
+                  minLines: 1,
+                  textCapitalization: TextCapitalization.sentences,
+                  style: const TextStyle(fontSize: 14, color: AppColors.neutralCharcoal),
+                  decoration: const InputDecoration(
+                    hintText: 'Ask anything, add food, or log meal...',
+                    hintStyle: TextStyle(fontSize: 13.5, color: Color(0xFF9CA3AF)),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  onSubmitted: (_) => _handleSend(),
+                ),
+              ),
+            ),
+
+            // Send Button
+            InkWell(
+              onTap: _isSending ? null : () => _handleSend(),
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: _isSending ? const Color(0xFFCBD5E1) : AppColors.forestGreen,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: _isSending
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 20),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
