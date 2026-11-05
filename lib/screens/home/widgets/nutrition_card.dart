@@ -175,21 +175,24 @@ class NutritionCard extends StatelessWidget {
 
                     // Horizontal Clean Progress Bar
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(3),
                       child: Container(
-                        height: 7,
+                        height: 6,
                         width: double.infinity,
-                        color: const Color(0xFFEEF3F0),
-                        child: FractionallySizedBox(
-                          alignment: Alignment.centerLeft,
-                          widthFactor: nutritionData.calorieProgress.clamp(0.0, 1.0),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.tealPrimary,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ),
-                        ),
+                        color: const Color(0xFFEFF2F0),
+                        child: nutritionData.calorieProgress > 0
+                            ? FractionallySizedBox(
+                                alignment: Alignment.centerLeft,
+                                widthFactor:
+                                    nutritionData.calorieProgress.clamp(0.0, 1.0),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: AppColors.tealPrimary,
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                ),
+                              )
+                            : const SizedBox.shrink(),
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -687,18 +690,20 @@ class NutritionCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(2),
           child: Container(
             height: 4,
-            width: 48,
-            color: const Color(0xFFEFF3F1),
-            child: FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: progress.clamp(0.0, 1.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: accentColor,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
+            width: 52,
+            color: const Color(0xFFEFF2F0),
+            child: progress > 0
+                ? FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: progress.clamp(0.0, 1.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: accentColor,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
           ),
         ),
       ],

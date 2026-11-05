@@ -62,6 +62,9 @@ class _HomeScreenState extends State<HomeScreen> {
         final nutrition = MockDataRepository.nutrition;
         final meals = MockDataRepository.meals;
         final hasUnread = NotificationRepository.hasUnread;
+        final bottomInset = MediaQuery.of(context).padding.bottom;
+        // Navigation bar clearance: _barTop (16) + barHeight (66) + wave rise / active circle (~14) + safe area + breathing margin
+        final double bottomScrollPadding = 118.0 + bottomInset;
 
         return Scaffold(
           backgroundColor: Colors.transparent,
@@ -69,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
             bottom: false,
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.only(top: 12, bottom: 28),
+              padding: EdgeInsets.only(top: 12, bottom: bottomScrollPadding),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
