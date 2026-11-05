@@ -4,6 +4,27 @@ import 'app_colors.dart';
 
 class AppTypography {
   // Headings
+  static TextStyle get displayLarge => GoogleFonts.plusJakartaSans(
+        fontSize: 30,
+        fontWeight: FontWeight.w800,
+        color: AppColors.neutralCharcoal,
+        letterSpacing: -0.8,
+      );
+
+  static TextStyle get screenHeading => GoogleFonts.plusJakartaSans(
+        fontSize: 22,
+        fontWeight: FontWeight.w800,
+        color: AppColors.neutralCharcoal,
+        letterSpacing: -0.4,
+      );
+
+  static TextStyle get sectionHeading => GoogleFonts.plusJakartaSans(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        color: AppColors.neutralCharcoal,
+        letterSpacing: -0.3,
+      );
+
   static TextStyle get greeting => GoogleFonts.plusJakartaSans(
         fontSize: 22,
         fontWeight: FontWeight.w700,
@@ -32,7 +53,28 @@ class AppTypography {
         letterSpacing: -0.2,
       );
 
-  // Big Numbers / Scores
+  // Big Numbers / Scores / Nutrition
+  static TextStyle get calorieHeroNumber => GoogleFonts.plusJakartaSans(
+        fontSize: 34,
+        fontWeight: FontWeight.w800,
+        color: AppColors.forestGreen,
+        letterSpacing: -1.0,
+      );
+
+  static TextStyle get calorieSubLabel => GoogleFonts.plusJakartaSans(
+        fontSize: 12.5,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textSecondary,
+        letterSpacing: -0.1,
+      );
+
+  static TextStyle get macroNumber => GoogleFonts.plusJakartaSans(
+        fontSize: 17,
+        fontWeight: FontWeight.w800,
+        color: AppColors.neutralCharcoal,
+        letterSpacing: -0.3,
+      );
+
   static TextStyle get scoreLarge => GoogleFonts.plusJakartaSans(
         fontSize: 44,
         fontWeight: FontWeight.w800,

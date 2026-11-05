@@ -9,9 +9,20 @@ class AppColors {
   // Cards & Surfaces
   static const Color cardWhite = Color(0xFFFFFFFF);
   static const Color cardCream = Color(0xFFFDFBF7);
+  static const Color warmCream = Color(0xFFFAF7F2); // Primary app background & warm surfaces
   static const Color cardBorder = Color(0x0F1B3B2B);
 
-  // Primary / Action (Muted Teal & Greens)
+  // New Redesign Primary Tokens (Deep Forest Green & Fresh Sage)
+  static const Color forestGreen = Color(0xFF143D30); // Deep forest green primary
+  static const Color forestGreenDark = Color(0xFF0D2B22);
+  static const Color sageAccent = Color(0xFF4FA878); // Fresh lime/sage green secondary accent
+  static const Color sageLight = Color(0xFFE8F4EC);
+  static const Color paleMint = Color(0xFFEAF5EE); // Pale mint subtle backgrounds
+  static const Color neutralCharcoal = Color(0xFF16231E); // Neutral dark charcoal primary text
+  static const Color neutralTrack = Color(0xFFEFF2F0); // Clean neutral progress track
+  static const Color coralHighlight = Color(0xFFE89073); // Soft peach/coral highlights
+
+  // Primary / Action (Muted Teal & Greens - Preserved for full backward compatibility)
   static const Color tealPrimary = Color(0xFF176D5C);
   static const Color tealAccent = Color(0xFF2A8B74);
   static const Color tealLight = Color(0xFFE4F4EE);
