@@ -1,11 +1,14 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../models/nutrition_data.dart';
 
-/// Expandable Nutrition Today Card.
-/// Collapsed state is visually unchanged.
-/// Expanding reveals daily calorie summary, meal-by-meal breakdown, and detailed nutrient progress.
+/// Redesigned Daily Nutrition Card featuring:
+/// - Prominent circular calorie progress visualization inspired by reference design
+/// - Compact macronutrient cards for Protein, Carbs, and Fat
+/// - Expandable detailed meal and nutrient breakdown
+/// - Clean zero-consumption state and over-target handling
 class NutritionCard extends StatelessWidget {
   final DailyNutritionData nutritionData;
   final bool isExpanded;
@@ -20,6 +23,12 @@ class NutritionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final consumed = nutritionData.consumedCalories;
+    final target = nutritionData.targetCalories;
+    final calorieProgress = nutritionData.calorieProgress;
+    final remaining = target - consumed;
+    final isOver = remaining < 0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -53,15 +62,18 @@ class NutritionCard extends StatelessWidget {
                     children: [
                       Text(
                         isExpanded ? 'Collapse' : 'See',
-                        style: AppTypography.actionLink,
+                        style: AppTypography.actionLink.copyWith(
+                          color: AppColors.forestGreen,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                      const SizedBox(width: 2),
+                      const SizedBox(width: 3),
                       Icon(
                         isExpanded
                             ? Icons.keyboard_arrow_up_rounded
-                            : Icons.arrow_forward_rounded,
-                        size: 13.5,
-                        color: AppColors.tealAccent,
+                            : Icons.keyboard_arrow_down_rounded,
+                        size: 16,
+                        color: AppColors.forestGreen,
                       ),
                     ],
                   ),
@@ -70,184 +82,165 @@ class NutritionCard extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
 
-        // Unified Card with Animated Expansion
+        // Main White Card with Calorie Ring & Compact Macro Cards
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
           child: Material(
             color: Colors.transparent,
             child: InkWell(
               onTap: onToggle,
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(24),
               child: Container(
                 decoration: BoxDecoration(
                   color: AppColors.cardWhite,
-                  borderRadius: BorderRadius.circular(22),
+                  borderRadius: BorderRadius.circular(24),
                   border: Border.all(
                     color: AppColors.cardBorder,
-                    width: 1,
+                    width: 1.0,
                   ),
                   boxShadow: const [AppColors.softShadow],
                 ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18.0,
-                  vertical: 15.0,
-                ),
+                padding: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 18.0),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Top Calories Row (Visually unchanged in collapsed state)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Calories',
-                                style: AppTypography.subtitle.copyWith(
-                                  color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12,
-                                  letterSpacing: 0.2,
-                                ),
+                    // ==========================================
+                    // 1. Prominent Calorie Ring Hero Display
+                    // ==========================================
+                    Center(
+                      child: SizedBox(
+                        width: 172,
+                        height: 172,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Background Track & Calorie Arc
+                            CustomPaint(
+                              size: const Size(172, 172),
+                              painter: _DashboardCalorieArcPainter(
+                                progress: calorieProgress,
+                                strokeWidth: 12.0,
+                                trackColor: const Color(0xFFEFF2F0),
+                                progressColor: isOver
+                                    ? AppColors.coralHighlight
+                                    : AppColors.sageAccent,
                               ),
-                              const SizedBox(height: 3),
-                              RichText(
-                                overflow: TextOverflow.ellipsis,
-                                text: TextSpan(
+                            ),
+                            // Central Numerical Content
+                            Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
-                                    TextSpan(
-                                      text: _formatNumber(
-                                          nutritionData.consumedCalories),
-                                      style: AppTypography.cardTitle.copyWith(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w800,
-                                        color: AppColors.textPrimary,
-                                        letterSpacing: -0.4,
+                                    // Small eco leaf icon
+                                    const Icon(
+                                      Icons.eco_rounded,
+                                      size: 16,
+                                      color: AppColors.forestGreen,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Today',
+                                      style: AppTypography.subtitle.copyWith(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textSecondary,
                                       ),
                                     ),
-                                    TextSpan(
-                                      text:
-                                          ' / ${_formatNumber(nutritionData.targetCalories)} kcal',
+                                    const SizedBox(height: 1),
+                                    // Big Consumed Calorie Number
+                                    Text(
+                                      _formatNumber(consumed),
+                                      style: AppTypography.calorieHeroNumber.copyWith(
+                                        fontSize: 30,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.neutralCharcoal,
+                                        letterSpacing: -0.8,
+                                      ),
+                                    ),
+                                    Text(
+                                      'kcal',
                                       style: AppTypography.subtitle.copyWith(
-                                        fontSize: 13,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
                                         color: AppColors.textTertiary,
-                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    // Goal / Remaining Subtitle
+                                    Text(
+                                      isOver
+                                          ? '${_formatNumber(remaining.abs())} kcal over'
+                                          : 'Goal ${_formatNumber(target)} kcal',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: isOver
+                                            ? AppColors.coralHighlight
+                                            : AppColors.textSecondary,
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Percentage Pill Badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.tealLight,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: const Color(0xFFC7E7DA),
-                              width: 0.9,
                             ),
-                          ),
-                          child: Text(
-                            '${(nutritionData.calorieProgress * 100).toInt()}%',
-                            style: AppTypography.badgeText.copyWith(
-                              color: AppColors.tealPrimary,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 11.5,
-                            ),
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Horizontal Clean Progress Bar
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(3),
-                      child: Container(
-                        height: 6,
-                        width: double.infinity,
-                        color: const Color(0xFFEFF2F0),
-                        child: nutritionData.calorieProgress > 0
-                            ? FractionallySizedBox(
-                                alignment: Alignment.centerLeft,
-                                widthFactor:
-                                    nutritionData.calorieProgress.clamp(0.0, 1.0),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: AppColors.tealPrimary,
-                                    borderRadius: BorderRadius.circular(3),
-                                  ),
-                                ),
-                              )
-                            : const SizedBox.shrink(),
                       ),
                     ),
-                    const SizedBox(height: 14),
 
-                    // Subtle Divider
-                    Container(
-                      height: 1,
-                      color: const Color(0xFFF0F4F2),
-                    ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 18),
 
-                    // Three Clean Nutrition Values: Protein, Carbs, Fat
+                    // ==========================================
+                    // 2. Three Compact Macronutrient Cards
+                    // ==========================================
                     Row(
                       children: [
                         Expanded(
-                          child: _buildMacroItem(
-                            label: nutritionData.protein.name,
+                          child: _buildCompactMacroCard(
+                            label: 'Protein',
                             amount: nutritionData.protein.amountGrams,
-                            unit: nutritionData.protein.unit,
+                            target: nutritionData.protein.targetGrams,
                             progress: nutritionData.protein.progress,
-                            accentColor: AppColors.tealPrimary,
+                            icon: Icons.spa_rounded,
+                            iconBg: const Color(0xFFE8F4EC),
+                            accentColor: AppColors.forestGreen,
                           ),
                         ),
-                        Container(
-                          width: 1,
-                          height: 38,
-                          color: const Color(0xFFEFF3F1),
-                        ),
+                        const SizedBox(width: 8),
                         Expanded(
-                          child: _buildMacroItem(
-                            label: nutritionData.carbs.name,
+                          child: _buildCompactMacroCard(
+                            label: 'Carbs',
                             amount: nutritionData.carbs.amountGrams,
-                            unit: nutritionData.carbs.unit,
+                            target: nutritionData.carbs.targetGrams,
                             progress: nutritionData.carbs.progress,
-                            accentColor: AppColors.peachAccent,
+                            icon: Icons.grain_rounded,
+                            iconBg: const Color(0xFFFDECE6),
+                            accentColor: AppColors.coralHighlight,
                           ),
                         ),
-                        Container(
-                          width: 1,
-                          height: 38,
-                          color: const Color(0xFFEFF3F1),
-                        ),
+                        const SizedBox(width: 8),
                         Expanded(
-                          child: _buildMacroItem(
-                            label: nutritionData.fat.name,
+                          child: _buildCompactMacroCard(
+                            label: 'Fat',
                             amount: nutritionData.fat.amountGrams,
-                            unit: nutritionData.fat.unit,
+                            target: nutritionData.fat.targetGrams,
                             progress: nutritionData.fat.progress,
+                            icon: Icons.water_drop_rounded,
+                            iconBg: const Color(0xFFFEF3C7),
                             accentColor: AppColors.amberPrimary,
                           ),
                         ),
                       ],
                     ),
 
-                    // Animated Expansion Details
+                    // ==========================================
+                    // 3. Animated Detailed Expansion
+                    // ==========================================
                     AnimatedSize(
                       duration: const Duration(milliseconds: 300),
                       curve: Curves.easeInOut,
@@ -265,6 +258,105 @@ class NutritionCard extends StatelessWidget {
     );
   }
 
+  Widget _buildCompactMacroCard({
+    required String label,
+    required int amount,
+    required int target,
+    required double progress,
+    required IconData icon,
+    required Color iconBg,
+    required Color accentColor,
+  }) {
+    final pctInt = (progress * 100).toInt();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FBF9),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFE8ECE9),
+          width: 0.9,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Circular Icon Container
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: iconBg,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              size: 15,
+              color: accentColor,
+            ),
+          ),
+          const SizedBox(height: 6),
+          // Label
+          Text(
+            label,
+            style: AppTypography.subtitle.copyWith(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 3),
+          // Amount
+          Text(
+            '${amount}g',
+            style: AppTypography.cardTitle.copyWith(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: AppColors.neutralCharcoal,
+              letterSpacing: -0.2,
+            ),
+          ),
+          const SizedBox(height: 2),
+          // Percentage
+          Text(
+            '$pctInt%',
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textTertiary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          // Mini Horizontal Progress Indicator
+          ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: Container(
+              height: 3.5,
+              width: double.infinity,
+              color: const Color(0xFFEFF2F0),
+              child: progress > 0
+                  ? FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: progress.clamp(0.0, 1.0),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: accentColor,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildExpandedNutritionContent() {
     final remainingCalories =
         nutritionData.targetCalories - nutritionData.consumedCalories;
@@ -273,22 +365,22 @@ class NutritionCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
         Container(
           height: 1,
           color: const Color(0xFFF0F4F2),
         ),
         const SizedBox(height: 16),
 
-        // A. Daily Calorie Summary Callout
+        // Daily Calorie Summary Callout
         Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           decoration: BoxDecoration(
             color: const Color(0xFFF6FAF7),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: AppColors.tealPrimary.withValues(alpha: 0.12),
+              color: AppColors.forestGreen.withValues(alpha: 0.12),
               width: 1,
             ),
           ),
@@ -325,7 +417,7 @@ class NutritionCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: isCalorieOver
                       ? const Color(0xFFFFF2EB)
-                      : AppColors.tealLight,
+                      : AppColors.sageLight,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -336,8 +428,8 @@ class NutritionCard extends StatelessWidget {
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,
                     color: isCalorieOver
-                        ? AppColors.peachPrimary
-                        : AppColors.tealPrimary,
+                        ? AppColors.coralHighlight
+                        : AppColors.forestGreen,
                   ),
                 ),
               ),
@@ -347,7 +439,7 @@ class NutritionCard extends StatelessWidget {
 
         const SizedBox(height: 18),
 
-        // B. Meal-by-Meal Breakdown ("Today's meals")
+        // Meal-by-Meal Breakdown ("Today's meals")
         const Text(
           "Today's meals",
           style: TextStyle(
@@ -362,7 +454,7 @@ class NutritionCard extends StatelessWidget {
 
         const SizedBox(height: 18),
 
-        // C. Nutrient Totals & Remaining Targets
+        // Target Progress & Remaining Bars
         const Text(
           'Target progress & remaining',
           style: TextStyle(
@@ -378,7 +470,7 @@ class NutritionCard extends StatelessWidget {
           consumed: nutritionData.consumedCalories,
           target: nutritionData.targetCalories,
           unit: 'kcal',
-          accentColor: AppColors.tealPrimary,
+          accentColor: AppColors.forestGreen,
         ),
         const SizedBox(height: 9),
         _buildTargetProgressBar(
@@ -386,7 +478,7 @@ class NutritionCard extends StatelessWidget {
           consumed: nutritionData.protein.amountGrams,
           target: nutritionData.protein.targetGrams,
           unit: 'g',
-          accentColor: AppColors.tealPrimary,
+          accentColor: AppColors.forestGreen,
         ),
         const SizedBox(height: 9),
         _buildTargetProgressBar(
@@ -394,7 +486,7 @@ class NutritionCard extends StatelessWidget {
           consumed: nutritionData.carbs.amountGrams,
           target: nutritionData.carbs.targetGrams,
           unit: 'g',
-          accentColor: AppColors.peachPrimary,
+          accentColor: AppColors.coralHighlight,
         ),
         const SizedBox(height: 9),
         _buildTargetProgressBar(
@@ -403,6 +495,72 @@ class NutritionCard extends StatelessWidget {
           target: nutritionData.fat.targetGrams,
           unit: 'g',
           accentColor: AppColors.amberPrimary,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTargetProgressBar({
+    required String label,
+    required int consumed,
+    required int target,
+    required String unit,
+    required Color accentColor,
+  }) {
+    final double progress = target > 0 ? (consumed / target).clamp(0.0, 1.0) : 0.0;
+    final int remaining = target - consumed;
+    final bool isOver = remaining < 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                isOver
+                    ? '${_formatNumber(consumed)} / ${_formatNumber(target)} $unit (${_formatNumber(remaining.abs())} $unit over)'
+                    : '${_formatNumber(consumed)} / ${_formatNumber(target)} $unit (${_formatNumber(remaining)} $unit left)',
+                textAlign: TextAlign.end,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(3),
+          child: Container(
+            height: 5,
+            width: double.infinity,
+            color: const Color(0xFFF0F4F2),
+            child: FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: progress,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: accentColor,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+          ),
         ),
       ],
     );
@@ -452,7 +610,7 @@ class NutritionCard extends StatelessWidget {
 
         if (isCompleted && loggedRecord != null) {
           displayName = loggedRecord['mealName'] ?? meal.name;
-          calories = loggedRecord['calories'] as int? ?? 0;
+          calories = (loggedRecord['calories'] as num?)?.toInt() ?? 0;
           final p = loggedRecord['protein'] ?? 0;
           final c = loggedRecord['carbs'] ?? 0;
           final f = loggedRecord['fat'] ?? 0;
@@ -530,7 +688,7 @@ class NutritionCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.tealPrimary,
+                        color: AppColors.forestGreen,
                       ),
                     ),
                     if (macroInfo.isNotEmpty)
@@ -561,159 +719,68 @@ class NutritionCard extends StatelessWidget {
     );
   }
 
-  Widget _buildTargetProgressBar({
-    required String label,
-    required int consumed,
-    required int target,
-    required String unit,
-    required Color accentColor,
-  }) {
-    final double progress = target > 0 ? (consumed / target).clamp(0.0, 1.0) : 0.0;
-    final int remaining = target - consumed;
-    final bool isOver = remaining < 0;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                isOver
-                    ? '${_formatNumber(consumed)} / ${_formatNumber(target)} $unit (${_formatNumber(remaining.abs())} $unit over)'
-                    : '${_formatNumber(consumed)} / ${_formatNumber(target)} $unit (${_formatNumber(remaining)} $unit left)',
-                textAlign: TextAlign.end,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(3),
-          child: Container(
-            height: 5,
-            width: double.infinity,
-            color: const Color(0xFFF0F4F2),
-            child: FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: progress,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: accentColor,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMacroItem({
-    required String label,
-    required int amount,
-    required String unit,
-    required double progress,
-    required Color accentColor,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(
-                color: accentColor,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: AppTypography.subtitle.copyWith(
-                color: AppColors.textSecondary,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              '$amount',
-              style: AppTypography.cardTitle.copyWith(
-                fontSize: 16.5,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
-                letterSpacing: -0.3,
-              ),
-            ),
-            Text(
-              ' $unit',
-              style: AppTypography.subtitle.copyWith(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textTertiary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(2),
-          child: Container(
-            height: 4,
-            width: 52,
-            color: const Color(0xFFEFF2F0),
-            child: progress > 0
-                ? FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: progress.clamp(0.0, 1.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: accentColor,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ),
-      ],
-    );
-  }
-
   String _formatNumber(int number) {
     return number.toString().replaceAllMapped(
           RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
           (Match m) => '${m[1]},',
         );
+  }
+}
+
+/// Circular arc painter for the dashboard hero calorie visualization
+class _DashboardCalorieArcPainter extends CustomPainter {
+  final double progress;
+  final double strokeWidth;
+  final Color trackColor;
+  final Color progressColor;
+
+  _DashboardCalorieArcPainter({
+    required this.progress,
+    required this.strokeWidth,
+    required this.trackColor,
+    required this.progressColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width - strokeWidth) / 2;
+
+    // Full 360-degree background track
+    final trackPaint = Paint()
+      ..color = trackColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawCircle(center, radius, trackPaint);
+
+    // Active progress arc starting from top (-90 deg)
+    if (progress > 0) {
+      final progressPaint = Paint()
+        ..color = progressColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round;
+
+      const startAngle = -math.pi / 2;
+      final sweepAngle = 2 * math.pi * progress.clamp(0.0, 1.0);
+
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startAngle,
+        sweepAngle,
+        false,
+        progressPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashboardCalorieArcPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.trackColor != trackColor ||
+        oldDelegate.progressColor != progressColor;
   }
 }

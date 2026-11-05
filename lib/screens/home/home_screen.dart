@@ -132,7 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   const SizedBox(height: 16),
 
-                  // 4. Nutrition Today (Interactive Smooth Expandable Card)
+                  // 4. Nutrition Today (Interactive Smooth Expandable Card with Hero Calorie Arc & Compact Macro Cards)
                   NutritionCard(
                     nutritionData: nutrition,
                     isExpanded: _isNutritionExpanded,
@@ -145,7 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   const SizedBox(height: 16),
 
-                  // 5. Today's Meals (Breakfast, Lunch, Snack, Dinner)
+                  // 5. Today's Meals (Breakfast, Lunch, Snack, Dinner with Real Food Photography & Calorie Count)
                   MealStatusCardSection(
                     meals: meals,
                     onMealTap: (meal) {
