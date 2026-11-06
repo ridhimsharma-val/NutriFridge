@@ -77,6 +77,8 @@ class _FridgePageState extends State<FridgePage> {
         final expiringCount = FridgeCategoryRepository.expiringSoonCount;
 
         return Scaffold(
+          primary: false,
+          resizeToAvoidBottomInset: false,
           backgroundColor: Colors.transparent,
           body: SafeArea(
             child: Column(
