@@ -3950,4 +3950,56 @@ void main() {
       expect(remainingOnion, isNull);
     });
   });
+
+  group('NUTRIFRIDGE — Fridge Screen Layout & Viewport Optimization', () {
+    testWidgets('Status card is completely removed and refrigerator fits without SingleChildScrollView', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(390 * 3.0, 844 * 3.0);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      // 1. Empty state
+      FridgeCategoryRepository.reset();
+      await tester.pumpWidget(const NutriFridgeApp());
+      await tester.pumpAndSettle();
+
+      // Navigate to Fridge
+      await tester.tap(find.byIcon(Icons.kitchen_rounded));
+      await tester.pumpAndSettle();
+
+      // Header is present
+      expect(find.text('My Fridge'), findsOneWidget);
+      expect(find.text('0 items'), findsOneWidget);
+      expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
+
+      // Status card is NOT present
+      expect(find.textContaining('Your fridge is currently empty'), findsNothing);
+      expect(find.textContaining('Tap doors to explore'), findsNothing);
+      expect(find.textContaining('Fresh:'), findsNothing);
+      expect(find.textContaining('Use soon:'), findsNothing);
+
+      // No SingleChildScrollView inside FridgePage
+      expect(find.byType(SingleChildScrollView), findsNothing);
+
+      // Refrigerator is visible and can be tapped
+      expect(find.byKey(const ValueKey('fridge_door_touch_target')), findsOneWidget);
+      expect(find.byKey(const ValueKey('freezer_door_touch_target')), findsOneWidget);
+
+      // Tap fridge door to open
+      await tester.tap(find.byKey(const ValueKey('fridge_door_touch_target')));
+      await tester.pumpAndSettle();
+      expect(find.text('DAIRY PRODUCTS'), findsOneWidget);
+
+      // 2. Populated state
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      await tester.pumpAndSettle();
+
+      expect(find.text('35 items'), findsOneWidget);
+      expect(find.textContaining('Your fridge is currently empty'), findsNothing);
+      expect(find.byType(SingleChildScrollView), findsNothing);
+      expect(find.byType(TopFreezerRefrigerator), findsOneWidget);
+    });
+  });
 }
