@@ -35,6 +35,7 @@ class AppPreferencesCard extends StatelessWidget {
             style: AppTypography.cardTitle.copyWith(
               fontSize: 16,
               fontWeight: FontWeight.w700,
+              color: AppColors.neutralCharcoal,
             ),
           ),
           const SizedBox(height: 3),
@@ -60,7 +61,7 @@ class AppPreferencesCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: AppColors.neutralCharcoal,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -76,7 +77,7 @@ class AppPreferencesCard extends StatelessWidget {
               ),
               Switch.adaptive(
                 value: profile.mealRemindersEnabled,
-                activeTrackColor: AppColors.tealPrimary,
+                activeTrackColor: AppColors.forestGreen,
                 onChanged: (val) {
                   onProfileChanged(
                     profile.copyWith(mealRemindersEnabled: val),
@@ -104,7 +105,7 @@ class AppPreferencesCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: AppColors.neutralCharcoal,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -120,7 +121,7 @@ class AppPreferencesCard extends StatelessWidget {
               ),
               Switch.adaptive(
                 value: profile.expiryAlertsEnabled,
-                activeTrackColor: AppColors.tealPrimary,
+                activeTrackColor: AppColors.forestGreen,
                 onChanged: (val) {
                   onProfileChanged(
                     profile.copyWith(expiryAlertsEnabled: val),

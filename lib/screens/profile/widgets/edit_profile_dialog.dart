@@ -151,7 +151,7 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.tealPrimary, width: 1.5),
+                borderSide: const BorderSide(color: AppColors.forestGreen, width: 1.5),
               ),
             ),
             onSubmitted: (_) => _handleSave(),
@@ -186,7 +186,7 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
                 child: ElevatedButton(
                   onPressed: _handleSave,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.tealPrimary,
+                    backgroundColor: AppColors.forestGreen,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     elevation: 0,

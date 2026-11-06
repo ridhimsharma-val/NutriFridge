@@ -58,14 +58,14 @@ class _ConsistencyHeatmapState extends State<ConsistencyHeatmap> {
     }
     switch (level) {
       case 1:
-        return const Color(0xFFBDE3D3); // Level 1: Light mint
+        return const Color(0xFFCBE5D7); // Level 1: Pale mint
       case 2:
-        return const Color(0xFF5FB497); // Level 2: Medium mint / teal
+        return AppColors.sageAccent; // Level 2: Fresh sage
       case 3:
-        return const Color(0xFF1B6A5A); // Level 3: Deep teal / green
+        return AppColors.forestGreen; // Level 3: Deep forest green
       case 0:
       default:
-        return const Color(0xFFEBF1EE); // Level 0: Pale neutral empty cell
+        return const Color(0xFFEFF3F0); // Level 0: Pale neutral empty cell
     }
   }
 
@@ -189,12 +189,12 @@ class _ConsistencyHeatmapState extends State<ConsistencyHeatmap> {
                               borderRadius: BorderRadius.circular(4),
                               border: isSelected
                                   ? Border.all(
-                                      color: AppColors.tealPrimary,
+                                      color: AppColors.forestGreen,
                                       width: 2.0,
                                     )
                                   : cell.isCurrentDay
                                       ? Border.all(
-                                          color: const Color(0xFF1B6A5A),
+                                          color: AppColors.forestGreenDark,
                                           width: 1.8,
                                         )
                                       : null,
@@ -220,7 +220,7 @@ class _ConsistencyHeatmapState extends State<ConsistencyHeatmap> {
                 color: const Color(0xFFF2F7F4),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: AppColors.tealPrimary.withValues(alpha: 0.18),
+                  color: AppColors.forestGreen.withValues(alpha: 0.18),
                   width: 0.8,
                 ),
               ),
@@ -229,7 +229,7 @@ class _ConsistencyHeatmapState extends State<ConsistencyHeatmap> {
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  color: AppColors.neutralCharcoal,
                 ),
               ),
             ),
@@ -249,7 +249,7 @@ class _ConsistencyHeatmapState extends State<ConsistencyHeatmap> {
                 style: AppTypography.subtitle.copyWith(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.tealPrimary,
+                  color: AppColors.forestGreen,
                 ),
               ),
 
@@ -257,13 +257,13 @@ class _ConsistencyHeatmapState extends State<ConsistencyHeatmap> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildLegendBlock(const Color(0xFFEBF1EE), '0'),
+                  _buildLegendBlock(const Color(0xFFEFF3F0), '0'),
                   const SizedBox(width: 8),
-                  _buildLegendBlock(const Color(0xFFBDE3D3), '1'),
+                  _buildLegendBlock(const Color(0xFFCBE5D7), '1'),
                   const SizedBox(width: 8),
-                  _buildLegendBlock(const Color(0xFF5FB497), '2'),
+                  _buildLegendBlock(AppColors.sageAccent, '2'),
                   const SizedBox(width: 8),
-                  _buildLegendBlock(const Color(0xFF1B6A5A), '3+'),
+                  _buildLegendBlock(AppColors.forestGreen, '3+'),
                 ],
               ),
             ],

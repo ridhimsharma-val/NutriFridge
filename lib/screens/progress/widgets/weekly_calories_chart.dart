@@ -108,7 +108,7 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
                 style: AppTypography.subtitle.copyWith(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.tealPrimary,
+                  color: AppColors.forestGreen,
                 ),
               ),
             ],
@@ -138,7 +138,7 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
                       Expanded(
                         child: Container(
                           height: 1.2,
-                          color: AppColors.tealPrimary.withValues(alpha: 0.25),
+                          color: AppColors.forestGreen.withValues(alpha: 0.25),
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -147,7 +147,7 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.tealPrimary.withValues(alpha: 0.7),
+                          color: AppColors.forestGreen.withValues(alpha: 0.7),
                         ),
                       ),
                     ],
@@ -191,7 +191,7 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
                                         style: const TextStyle(
                                           fontSize: 10.5,
                                           fontWeight: FontWeight.w700,
-                                          color: AppColors.tealPrimary,
+                                          color: AppColors.forestGreen,
                                         ),
                                       ),
                                     )
@@ -212,8 +212,8 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
                                               begin: Alignment.topCenter,
                                               end: Alignment.bottomCenter,
                                               colors: [
-                                                Color(0xFF2A8B74),
-                                                Color(0xFF1B6A5A),
+                                                AppColors.forestGreen,
+                                                AppColors.sageAccent,
                                               ],
                                             )
                                           : LinearGradient(
@@ -227,7 +227,7 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
                                       boxShadow: isSelected
                                           ? [
                                               BoxShadow(
-                                                color: AppColors.tealPrimary
+                                                color: AppColors.forestGreen
                                                     .withValues(alpha: 0.25),
                                                 blurRadius: 8,
                                                 offset: const Offset(0, 4),
@@ -247,7 +247,7 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
                                           ? FontWeight.w700
                                           : FontWeight.w500,
                                       color: isSelected
-                                          ? AppColors.tealPrimary
+                                          ? AppColors.forestGreen
                                           : AppColors.textSecondary,
                                     ),
                                   ),
@@ -306,7 +306,7 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AppColors.tealLight,
+                            color: AppColors.paleMint,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: const Text(
@@ -314,7 +314,7 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.tealPrimary,
+                              color: AppColors.forestGreen,
                             ),
                           ),
                         ),
@@ -335,8 +335,8 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
                     spacing: 8,
                     runSpacing: 6,
                     children: [
-                      _buildMacroBadge('Protein', '${selectedDay.proteinGrams}g', AppColors.tealAccent),
-                      _buildMacroBadge('Carbs', '${selectedDay.carbsGrams}g', AppColors.peachPrimary),
+                      _buildMacroBadge('Protein', '${selectedDay.proteinGrams}g', AppColors.sageAccent),
+                      _buildMacroBadge('Carbs', '${selectedDay.carbsGrams}g', AppColors.coralHighlight),
                       _buildMacroBadge('Fat', '${selectedDay.fatGrams}g', AppColors.amberPrimary),
                     ],
                   ),

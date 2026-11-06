@@ -43,10 +43,10 @@ class ProfileHeaderCard extends StatelessWidget {
             width: 54,
             height: 54,
             decoration: BoxDecoration(
-              color: AppColors.tealLight,
+              color: AppColors.paleMint,
               shape: BoxShape.circle,
               border: Border.all(
-                color: AppColors.tealPrimary.withValues(alpha: 0.18),
+                color: AppColors.forestGreen.withValues(alpha: 0.18),
                 width: 1.5,
               ),
             ),
@@ -56,7 +56,7 @@ class ProfileHeaderCard extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.tealPrimary,
+                  color: AppColors.forestGreen,
                   letterSpacing: -0.5,
                 ),
               ),
@@ -75,6 +75,7 @@ class ProfileHeaderCard extends StatelessWidget {
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                     letterSpacing: -0.3,
+                    color: AppColors.neutralCharcoal,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -101,10 +102,10 @@ class ProfileHeaderCard extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0F6F3),
+                  color: AppColors.paleMint,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: AppColors.tealPrimary.withValues(alpha: 0.15),
+                    color: AppColors.forestGreen.withValues(alpha: 0.2),
                     width: 1.0,
                   ),
                 ),
@@ -113,7 +114,7 @@ class ProfileHeaderCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.tealPrimary,
+                    color: AppColors.forestGreen,
                   ),
                 ),
               ),

@@ -81,6 +81,7 @@ class NutritionPreferencesCard extends StatelessWidget {
                       style: AppTypography.cardTitle.copyWith(
                         fontSize: 15.5,
                         fontWeight: FontWeight.w700,
+                        color: AppColors.neutralCharcoal,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -89,7 +90,7 @@ class NutritionPreferencesCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.tealPrimary,
+                        color: AppColors.forestGreen,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

@@ -75,6 +75,7 @@ class DietaryRestrictionsCard extends StatelessWidget {
                       style: AppTypography.cardTitle.copyWith(
                         fontSize: 15.5,
                         fontWeight: FontWeight.w700,
+                        color: AppColors.neutralCharcoal,
                       ),
                     ),
                     const SizedBox(height: 4),

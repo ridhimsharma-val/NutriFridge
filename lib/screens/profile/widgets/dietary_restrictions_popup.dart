@@ -243,9 +243,9 @@ class _DietaryRestrictionsPopupState extends State<DietaryRestrictionsPopup> {
                       return _buildTagChip(
                         label: food,
                         isSelected: isSelected,
-                        selectedBgColor: const Color(0xFFE8F5F0),
-                        selectedBorderColor: AppColors.tealPrimary,
-                        selectedTextColor: AppColors.tealPrimary,
+                        selectedBgColor: AppColors.paleMint,
+                        selectedBorderColor: AppColors.forestGreen,
+                        selectedTextColor: AppColors.forestGreen,
                         onTap: () => _toggleAvoided(food),
                       );
                     }).toList(),
@@ -368,7 +368,7 @@ class _DietaryRestrictionsPopupState extends State<DietaryRestrictionsPopup> {
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
                               borderSide: const BorderSide(
-                                color: AppColors.tealPrimary,
+                                color: AppColors.forestGreen,
                                 width: 1.5,
                               ),
                             ),
@@ -388,7 +388,7 @@ class _DietaryRestrictionsPopupState extends State<DietaryRestrictionsPopup> {
                               vertical: 10,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.tealPrimary,
+                              color: AppColors.forestGreen,
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: const Text(
@@ -469,7 +469,7 @@ class _DietaryRestrictionsPopupState extends State<DietaryRestrictionsPopup> {
                   child: ElevatedButton(
                     onPressed: _handleSave,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.tealPrimary,
+                      backgroundColor: AppColors.forestGreen,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 13),
                       elevation: 0,

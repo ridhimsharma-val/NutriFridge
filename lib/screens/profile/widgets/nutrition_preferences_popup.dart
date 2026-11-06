@@ -307,7 +307,7 @@ class _NutritionPreferencesPopupState extends State<NutritionPreferencesPopup> {
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.tealPrimary,
+                            color: AppColors.forestGreen,
                           ),
                           decoration: InputDecoration(
                             suffixText: ' kcal',
@@ -342,7 +342,7 @@ class _NutritionPreferencesPopupState extends State<NutritionPreferencesPopup> {
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
                               borderSide: const BorderSide(
-                                color: AppColors.tealPrimary,
+                                color: AppColors.forestGreen,
                                 width: 1.5,
                               ),
                             ),
@@ -395,7 +395,7 @@ class _NutritionPreferencesPopupState extends State<NutritionPreferencesPopup> {
                   child: ElevatedButton(
                     onPressed: _handleSave,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.tealPrimary,
+                      backgroundColor: AppColors.forestGreen,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 13),
                       elevation: 0,
@@ -428,8 +428,8 @@ class _NutritionPreferencesPopupState extends State<NutritionPreferencesPopup> {
     Color? selectedBorderColor,
     Color? selectedTextColor,
   }) {
-    final bg = selectedBgColor ?? AppColors.tealPrimary;
-    final border = selectedBorderColor ?? AppColors.tealPrimary;
+    final bg = selectedBgColor ?? AppColors.forestGreen;
+    final border = selectedBorderColor ?? AppColors.forestGreen;
     final text = selectedTextColor ?? Colors.white;
 
     return Material(
