@@ -31,8 +31,7 @@ class SupabaseManager {
 
     await Supabase.initialize(
       url: SupabaseConfig.supabaseUrl,
-      // ignore: deprecated_member_use
-      anonKey: SupabaseConfig.supabasePublishableKey,
+      publishableKey: SupabaseConfig.supabasePublishableKey,
       authOptions: const FlutterAuthClientOptions(
         authFlowType: AuthFlowType.pkce,
       ),

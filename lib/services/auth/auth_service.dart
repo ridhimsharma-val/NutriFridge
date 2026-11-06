@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase/supabase_client.dart';
+import '../sync/user_data_sync_service.dart';
 
 /// Centralized authentication service for NutriFridge using Supabase Auth.
 /// Provides email/password signup, login, password recovery, session restore,
@@ -101,6 +102,8 @@ class AuthService {
       throw AuthFailure(formatAuthError(e.message));
     } catch (_) {
       // Allow sign out to succeed locally even on network failure
+    } finally {
+      UserDataSyncService.clearAllUserDataForLogout();
     }
   }
 

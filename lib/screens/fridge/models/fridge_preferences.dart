@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../services/auth/auth_service.dart';
+import '../../../services/preferences/fridge_preferences_service.dart';
 
 /// Exterior finish options for the NutriFridge refrigerator
 enum FridgeColorFinish {
@@ -292,6 +294,29 @@ class FridgePreferencesRepository {
   static void update(FridgePreferences newPreferences) {
     _current = newPreferences;
     notifier.value = _current;
+
+    if (AuthService.instance.isAuthenticated &&
+        AuthService.instance.currentUser != null) {
+      FridgePreferencesService.instance.savePreferences(newPreferences).catchError((_) {
+        return newPreferences;
+      });
+    }
+  }
+
+  /// Loads saved preferences from Supabase for the authenticated user.
+  static Future<void> loadFromSupabase({String? userId}) async {
+    final effectiveUserId = userId ?? AuthService.instance.currentUser?.id;
+    if (effectiveUserId == null) return;
+
+    try {
+      final saved = await FridgePreferencesService.instance.fetchPreferences(userId: effectiveUserId);
+      if (saved != null) {
+        _current = saved;
+        notifier.value = _current;
+      }
+    } catch (_) {
+      // Gracefully preserve current preferences on failure
+    }
   }
 
   /// Resets to default settings (Midnight Navy, Freezer on Top)

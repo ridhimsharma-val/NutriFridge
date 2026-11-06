@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/config/supabase_config.dart';
 import '../../services/auth/auth_service.dart';
+import '../../services/sync/user_data_sync_service.dart';
 import '../main_navigation_shell.dart';
 import 'configuration_error_screen.dart';
 import 'login_screen.dart';
@@ -59,6 +60,12 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     _isAuthenticated = AuthService.instance.isAuthenticated;
+    if (_isAuthenticated) {
+      final user = AuthService.instance.currentUser;
+      if (user != null) {
+        UserDataSyncService.syncAllUserData(user.id);
+      }
+    }
   }
 
   void _subscribeToAuthChanges() {
@@ -76,6 +83,11 @@ class _AuthGateState extends State<AuthGate> {
           }
         } else {
           final newAuth = session != null;
+          if (session != null) {
+            UserDataSyncService.syncAllUserData(session.user.id);
+          } else {
+            UserDataSyncService.clearAllUserDataForLogout();
+          }
           if (_isAuthenticated != newAuth && mounted) {
             setState(() {
               _isAuthenticated = newAuth;

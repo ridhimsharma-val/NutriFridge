@@ -96,6 +96,47 @@ class _FridgePageState extends State<FridgePage> {
                   },
                 ),
 
+                if (FridgeCategoryRepository.isLoading)
+                  const LinearProgressIndicator(
+                    minHeight: 2,
+                    backgroundColor: Colors.transparent,
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5B7E58)),
+                  ),
+
+                if (FridgeCategoryRepository.loadError != null)
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFBEBEA),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFF09995)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline, size: 18, color: Color(0xFFC53929)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            FridgeCategoryRepository.loadError!,
+                            style: const TextStyle(fontSize: 12, color: Color(0xFFC53929)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => FridgeCategoryRepository.loadFromSupabase(force: true),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text('Retry', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFC53929))),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // 2. Main Centralized Appliance Area (Positioned immediately below header, fitted without scrolling)
                 Expanded(
                   child: Padding(

@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../screens/profile/models/user_profile_data.dart';
+import '../services/auth/auth_service.dart';
+import '../services/profile/profile_service.dart';
 import 'notification_data.dart';
 
 /// Supported recommendation lifecycle states.
@@ -464,6 +466,32 @@ class MockDataRepository {
       );
     }
     _notify();
+
+    if (AuthService.instance.isAuthenticated &&
+        AuthService.instance.currentUser != null) {
+      ProfileService.instance.saveProfileWithGoals(updated).catchError((_) {});
+    }
+  }
+
+  /// Loads user profile and nutrition goals from Supabase for the authenticated user.
+  static Future<void> loadFromSupabase({String? userId}) async {
+    final effectiveUserId = userId ?? AuthService.instance.currentUser?.id;
+    if (effectiveUserId == null) return;
+
+    try {
+      final savedProfile = await ProfileService.instance.fetchProfileWithGoals(userId: effectiveUserId);
+      if (savedProfile != null) {
+        _currentProfile = savedProfile;
+        if (savedProfile.dailyCalorieTarget != null) {
+          _currentNutrition = _currentNutrition.copyWith(
+            targetCalories: savedProfile.dailyCalorieTarget!,
+          );
+        }
+        _notify();
+      }
+    } catch (_) {
+      // Preserve current state gracefully on network failure
+    }
   }
 
   /// Current daily nutrition totals

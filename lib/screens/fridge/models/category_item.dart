@@ -1,6 +1,9 @@
+// ignore_for_file: prefer_initializing_formals
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../models/notification_data.dart';
+import '../../../../services/auth/auth_service.dart';
+import '../../../../services/inventory/fridge_inventory_repository.dart';
 
 /// Expiry urgency level with calm, subtle pastel status colors
 enum ExpiryStatus {
@@ -16,18 +19,35 @@ class CategoryFoodItem {
   final String id;
   final String name;
   final String quantity;
-  final int? expiryDays;
+  final int? _expiryDays;
+  final DateTime? expiryDate;
   final String? imageAsset;
+  final String? storageImagePath;
   final String? iconEmoji;
+  final String? category;
 
   const CategoryFoodItem({
     required this.id,
     required this.name,
     required this.quantity,
-    this.expiryDays,
+    int? expiryDays,
+    this.expiryDate,
     this.imageAsset,
+    this.storageImagePath,
     this.iconEmoji,
-  });
+    this.category,
+  }) : _expiryDays = expiryDays;
+
+  int? get expiryDays {
+    if (_expiryDays != null) return _expiryDays;
+    if (expiryDate != null) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final target = DateTime(expiryDate!.year, expiryDate!.month, expiryDate!.day);
+      return target.difference(today).inDays;
+    }
+    return null;
+  }
 
   bool get isExpired => expiryDays != null && expiryDays! < 0;
   bool get isExpiringSoon => expiryDays != null && expiryDays! >= 0 && expiryDays! <= 3;
@@ -79,16 +99,22 @@ class CategoryFoodItem {
     String? name,
     String? quantity,
     int? expiryDays,
+    DateTime? expiryDate,
     String? imageAsset,
+    String? storageImagePath,
     String? iconEmoji,
+    String? category,
   }) {
     return CategoryFoodItem(
       id: id ?? this.id,
       name: name ?? this.name,
       quantity: quantity ?? this.quantity,
-      expiryDays: expiryDays ?? this.expiryDays,
+      expiryDays: expiryDays ?? _expiryDays,
+      expiryDate: expiryDate ?? this.expiryDate,
       imageAsset: imageAsset ?? this.imageAsset,
+      storageImagePath: storageImagePath ?? this.storageImagePath,
       iconEmoji: iconEmoji ?? this.iconEmoji,
+      category: category ?? this.category,
     );
   }
 
@@ -413,6 +439,68 @@ class FridgeCategoryRepository {
 
   /// Change notifier for dynamic inventory updates across screens
   static final ValueNotifier<int> notifier = ValueNotifier<int>(0);
+
+  static bool isLoading = false;
+  static String? loadError;
+  static bool isLoadedFromSupabase = false;
+  static String? currentLoadedUserId;
+  static bool forceInMemoryForTesting = false;
+
+  static String canonicalizeCategory(String name) => _canonicalizeCategory(name);
+  static String categoryEmoji(String key) => _categoryEmoji(key);
+  static String categoryImage(String key) => _categoryImage(key);
+
+  /// Loads all items from public.fridge_items for the authenticated user.
+  static Future<void> loadFromSupabase({String? userId, bool force = false}) async {
+    final effectiveUserId = userId ?? AuthService.instance.currentUser?.id;
+    if (effectiveUserId == null) return;
+    if (forceInMemoryForTesting) return;
+
+    if (!force && isLoadedFromSupabase && currentLoadedUserId == effectiveUserId) {
+      return;
+    }
+
+    isLoading = true;
+    loadError = null;
+    _notify();
+
+    try {
+      final items = await FridgeInventoryRepository.instance.fetchItems(userId: effectiveUserId);
+      if (AuthService.instance.currentUser?.id != effectiveUserId) {
+        // Discard stale response if active user switched during network call
+        return;
+      }
+
+      final newStore = _buildInitialStore();
+      for (final item in items) {
+        final cat = _canonicalizeCategory(item.category ?? 'Others');
+        newStore.putIfAbsent(cat, () => []).add(item);
+      }
+
+      _categoryStore = newStore;
+      isLoadedFromSupabase = true;
+      currentLoadedUserId = effectiveUserId;
+      isLoading = false;
+      loadError = null;
+      _notify();
+    } catch (e) {
+      if (AuthService.instance.currentUser?.id == effectiveUserId) {
+        isLoading = false;
+        loadError = e.toString();
+        _notify();
+      }
+    }
+  }
+
+  /// Clears inventory state upon user logout to prevent account leakage.
+  static void clearForLogout() {
+    currentLoadedUserId = null;
+    isLoadedFromSupabase = false;
+    isLoading = false;
+    loadError = null;
+    _categoryStore = _buildInitialStore();
+    _notify();
+  }
 
   static void _notify() {
     notifier.value++;
@@ -800,7 +888,7 @@ class FridgeCategoryRepository {
   }
 
   /// Add a food item into a category
-  static void addItemToCategory(String categoryName, CategoryFoodItem item) {
+  static Future<CategoryFoodItem> addItemToCategory(String categoryName, CategoryFoodItem item) async {
     final canonicalName = _canonicalizeCategory(categoryName);
     final resolvedImage = (item.imageAsset != null &&
             item.imageAsset!.isNotEmpty &&
@@ -817,9 +905,34 @@ class FridgeCategoryRepository {
             !item.imageAsset!.contains('categories/others'))
         ? item.imageAsset
         : FoodItemAssetRegistry.getAssetForItem(item.name, canonicalName);
+
+    if (!forceInMemoryForTesting &&
+        AuthService.instance.isAuthenticated &&
+        AuthService.instance.currentUser != null) {
+      final savedItem = await FridgeInventoryRepository.instance.insertItem(
+        name: item.name,
+        category: canonicalName,
+        quantity: item.decimalAmount,
+        unit: item.unit,
+        expiryDate: item.expiryDate,
+        expiryDays: item.expiryDays,
+        imageAsset: resolvedImage,
+        storageImagePath: item.storageImagePath,
+      );
+      final list = _categoryStore.putIfAbsent(canonicalName, () => []);
+      list.add(savedItem);
+      NotificationRepository.addNotification(
+        title: 'Inventory update',
+        description: '${savedItem.name} was added to your fridge.',
+        type: NotificationType.inventoryUpdate,
+      );
+      _notify();
+      return savedItem;
+    }
+
     final resolvedItem = (item.imageAsset == resolvedImage)
-        ? item
-        : item.copyWith(imageAsset: resolvedImage);
+        ? item.copyWith(category: canonicalName)
+        : item.copyWith(imageAsset: resolvedImage, category: canonicalName);
     final list = _categoryStore.putIfAbsent(canonicalName, () => []);
     list.add(resolvedItem);
     NotificationRepository.addNotification(
@@ -828,6 +941,7 @@ class FridgeCategoryRepository {
       type: NotificationType.inventoryUpdate,
     );
     _notify();
+    return resolvedItem;
   }
 
   /// Formats quantity with clean number and plural-aware unit
@@ -1003,6 +1117,25 @@ class FridgeCategoryRepository {
           expiryDays: expiryDays ?? existingItem.expiryDays,
         );
 
+        if (!forceInMemoryForTesting &&
+            AuthService.instance.isAuthenticated &&
+            AuthService.instance.currentUser != null &&
+            existingItem.id.isNotEmpty &&
+            !existingItem.id.startsWith('item_') &&
+            !existingItem.id.startsWith('food_') &&
+            !existingItem.id.startsWith('dairy_')) {
+          FridgeInventoryRepository.instance.updateItem(
+            id: existingItem.id,
+            quantity: mergedAmount,
+            unit: mergedUnit,
+            expiryDate: updatedItem.expiryDate,
+            expiryDays: updatedItem.expiryDays,
+          ).catchError((e) {
+            debugPrint('[FridgeCategoryRepository] Failed to persist merged item: $e');
+            return updatedItem;
+          });
+        }
+
         final catList = _categoryStore[foundCategory]!;
         final idx = catList.indexWhere((it) => it.id == existingItem!.id);
         if (idx != -1) {
@@ -1043,10 +1176,32 @@ class FridgeCategoryRepository {
       quantity: cleanQtyStr,
       expiryDays: expiryDays,
       imageAsset: resolvedImage,
+      category: canonicalName,
     );
 
     final list = _categoryStore.putIfAbsent(canonicalName, () => []);
     list.add(newItem);
+
+    if (!forceInMemoryForTesting &&
+        AuthService.instance.isAuthenticated &&
+        AuthService.instance.currentUser != null) {
+      FridgeInventoryRepository.instance.insertItem(
+        name: name,
+        category: canonicalName,
+        quantity: quantity,
+        unit: unit,
+        expiryDays: expiryDays,
+        imageAsset: resolvedImage,
+      ).then((savedItem) {
+        final idx = list.indexWhere((it) => it.id == newItem.id);
+        if (idx != -1) {
+          list[idx] = savedItem;
+          _notify();
+        }
+      }).catchError((e) {
+        debugPrint('[FridgeCategoryRepository] Failed to insert new item into Supabase: $e');
+      });
+    }
 
     NotificationRepository.addNotification(
       title: 'Inventory update',
@@ -1064,9 +1219,30 @@ class FridgeCategoryRepository {
     }
   }
 
-  /// Update item quantity in mock state
-  static void updateItem(String categoryIdOrName, CategoryFoodItem updatedItem) {
+  /// Update item quantity in repository
+  static Future<void> updateItem(String categoryIdOrName, CategoryFoodItem updatedItem) async {
     final canonicalName = _canonicalizeCategory(categoryIdOrName);
+
+    if (!forceInMemoryForTesting &&
+        AuthService.instance.isAuthenticated &&
+        AuthService.instance.currentUser != null &&
+        updatedItem.id.isNotEmpty &&
+        !updatedItem.id.startsWith('item_') &&
+        !updatedItem.id.startsWith('food_') &&
+        !updatedItem.id.startsWith('dairy_')) {
+      await FridgeInventoryRepository.instance.updateItem(
+        id: updatedItem.id,
+        name: updatedItem.name,
+        category: canonicalName,
+        quantity: updatedItem.decimalAmount,
+        unit: updatedItem.unit,
+        expiryDate: updatedItem.expiryDate,
+        expiryDays: updatedItem.expiryDays,
+        imageAsset: updatedItem.imageAsset,
+        storageImagePath: updatedItem.storageImagePath,
+      );
+    }
+
     final list = _categoryStore[canonicalName];
     if (list != null) {
       final index = list.indexWhere((it) => it.id == updatedItem.id);
@@ -1087,9 +1263,21 @@ class FridgeCategoryRepository {
     }
   }
 
-  /// Remove item from mock state
-  static void removeItem(String categoryIdOrName, String itemId) {
+  /// Remove item from repository
+  static Future<void> removeItem(String categoryIdOrName, String itemId) async {
     final canonicalName = _canonicalizeCategory(categoryIdOrName);
+
+    if (!forceInMemoryForTesting &&
+        AuthService.instance.isAuthenticated &&
+        AuthService.instance.currentUser != null &&
+        itemId.isNotEmpty &&
+        !itemId.startsWith('item_') &&
+        !itemId.startsWith('food_') &&
+        !itemId.startsWith('dairy_') &&
+        !itemId.startsWith('veg_')) {
+      await FridgeInventoryRepository.instance.deleteItem(itemId);
+    }
+
     final list = _categoryStore[canonicalName];
     if (list != null) {
       list.removeWhere((it) => it.id == itemId);
