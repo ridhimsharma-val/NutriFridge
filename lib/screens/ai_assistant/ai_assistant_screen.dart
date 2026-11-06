@@ -1539,30 +1539,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       padding: const EdgeInsets.only(top: 10, bottom: 20),
       child: Column(
         children: [
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: AppColors.cardWhite,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.cardBorder, width: 1.2),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x10143D30),
-                  blurRadius: 16,
-                  offset: Offset(0, 6),
-                ),
-              ],
-            ),
-            child: const Center(
-              child: Icon(
-                Icons.auto_awesome_rounded,
-                color: AppColors.sageAccent,
-                size: 26,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
+
           const Text(
             'Hi there!',
             style: TextStyle(
@@ -1588,9 +1565,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             runSpacing: 8,
             alignment: WrapAlignment.center,
             children: [
-              _buildSuggestionPill('🥗 Log my meal', 'I had a grilled chicken salad with avocado'),
-              _buildSuggestionPill('🍎 Add groceries', 'Add 2 apples and 1L milk to fridge'),
-              _buildSuggestionPill('🥑 Recipe ideas', 'What can I cook with ingredients in my fridge?'),
+              _buildSuggestionPill('Log my meal', 'I had a grilled chicken salad with avocado'),
+              _buildSuggestionPill('Add groceries', 'Add 2 apples and 1L milk to fridge'),
+              _buildSuggestionPill('Recipe ideas', 'What can I cook with ingredients in my fridge?'),
             ],
           ),
         ],
@@ -1735,34 +1712,17 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Assistant Avatar & Identity header indicator
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      color: AppColors.paleMint,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Center(
-                      child: Icon(Icons.auto_awesome_rounded, size: 13, color: AppColors.forestGreen),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'AI Assistant',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.forestGreen,
-                      letterSpacing: 0.1,
-                    ),
-                  ),
-                ],
+              // Assistant Identity header
+              const Text(
+                'AI Assistant',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.forestGreen,
+                  letterSpacing: 0.2,
+                ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
 
               // Assistant Text
               Text(
@@ -1841,8 +1801,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.kitchen_rounded, size: 16, color: AppColors.forestGreen),
-              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   'Proposed Fridge Additions',
@@ -2115,8 +2073,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFFDC2626)),
-              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   'Proposed Fridge Removals',
@@ -2269,24 +2225,13 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                       width: 0.8,
                     ),
                   ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.edit_note_rounded,
-                        size: 11,
-                        color: Color(0xFF2563EB),
-                      ),
-                      SizedBox(width: 3),
-                      Text(
-                        'Manual Entry',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1D4ED8),
-                        ),
-                      ),
-                    ],
+                  child: const Text(
+                    'Manual Entry',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1D4ED8),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 6),

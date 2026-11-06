@@ -136,13 +136,6 @@ class NutritionCard extends StatelessWidget {
                                   mainAxisSize: MainAxisSize.min,
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
-                                    // Small eco leaf icon
-                                    const Icon(
-                                      Icons.eco_rounded,
-                                      size: 16,
-                                      color: AppColors.forestGreen,
-                                    ),
-                                    const SizedBox(height: 2),
                                     Text(
                                       'Today',
                                       style: AppTypography.subtitle.copyWith(
@@ -206,8 +199,6 @@ class NutritionCard extends StatelessWidget {
                             amount: nutritionData.protein.amountGrams,
                             target: nutritionData.protein.targetGrams,
                             progress: nutritionData.protein.progress,
-                            icon: Icons.spa_rounded,
-                            iconBg: const Color(0xFFE8F4EC),
                             accentColor: AppColors.freshGreen,
                           ),
                         ),
@@ -218,8 +209,6 @@ class NutritionCard extends StatelessWidget {
                             amount: nutritionData.carbs.amountGrams,
                             target: nutritionData.carbs.targetGrams,
                             progress: nutritionData.carbs.progress,
-                            icon: Icons.grain_rounded,
-                            iconBg: AppColors.palePeachSurface,
                             accentColor: AppColors.coralPeach,
                           ),
                         ),
@@ -230,8 +219,6 @@ class NutritionCard extends StatelessWidget {
                             amount: nutritionData.fat.amountGrams,
                             target: nutritionData.fat.targetGrams,
                             progress: nutritionData.fat.progress,
-                            icon: Icons.water_drop_rounded,
-                            iconBg: const Color(0xFFF4FADF),
                             accentColor: AppColors.vibrantLime,
                           ),
                         ),
@@ -263,8 +250,6 @@ class NutritionCard extends StatelessWidget {
     required int amount,
     required int target,
     required double progress,
-    required IconData icon,
-    required Color iconBg,
     required Color accentColor,
   }) {
     final pctInt = (progress * 100).toInt();
@@ -283,21 +268,6 @@ class NutritionCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Circular Icon Container
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: iconBg,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              size: 15,
-              color: accentColor,
-            ),
-          ),
-          const SizedBox(height: 6),
           // Label
           Text(
             label,
@@ -632,18 +602,20 @@ class NutritionCard extends StatelessWidget {
           ),
           child: Row(
             children: [
-              // Meal Type Pill
+              // Meal Slot Tag
               Container(
-                width: 30,
-                height: 30,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: isCompleted ? AppColors.tealLight : const Color(0xFFEFF2F0),
-                  shape: BoxShape.circle,
+                  color: isCompleted ? AppColors.paleMint : const Color(0xFFEFF2F0),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Center(
-                  child: Text(
-                    meal.iconEmoji.isNotEmpty ? meal.iconEmoji : '🍽️',
-                    style: const TextStyle(fontSize: 14),
+                child: Text(
+                  meal.name.substring(0, meal.name.length > 3 ? 3 : meal.name.length).toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: isCompleted ? AppColors.primaryForest : AppColors.textSecondary,
+                    letterSpacing: 0.4,
                   ),
                 ),
               ),

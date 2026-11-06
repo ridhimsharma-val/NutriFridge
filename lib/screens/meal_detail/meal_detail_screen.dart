@@ -310,24 +310,13 @@ class MealDetailScreen extends StatelessWidget {
                     width: 1.0,
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.schedule_rounded,
-                      size: 13,
-                      color: AppColors.forestGreen,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${meal.prepTimeMinutes} mins prep',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.forestGreen,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  '${meal.prepTimeMinutes} mins prep',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.forestGreen,
+                  ),
                 ),
               ),
             ],
@@ -677,21 +666,14 @@ class MealDetailScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: const Color(0xFFD4E7D9), width: 0.8),
                 ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.auto_awesome_rounded, size: 12, color: AppColors.forestGreen),
-                    SizedBox(width: 4),
-                    Text(
-                      'NutriFridge AI',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.3,
-                        color: AppColors.forestGreen,
-                      ),
-                    ),
-                  ],
+                child: const Text(
+                  'NutriFridge AI',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                    color: AppColors.forestGreen,
+                  ),
                 ),
               ),
             ],
@@ -975,18 +957,17 @@ class MealDetailScreen extends StatelessWidget {
             Expanded(
               child: SizedBox(
                 height: 48,
-                child: ElevatedButton.icon(
+                child: ElevatedButton(
                   onPressed: () => AiAssistantModalSheet.show(context, mealName: meal.name),
-                  icon: const Icon(Icons.auto_awesome_rounded, size: 16),
-                  label: const Text(
-                    'Cook with AI',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.vibrantLime,
                     foregroundColor: AppColors.primaryForest,
                     elevation: 0,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  ),
+                  child: const Text(
+                    'Cook with AI',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
@@ -996,18 +977,17 @@ class MealDetailScreen extends StatelessWidget {
             Expanded(
               child: SizedBox(
                 height: 48,
-                child: ElevatedButton.icon(
+                child: ElevatedButton(
                   onPressed: () => _handleLogMeal(context, meal),
-                  icon: const Icon(Icons.check_rounded, size: 18),
-                  label: const Text(
-                    'Log Meal',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryForest,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  ),
+                  child: const Text(
+                    'Log Meal',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),

@@ -101,45 +101,20 @@ class RecommendationCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.peachBorder),
-                  ),
-                  child: const Icon(
-                    Icons.restaurant_menu_rounded,
-                    size: 20,
-                    color: AppColors.peachPrimary,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Your fridge is waiting for its first ingredients.',
-                        style: AppTypography.cardTitle.copyWith(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Your next meal starts with your fridge.',
-                        style: AppTypography.subtitle.copyWith(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            Text(
+              'Your fridge is waiting for its first ingredients.',
+              style: AppTypography.cardTitle.copyWith(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              'Your next meal starts with your fridge.',
+              style: AppTypography.subtitle.copyWith(
+                fontSize: 12.5,
+                color: AppColors.textSecondary,
+              ),
             ),
             const SizedBox(height: 10),
             Text(
@@ -261,32 +236,12 @@ class RecommendationCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.peachBorder),
-                  ),
-                  child: const Icon(
-                    Icons.search_off_rounded,
-                    size: 20,
-                    color: AppColors.peachPrimary,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    "We couldn't find a suitable meal with your current ingredients.",
-                    style: AppTypography.cardTitle.copyWith(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
+            Text(
+              "We couldn't find a suitable meal with your current ingredients.",
+              style: AppTypography.cardTitle.copyWith(
+                fontSize: 15.5,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -538,24 +493,13 @@ class RecommendationCard extends StatelessWidget {
                         color: Colors.black.withValues(alpha: 0.42),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.timer_outlined,
-                            size: 13,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${recommendation.prepTimeMinutes} min',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        '${recommendation.prepTimeMinutes} min',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
@@ -662,10 +606,13 @@ class RecommendationCard extends StatelessWidget {
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              const Icon(
-                                Icons.check_circle_outline_rounded,
-                                size: 13,
-                                color: AppColors.coralPeach,
+                              Container(
+                                width: 4.5,
+                                height: 4.5,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.coralPeach,
+                                  shape: BoxShape.circle,
+                                ),
                               ),
                               const SizedBox(width: 6),
                               Expanded(

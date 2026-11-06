@@ -49,42 +49,23 @@ class MealStatusCardSection extends StatelessWidget {
                     border: Border.all(color: AppColors.cardBorder, width: 1.0),
                     boxShadow: const [AppColors.softShadow],
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(9),
-                        decoration: BoxDecoration(
-                          color: AppColors.paleMint,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.restaurant_outlined,
-                          size: 20,
-                          color: AppColors.forestGreen,
+                      const Text(
+                        'No meals logged yet today',
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'No meals logged yet today',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Log meals via AI Assistant or camera',
-                              style: AppTypography.subtitle.copyWith(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
+                      const SizedBox(height: 3),
+                      Text(
+                        'Log meals via AI Assistant or camera',
+                        style: AppTypography.subtitle.copyWith(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ],

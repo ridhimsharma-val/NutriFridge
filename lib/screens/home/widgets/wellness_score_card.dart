@@ -100,32 +100,15 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(
-                color: AppColors.cardWhite.withValues(alpha: 0.9),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.spa_rounded,
-                size: 18,
-                color: AppColors.tealPrimary,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              "Today's Wellness",
-              style: AppTypography.cardTitle.copyWith(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ],
+        Text(
+          "Today's Wellness",
+          style: AppTypography.cardTitle.copyWith(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         const Text(
           'Your wellness insights will appear here as you log meals.',
           style: TextStyle(

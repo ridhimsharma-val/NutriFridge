@@ -728,24 +728,13 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                 width: 0.8,
               ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  nutrition.isManual ? Icons.edit_note_rounded : Icons.auto_awesome,
-                  size: 12,
-                  color: nutrition.isManual ? const Color(0xFF2563EB) : AppColors.forestGreen,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  nutrition.isManual ? 'Manual Entry' : 'AI Estimate',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: nutrition.isManual ? const Color(0xFF1D4ED8) : AppColors.forestGreen,
-                  ),
-                ),
-              ],
+            child: Text(
+              nutrition.isManual ? 'Manual Entry' : 'AI Estimate',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: nutrition.isManual ? const Color(0xFF1D4ED8) : AppColors.forestGreen,
+              ),
             ),
           ),
 

@@ -117,20 +117,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.paleMint,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.forestGreen.withValues(alpha: 0.15)),
-            ),
-            child: const Icon(
-              Icons.insights_rounded,
-              size: 32,
-              color: AppColors.forestGreen,
-            ),
-          ),
-          const SizedBox(height: 16),
+
           const Text(
             'Your nutrition journey starts with your first meal.',
             textAlign: TextAlign.center,
@@ -152,7 +139,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          ElevatedButton.icon(
+          ElevatedButton(
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -160,8 +147,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 ),
               );
             },
-            icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('Log a Meal with AI'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.forestGreen,
               foregroundColor: Colors.white,
@@ -170,6 +155,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
               ),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             ),
+            child: const Text('Log a Meal with AI'),
           ),
         ],
       ),
