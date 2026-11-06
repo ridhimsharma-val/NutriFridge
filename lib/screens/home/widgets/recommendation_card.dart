@@ -89,10 +89,10 @@ class RecommendationCard extends StatelessWidget {
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
-          color: AppColors.peachCard,
+          color: AppColors.pureWhite,
           borderRadius: BorderRadius.circular(22),
           border: Border.all(
-            color: AppColors.peachBorder,
+            color: AppColors.coralPeach.withValues(alpha: 0.32),
             width: 1.2,
           ),
           boxShadow: const [AppColors.softShadow],
@@ -249,10 +249,10 @@ class RecommendationCard extends StatelessWidget {
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
-          color: AppColors.peachCard,
+          color: AppColors.pureWhite,
           borderRadius: BorderRadius.circular(22),
           border: Border.all(
-            color: AppColors.peachBorder,
+            color: AppColors.coralPeach.withValues(alpha: 0.32),
             width: 1.2,
           ),
           boxShadow: const [AppColors.softShadow],
@@ -425,10 +425,10 @@ class RecommendationCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(22),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.peachCard,
+          color: AppColors.pureWhite,
           borderRadius: BorderRadius.circular(22),
           border: Border.all(
-            color: AppColors.peachBorder,
+            color: AppColors.coralPeach.withValues(alpha: 0.32),
             width: 1.2,
           ),
           boxShadow: const [AppColors.softShadow],
@@ -483,10 +483,10 @@ class RecommendationCard extends StatelessWidget {
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.94),
+                      color: AppColors.palePeachSurface,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: AppColors.peachBorder,
+                        color: AppColors.coralPeach.withValues(alpha: 0.32),
                         width: 1.0,
                       ),
                       boxShadow: [
@@ -504,7 +504,7 @@ class RecommendationCard extends StatelessWidget {
                           width: 6,
                           height: 6,
                           decoration: const BoxDecoration(
-                            color: AppColors.peachPrimary,
+                            color: AppColors.coralPeach,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -514,7 +514,7 @@ class RecommendationCard extends StatelessWidget {
                               ? recommendation.mealType.toUpperCase()
                               : recommendation.tag,
                           style: AppTypography.badgeText.copyWith(
-                            color: AppColors.peachText,
+                            color: AppColors.darkPeachText,
                             fontWeight: FontWeight.w700,
                             fontSize: 10.5,
                             letterSpacing: 0.5,
@@ -603,7 +603,7 @@ class RecommendationCard extends StatelessWidget {
                                       text: ' · ${recommendation.fridgeItemsUsed} in fridge',
                                       style: AppTypography.subtitle.copyWith(
                                         fontSize: 12,
-                                        color: AppColors.tealPrimary,
+                                        color: AppColors.freshGreen,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -625,7 +625,7 @@ class RecommendationCard extends StatelessWidget {
                           color: AppColors.cardWhite,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: AppColors.peachBorder,
+                            color: AppColors.coralPeach.withValues(alpha: 0.32),
                             width: 1.2,
                           ),
                           boxShadow: const [AppColors.cardShadow],
@@ -633,7 +633,7 @@ class RecommendationCard extends StatelessWidget {
                         child: const Icon(
                           Icons.arrow_forward_rounded,
                           size: 18,
-                          color: AppColors.peachAccent,
+                          color: AppColors.coralPeach,
                         ),
                       ),
                     ],
@@ -647,10 +647,10 @@ class RecommendationCard extends StatelessWidget {
                       vertical: 7,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.peachLight.withValues(alpha: 0.65),
+                      color: AppColors.palePeachSurface,
                       borderRadius: BorderRadius.circular(11),
                       border: Border.all(
-                        color: AppColors.peachBorder.withValues(alpha: 0.8),
+                        color: AppColors.palePeachBorder,
                         width: 1.0,
                       ),
                     ),
@@ -665,14 +665,14 @@ class RecommendationCard extends StatelessWidget {
                               const Icon(
                                 Icons.check_circle_outline_rounded,
                                 size: 13,
-                                color: AppColors.peachAccent,
+                                color: AppColors.coralPeach,
                               ),
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
                                   reason,
                                   style: AppTypography.badgeText.copyWith(
-                                    color: AppColors.peachText,
+                                    color: AppColors.darkPeachText,
                                     fontWeight: FontWeight.w600,
                                     fontSize: 11.5,
                                   ),

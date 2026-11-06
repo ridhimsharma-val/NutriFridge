@@ -133,7 +133,7 @@ class MacroMetricCard extends StatelessWidget {
             child: Container(
               height: 5,
               width: double.infinity,
-              color: const Color(0xFFEFF2F0),
+              color: AppColors.neutralTrack,
               child: progress > 0
                   ? FractionallySizedBox(
                       alignment: Alignment.centerLeft,
@@ -176,7 +176,7 @@ class MacroMetricRow extends StatelessWidget {
         Expanded(
           child: MacroMetricCard.fromMacro(
             protein,
-            accentColor: AppColors.forestGreen,
+            accentColor: AppColors.freshGreen,
             onTap: onTap,
           ),
         ),
@@ -184,7 +184,7 @@ class MacroMetricRow extends StatelessWidget {
         Expanded(
           child: MacroMetricCard.fromMacro(
             carbs,
-            accentColor: AppColors.coralHighlight,
+            accentColor: AppColors.coralPeach,
             onTap: onTap,
           ),
         ),
@@ -192,7 +192,7 @@ class MacroMetricRow extends StatelessWidget {
         Expanded(
           child: MacroMetricCard.fromMacro(
             fat,
-            accentColor: AppColors.amberPrimary,
+            accentColor: AppColors.vibrantLime,
             onTap: onTap,
           ),
         ),

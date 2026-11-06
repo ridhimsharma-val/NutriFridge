@@ -593,13 +593,13 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
               const SizedBox(height: 10),
 
               // 8. Action 2: Secondary "+ Add Food" (Outlined button)
-              OutlinedButton(
+              ElevatedButton(
                 onPressed: _isProcessing ? null : _handleAddFood,
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: AppColors.sageLight,
-                  foregroundColor: AppColors.forestGreen,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.freshGreen,
+                  foregroundColor: Colors.white,
                   side: BorderSide(
-                    color: AppColors.sageAccent.withValues(alpha: 0.5),
+                    color: AppColors.freshGreen,
                     width: 1.2,
                   ),
                   shape: RoundedRectangleBorder(

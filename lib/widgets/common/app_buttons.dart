@@ -97,7 +97,7 @@ class AppSecondaryButton extends StatelessWidget {
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
-          backgroundColor: AppColors.warmCream,
+          backgroundColor: AppColors.paleMint,
           foregroundColor: textColor ?? AppColors.forestGreen,
           elevation: 0,
           side: const BorderSide(

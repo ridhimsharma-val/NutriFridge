@@ -26,8 +26,8 @@ class CircularCalorieRing extends StatelessWidget {
     required this.targetCalories,
     this.diameter = 164.0,
     this.strokeWidth = 11.0,
-    this.trackColor = const Color(0xFFEFF2F0),
-    this.progressColor = AppColors.forestGreen,
+    this.trackColor = AppColors.neutralTrack,
+    this.progressColor = AppColors.freshGreen,
     this.onTap,
   });
 

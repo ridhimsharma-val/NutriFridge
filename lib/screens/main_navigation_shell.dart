@@ -50,9 +50,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.warmCream,
+      color: AppColors.softCream,
       child: Scaffold(
-        backgroundColor: AppColors.warmCream,
+        backgroundColor: AppColors.softCream,
         body: IndexedStack(
           index: _currentIndex,
           children: _screens,

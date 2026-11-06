@@ -58,14 +58,14 @@ class _ConsistencyHeatmapState extends State<ConsistencyHeatmap> {
     }
     switch (level) {
       case 1:
-        return const Color(0xFFCBE5D7); // Level 1: Pale mint
+        return AppColors.paleMint;
       case 2:
-        return AppColors.sageAccent; // Level 2: Fresh sage
+        return AppColors.freshGreen;
       case 3:
-        return AppColors.forestGreen; // Level 3: Deep forest green
+        return AppColors.primaryForest;
       case 0:
       default:
-        return const Color(0xFFEFF3F0); // Level 0: Pale neutral empty cell
+        return AppColors.neutralTrack;
     }
   }
 

@@ -60,10 +60,10 @@ class LiquidFloatNavigationBar extends StatefulWidget {
     this.onItemSelected,
     this.onActionPressed,
     this.items = LiquidFloatNavItem.nutriFridgeItems,
-    this.backgroundColor = Colors.white,
-    this.activeColor = AppColors.forestGreen,
-    this.inactiveColor = const Color(0xFF8FA499),
-    this.shadowColor = const Color(0x14000000),
+    this.backgroundColor = AppColors.pureWhite,
+    this.activeColor = AppColors.primaryForest,
+    this.inactiveColor = AppColors.mutedText,
+    this.shadowColor = const Color(0x12145A42),
     this.animationDuration = const Duration(milliseconds: 340),
     this.animationCurve = const LiquidFloatCurve(),
     this.circleDiameter = 58.0,
@@ -306,11 +306,11 @@ class _LiquidFloatNavigationBarState extends State<LiquidFloatNavigationBar>
                                           width: 48,
                                           height: 48,
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFF10B981),
+                                            color: AppColors.freshGreen,
                                             shape: BoxShape.circle,
                                             boxShadow: [
                                               BoxShadow(
-                                                color: const Color(0xFF10B981)
+                                                color: AppColors.freshGreen
                                                     .withValues(alpha: 0.35),
                                                 blurRadius: 10,
                                                 offset: const Offset(0, 3),

@@ -54,17 +54,10 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFFE7F6F0),
-                  Color(0xFFD8EFE6),
-                ],
-              ),
+              color: AppColors.paleMint,
               borderRadius: BorderRadius.circular(22),
               border: Border.all(
-                color: const Color(0xFFC7E7DA),
+                color: AppColors.freshGreen.withValues(alpha: 0.25),
                 width: 1.2,
               ),
               boxShadow: const [AppColors.softShadow],
@@ -164,7 +157,7 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
                       style: AppTypography.cardTitle.copyWith(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: AppColors.primaryForest,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -183,7 +176,7 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
               Text(
                 wellnessData.statusText,
                 style: AppTypography.scoreSubtitle.copyWith(
-                  color: AppColors.tealPrimary,
+                  color: AppColors.freshGreen,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -218,14 +211,14 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
                             ? Icons.trending_up_rounded
                             : Icons.trending_down_rounded,
                         size: 13,
-                        color: AppColors.tealPrimary,
+                        color: AppColors.freshGreen,
                       ),
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
                           '${wellnessData.scoreDiff > 0 ? "+" : ""}${wellnessData.scoreDiff} points from yesterday',
                           style: AppTypography.badgeText.copyWith(
-                            color: AppColors.tealPrimary,
+                            color: AppColors.primaryForest,
                             fontWeight: FontWeight.w600,
                             fontSize: 11,
                           ),
@@ -271,7 +264,7 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF1B6B5A),
+                      color: AppColors.primaryForest,
                       letterSpacing: -0.8,
                     ),
                   ),
@@ -297,8 +290,8 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
       size: const Size(82, 82),
       painter: _ScoreRingPainter(
         progress: (wellnessData.currentScore / wellnessData.maxScore.toDouble()).clamp(0.0, 1.0),
-        trackColor: const Color(0xFFD4ECE2),
-        progressColor: AppColors.tealAccent,
+        trackColor: AppColors.neutralTrack,
+        progressColor: AppColors.freshGreen,
         strokeWidth: 6.0,
       ),
     );
@@ -337,7 +330,7 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: AppColors.primaryForest,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -473,7 +466,7 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
                       style: const TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.tealPrimary,
+                        color: AppColors.freshGreen,
                       ),
                     ),
                     const SizedBox(height: 2),

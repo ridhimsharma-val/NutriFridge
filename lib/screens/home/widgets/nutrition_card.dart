@@ -121,10 +121,10 @@ class NutritionCard extends StatelessWidget {
                               painter: _DashboardCalorieArcPainter(
                                 progress: calorieProgress,
                                 strokeWidth: 12.0,
-                                trackColor: const Color(0xFFEFF2F0),
+                                trackColor: AppColors.neutralTrack,
                                 progressColor: isOver
-                                    ? AppColors.coralHighlight
-                                    : AppColors.sageAccent,
+                                    ? AppColors.coralPeach
+                                    : AppColors.freshGreen,
                               ),
                             ),
                             // Central Numerical Content
@@ -180,7 +180,7 @@ class NutritionCard extends StatelessWidget {
                                         fontSize: 11,
                                         fontWeight: FontWeight.w600,
                                         color: isOver
-                                            ? AppColors.coralHighlight
+                                            ? AppColors.coralPeach
                                             : AppColors.textSecondary,
                                       ),
                                     ),
@@ -208,7 +208,7 @@ class NutritionCard extends StatelessWidget {
                             progress: nutritionData.protein.progress,
                             icon: Icons.spa_rounded,
                             iconBg: const Color(0xFFE8F4EC),
-                            accentColor: AppColors.forestGreen,
+                            accentColor: AppColors.freshGreen,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -219,8 +219,8 @@ class NutritionCard extends StatelessWidget {
                             target: nutritionData.carbs.targetGrams,
                             progress: nutritionData.carbs.progress,
                             icon: Icons.grain_rounded,
-                            iconBg: const Color(0xFFFDECE6),
-                            accentColor: AppColors.coralHighlight,
+                            iconBg: AppColors.palePeachSurface,
+                            accentColor: AppColors.coralPeach,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -231,8 +231,8 @@ class NutritionCard extends StatelessWidget {
                             target: nutritionData.fat.targetGrams,
                             progress: nutritionData.fat.progress,
                             icon: Icons.water_drop_rounded,
-                            iconBg: const Color(0xFFFEF3C7),
-                            accentColor: AppColors.amberPrimary,
+                            iconBg: const Color(0xFFF4FADF),
+                            accentColor: AppColors.vibrantLime,
                           ),
                         ),
                       ],
@@ -337,7 +337,7 @@ class NutritionCard extends StatelessWidget {
             child: Container(
               height: 3.5,
               width: double.infinity,
-              color: const Color(0xFFEFF2F0),
+              color: AppColors.neutralTrack,
               child: progress > 0
                   ? FractionallySizedBox(
                       alignment: Alignment.centerLeft,
@@ -757,7 +757,16 @@ class _DashboardCalorieArcPainter extends CustomPainter {
 
     // Active progress arc starting from top (-90 deg)
     if (progress > 0) {
+      final arcRect = Rect.fromCircle(center: center, radius: radius);
       final progressPaint = Paint()
+        ..shader = (progressColor == AppColors.freshGreen && progress > 0.05)
+            ? SweepGradient(
+                startAngle: -math.pi / 2,
+                endAngle: -math.pi / 2 + (2 * math.pi * progress.clamp(0.0, 1.0)),
+                colors: const [AppColors.freshGreen, AppColors.vibrantLime],
+                transform: const GradientRotation(-math.pi / 2),
+              ).createShader(arcRect)
+            : null
         ..color = progressColor
         ..style = PaintingStyle.stroke
         ..strokeWidth = strokeWidth
@@ -767,7 +776,7 @@ class _DashboardCalorieArcPainter extends CustomPainter {
       final sweepAngle = 2 * math.pi * progress.clamp(0.0, 1.0);
 
       canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
+        arcRect,
         startAngle,
         sweepAngle,
         false,

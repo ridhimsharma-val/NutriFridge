@@ -59,7 +59,7 @@ class DashboardHeader extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
+                        color: AppColors.darkText,
                         letterSpacing: -0.4,
                       ),
                     ),
@@ -68,7 +68,7 @@ class DashboardHeader extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.tealPrimary,
+                        color: AppColors.primaryForest,
                         letterSpacing: -0.4,
                       ),
                     ),
@@ -102,7 +102,7 @@ class DashboardHeader extends StatelessWidget {
                     const Icon(
                       Icons.notifications_outlined,
                       size: 22,
-                      color: AppColors.textPrimary,
+                      color: AppColors.primaryForest,
                     ),
                     // Small subtle notification badge dot (visible when unread notifications exist)
                     if (hasUnread)

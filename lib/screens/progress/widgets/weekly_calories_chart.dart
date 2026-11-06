@@ -335,9 +335,9 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
                     spacing: 8,
                     runSpacing: 6,
                     children: [
-                      _buildMacroBadge('Protein', '${selectedDay.proteinGrams}g', AppColors.sageAccent),
-                      _buildMacroBadge('Carbs', '${selectedDay.carbsGrams}g', AppColors.coralHighlight),
-                      _buildMacroBadge('Fat', '${selectedDay.fatGrams}g', AppColors.amberPrimary),
+                      _buildMacroBadge('Protein', '${selectedDay.proteinGrams}g', AppColors.freshGreen),
+                      _buildMacroBadge('Carbs', '${selectedDay.carbsGrams}g', AppColors.coralPeach),
+                      _buildMacroBadge('Fat', '${selectedDay.fatGrams}g', AppColors.vibrantLime),
                     ],
                   ),
                 ],
