@@ -119,7 +119,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: AppColors.tealPrimary, width: 1.5),
+                    borderSide: const BorderSide(color: AppColors.forestGreen, width: 1.5),
                   ),
                 ),
               ),
@@ -149,7 +149,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                         Navigator.of(ctx).pop();
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.tealPrimary,
+                        backgroundColor: AppColors.forestGreen,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -251,103 +251,92 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
   Widget build(BuildContext context) {
     final nutrition = _nutrition;
 
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppColors.bgGradientTop,
-            Color(0xFFF7FAF8),
-            AppColors.bgGradientBottom,
-          ],
+    return Scaffold(
+      backgroundColor: AppColors.warmCream,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            size: 20,
+            color: AppColors.neutralCharcoal,
+          ),
+          tooltip: 'Back to Meal Analysis',
+          onPressed: () => Navigator.of(context).pop(_mealName),
+        ),
+        centerTitle: true,
+        title: Text(
+          'Nutrition Review',
+          style: AppTypography.sectionTitle.copyWith(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppColors.neutralCharcoal,
+          ),
         ),
       ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              size: 20,
-              color: AppColors.textPrimary,
-            ),
-            tooltip: 'Back to Meal Analysis',
-            onPressed: () => Navigator.of(context).pop(_mealName),
-          ),
-          centerTitle: true,
-          title: Text(
-            'Nutrition Review',
-            style: AppTypography.sectionTitle.copyWith(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 22.0, vertical: 8.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 1. Header (Title & Subtitle)
-                      Text(
-                        'Your meal breakdown',
-                        style: AppTypography.greeting.copyWith(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.4,
-                        ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 22.0, vertical: 8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 1. Header (Title & Subtitle)
+                    Text(
+                      'Your meal breakdown',
+                      style: AppTypography.greeting.copyWith(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.4,
+                        color: AppColors.neutralCharcoal,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "Here's the estimated nutrition for your meal.",
-                        style: AppTypography.subtitle.copyWith(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
-                        ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Here's the estimated nutrition for your meal.",
+                      style: AppTypography.subtitle.copyWith(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
                       ),
-                      const SizedBox(height: 18),
+                    ),
+                    const SizedBox(height: 18),
 
-                      // 2. Meal Summary Card (Photo, Name, Meal Type Selection)
-                      _buildMealSummaryCard(),
+                    // 2. Meal Summary Card (Photo, Name, Meal Type Selection)
+                    _buildMealSummaryCard(),
 
-                      const SizedBox(height: 18),
+                    const SizedBox(height: 18),
 
-                      // 3. Estimated Calories & Macronutrients
-                      _buildNutritionOverview(nutrition),
+                    // 3. Estimated Calories & Macronutrients
+                    _buildNutritionOverview(nutrition),
 
-                      const SizedBox(height: 18),
+                    const SizedBox(height: 18),
 
-                      // 4. Ingredients Detected (with subtle action to return to Screen 2)
-                      _buildIngredientsSummary(),
+                    // 4. Ingredients Detected (with subtle action to return to Screen 2)
+                    _buildIngredientsSummary(),
 
-                      const SizedBox(height: 18),
+                    const SizedBox(height: 18),
 
-                      // 5. Optional Additional Nutrition Details (Expandable)
-                      _buildMoreNutritionDetails(nutrition),
+                    // 5. Optional Additional Nutrition Details (Expandable)
+                    _buildMoreNutritionDetails(nutrition),
 
-                      const SizedBox(height: 18),
+                    const SizedBox(height: 18),
 
-                      // 6. Fridge Inventory Adjustment (Update your fridge)
-                      _buildFridgeInventorySection(),
+                    // 6. Fridge Inventory Adjustment (Update your fridge)
+                    _buildFridgeInventorySection(),
 
-                      const SizedBox(height: 24),
-                    ],
-                  ),
+                    const SizedBox(height: 24),
+                  ],
                 ),
               ),
+            ),
 
-              // 7. Primary Action: Confirm & Log Meal
-              _buildBottomAction(),
-            ],
-          ),
+            // 7. Primary Action: Confirm & Log Meal
+            _buildBottomAction(),
+          ],
         ),
       ),
     );
@@ -374,7 +363,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                 height: 58,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
-                  color: const Color(0xFFF2F6F3),
+                  color: AppColors.paleMint,
                   border: Border.all(color: AppColors.cardBorder, width: 1),
                 ),
                 child: ClipRRect(
@@ -386,13 +375,13 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                           errorBuilder: (context, error, stackTrace) => const Icon(
                             Icons.restaurant_rounded,
                             size: 24,
-                            color: AppColors.tealPrimary,
+                            color: AppColors.forestGreen,
                           ),
                         )
                       : const Icon(
                           Icons.restaurant_rounded,
                           size: 24,
-                          color: AppColors.tealPrimary,
+                          color: AppColors.forestGreen,
                         ),
                 ),
               ),
@@ -416,6 +405,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                                 fontSize: 17,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: -0.3,
+                                color: AppColors.neutralCharcoal,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -424,7 +414,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                           const Icon(
                             Icons.edit_outlined,
                             size: 15,
-                            color: AppColors.tealPrimary,
+                            color: AppColors.forestGreen,
                           ),
                         ],
                       ),
@@ -476,12 +466,12 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? (type == 'Snack' ? AppColors.peachLight : AppColors.tealLight)
+                            ? (type == 'Snack' ? AppColors.peachLight : AppColors.paleMint)
                             : const Color(0xFFF6F9F7),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isSelected
-                              ? (type == 'Snack' ? AppColors.peachPrimary : AppColors.tealPrimary)
+                              ? (type == 'Snack' ? AppColors.peachPrimary : AppColors.forestGreen)
                               : AppColors.cardBorder,
                           width: isSelected ? 1.4 : 1,
                         ),
@@ -493,7 +483,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                           fontSize: 12,
                           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                           color: isSelected
-                              ? (type == 'Snack' ? AppColors.peachPrimary : AppColors.tealPrimary)
+                              ? (type == 'Snack' ? AppColors.peachPrimary : AppColors.forestGreen)
                               : AppColors.textPrimary,
                         ),
                       ),
@@ -627,7 +617,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                       height: 44,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.tealPrimary,
+                          backgroundColor: AppColors.forestGreen,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
@@ -694,7 +684,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.edit_outlined, size: 17, color: AppColors.tealPrimary),
+                icon: const Icon(Icons.edit_outlined, size: 17, color: AppColors.forestGreen),
                 tooltip: 'Edit Nutrition',
                 constraints: const BoxConstraints(),
                 padding: const EdgeInsets.all(4),
@@ -712,7 +702,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                 style: const TextStyle(
                   fontSize: 34,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
+                  color: AppColors.neutralCharcoal,
                   letterSpacing: -0.8,
                 ),
               ),
@@ -731,7 +721,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
             decoration: BoxDecoration(
-              color: nutrition.isManual ? const Color(0xFFEFF6FF) : const Color(0xFFE8F6F0),
+              color: nutrition.isManual ? const Color(0xFFEFF6FF) : AppColors.paleMint,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: nutrition.isManual ? const Color(0xFFBFDBFE) : const Color(0xFFA7F3D0),
@@ -744,7 +734,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                 Icon(
                   nutrition.isManual ? Icons.edit_note_rounded : Icons.auto_awesome,
                   size: 12,
-                  color: nutrition.isManual ? const Color(0xFF2563EB) : AppColors.tealPrimary,
+                  color: nutrition.isManual ? const Color(0xFF2563EB) : AppColors.forestGreen,
                 ),
                 const SizedBox(width: 4),
                 Text(
@@ -752,7 +742,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: nutrition.isManual ? const Color(0xFF1D4ED8) : AppColors.tealPrimary,
+                    color: nutrition.isManual ? const Color(0xFF1D4ED8) : AppColors.forestGreen,
                   ),
                 ),
               ],
@@ -770,8 +760,8 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                 child: _buildMacroItem(
                   label: 'Protein',
                   amount: '${nutrition.proteinGrams} g',
-                  accentColor: AppColors.tealAccent,
-                  bgColor: const Color(0xFFE8F6F0),
+                  accentColor: AppColors.sageAccent,
+                  bgColor: AppColors.paleMint,
                 ),
               ),
               const SizedBox(width: 10),
@@ -779,7 +769,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                 child: _buildMacroItem(
                   label: 'Carbohydrates',
                   amount: '${nutrition.carbsGrams} g',
-                  accentColor: AppColors.peachPrimary,
+                  accentColor: AppColors.coralHighlight,
                   bgColor: AppColors.peachLight,
                 ),
               ),
@@ -865,7 +855,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
+              color: AppColors.neutralCharcoal,
             ),
           ),
         ],
@@ -887,6 +877,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                 style: AppTypography.sectionTitle.copyWith(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
+                  color: AppColors.neutralCharcoal,
                 ),
               ),
             ),
@@ -903,14 +894,14 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                       style: AppTypography.subtitle.copyWith(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.tealPrimary,
+                        color: AppColors.forestGreen,
                       ),
                     ),
                     const SizedBox(width: 2),
                     const Icon(
                       Icons.arrow_forward_ios_rounded,
                       size: 11,
-                      color: AppColors.tealPrimary,
+                      color: AppColors.forestGreen,
                     ),
                   ],
                 ),
@@ -959,13 +950,13 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                                 errorBuilder: (context, error, stackTrace) => const Icon(
                                   Icons.restaurant_rounded,
                                   size: 18,
-                                  color: AppColors.tealAccent,
+                                  color: AppColors.sageAccent,
                                 ),
                               )
                             : const Icon(
                                 Icons.restaurant_rounded,
                                 size: 18,
-                                color: AppColors.tealAccent,
+                                color: AppColors.sageAccent,
                               ),
                       ),
                     ),
@@ -976,7 +967,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                         style: const TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          color: AppColors.neutralCharcoal,
                         ),
                       ),
                     ),
@@ -985,7 +976,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                       style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.tealPrimary.withValues(alpha: 0.95),
+                        color: AppColors.forestGreen.withValues(alpha: 0.95),
                       ),
                     ),
                   ],
@@ -1116,7 +1107,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
               const Icon(
                 Icons.kitchen_outlined,
                 size: 20,
-                color: AppColors.tealPrimary,
+                color: AppColors.forestGreen,
               ),
               const SizedBox(width: 8),
               Text(
@@ -1124,6 +1115,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                 style: AppTypography.cardTitle.copyWith(
                   fontSize: 15.5,
                   fontWeight: FontWeight.w700,
+                  color: AppColors.neutralCharcoal,
                 ),
               ),
             ],
@@ -1162,7 +1154,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                       height: 28,
                       child: Checkbox(
                         value: status.isSelected,
-                        activeColor: AppColors.tealPrimary,
+                        activeColor: AppColors.forestGreen,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(6),
                         ),
@@ -1187,7 +1179,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: canDeduct ? AppColors.textPrimary : AppColors.textSecondary,
+                              color: canDeduct ? AppColors.neutralCharcoal : AppColors.textSecondary,
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -1198,7 +1190,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
                             style: TextStyle(
                               fontSize: 11.5,
                               color: canDeduct
-                                  ? (status.isSelected ? AppColors.tealPrimary : AppColors.textTertiary)
+                                  ? (status.isSelected ? AppColors.forestGreen : AppColors.textTertiary)
                                   : AppColors.textTertiary,
                               fontWeight: status.isSelected ? FontWeight.w600 : FontWeight.w400,
                             ),
@@ -1226,10 +1218,10 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
         child: ElevatedButton(
           onPressed: _isLogging ? null : _onConfirmAndLogMeal,
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.tealPrimary,
+            backgroundColor: AppColors.forestGreen,
             foregroundColor: Colors.white,
             elevation: 2,
-            shadowColor: AppColors.tealPrimary.withValues(alpha: 0.35),
+            shadowColor: AppColors.forestGreen.withValues(alpha: 0.35),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),

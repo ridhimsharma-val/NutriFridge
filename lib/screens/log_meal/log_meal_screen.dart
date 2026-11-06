@@ -103,16 +103,16 @@ class _LogMealScreenState extends State<LogMealScreen> {
             ),
             const SizedBox(height: 16),
             ListTile(
-              leading: const Icon(Icons.camera_alt_rounded, color: AppColors.tealPrimary),
-              title: const Text('Take Photo', style: TextStyle(fontWeight: FontWeight.w600)),
+              leading: const Icon(Icons.camera_alt_rounded, color: AppColors.forestGreen),
+              title: const Text('Take Photo', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.neutralCharcoal)),
               onTap: () {
                 Navigator.of(ctx).pop();
                 _pickImage(ImageSource.camera);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library_rounded, color: AppColors.tealPrimary),
-              title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w600)),
+              leading: const Icon(Icons.photo_library_rounded, color: AppColors.forestGreen),
+              title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.neutralCharcoal)),
               onTap: () {
                 Navigator.of(ctx).pop();
                 _pickImage(ImageSource.gallery);
@@ -229,136 +229,124 @@ class _LogMealScreenState extends State<LogMealScreen> {
   Widget build(BuildContext context) {
     final bool hasImage = _imageBytes != null;
 
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppColors.bgGradientTop,
-            Color(0xFFF7FAF8),
-            AppColors.bgGradientBottom,
-          ],
+    return Scaffold(
+      backgroundColor: AppColors.warmCream,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            size: 20,
+            color: AppColors.neutralCharcoal,
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        centerTitle: true,
+        title: Text(
+          'Log Meal',
+          style: AppTypography.sectionTitle.copyWith(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppColors.neutralCharcoal,
+          ),
         ),
       ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              size: 20,
-              color: AppColors.textPrimary,
-            ),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          centerTitle: true,
-          title: Text(
-            'Log Meal',
-            style: AppTypography.sectionTitle.copyWith(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              // Scrollable content area
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Subtitle Header
-                      Text(
-                        "Let's see what you had.",
-                        style: AppTypography.greeting.copyWith(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.4,
-                          color: AppColors.textPrimary,
-                        ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Scrollable content area
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Subtitle Header
+                    Text(
+                      "Let's see what you had.",
+                      style: AppTypography.greeting.copyWith(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.4,
+                        color: AppColors.neutralCharcoal,
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Take a photo of your plate to estimate its nutrition.',
-                        style: AppTypography.bodyMedium.copyWith(
-                          fontSize: 13.5,
-                          color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Take a photo of your plate to estimate its nutrition.',
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontSize: 13.5,
+                        color: AppColors.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Main Photo Area
+                    _buildPhotoArea(hasImage),
+
+                    const SizedBox(height: 18),
+
+                    // Camera and Gallery Actions
+                    _buildActionButtons(hasImage),
+
+                    const SizedBox(height: 16),
+
+                    // Helpful Note
+                    Center(
+                      child: Text(
+                        'Clear lighting and top-down angles provide the most accurate estimate.',
+                        textAlign: TextAlign.center,
+                        style: AppTypography.subtitle.copyWith(
+                          fontSize: 12,
+                          color: AppColors.textTertiary,
                           height: 1.4,
                         ),
                       ),
-                      const SizedBox(height: 20),
+                    ),
 
-                      // Main Photo Area
-                      _buildPhotoArea(hasImage),
-
-                      const SizedBox(height: 18),
-
-                      // Camera and Gallery Actions
-                      _buildActionButtons(hasImage),
-
-                      const SizedBox(height: 16),
-
-                      // Helpful Note
-                      Center(
-                        child: Text(
-                          'Clear lighting and top-down angles provide the most accurate estimate.',
-                          textAlign: TextAlign.center,
-                          style: AppTypography.subtitle.copyWith(
-                            fontSize: 12,
-                            color: AppColors.textTertiary,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-                    ],
-                  ),
+                    const SizedBox(height: 20),
+                  ],
                 ),
               ),
+            ),
 
-              // Bottom-pinned Primary CTA
-              Padding(
-                padding: const EdgeInsets.fromLTRB(22, 10, 22, 16),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 54,
-                  child: ElevatedButton(
-                    onPressed: hasImage ? _onAnalyzeMeal : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.tealPrimary,
-                      disabledBackgroundColor: const Color(0xFFD3DDD7),
-                      foregroundColor: Colors.white,
-                      disabledForegroundColor: const Color(0xFF8B9D94),
-                      elevation: hasImage ? 2 : 0,
-                      shadowColor: hasImage
-                          ? AppColors.tealPrimary.withValues(alpha: 0.35)
-                          : Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
+            // Bottom-pinned Primary CTA
+            Padding(
+              padding: const EdgeInsets.fromLTRB(22, 10, 22, 16),
+              child: SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton(
+                  onPressed: hasImage ? _onAnalyzeMeal : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.forestGreen,
+                    disabledBackgroundColor: const Color(0xFFD6DDD8),
+                    foregroundColor: Colors.white,
+                    disabledForegroundColor: const Color(0xFF8B9D94),
+                    elevation: hasImage ? 2 : 0,
+                    shadowColor: hasImage
+                        ? AppColors.forestGreen.withValues(alpha: 0.35)
+                        : Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Text(
-                      'Analyze Meal',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.2,
-                        color: Colors.white,
-                      ),
+                  ),
+                  child: const Text(
+                    'Analyze Meal',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.2,
+                      color: Colors.white,
                     ),
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -374,7 +362,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
         color: AppColors.cardWhite,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: hasImage ? AppColors.tealPrimary.withValues(alpha: 0.4) : AppColors.cardBorder,
+          color: hasImage ? AppColors.forestGreen.withValues(alpha: 0.4) : AppColors.cardBorder,
           width: 1.2,
         ),
         boxShadow: const [AppColors.softShadow],
@@ -384,7 +372,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
         child: _isLoading
             ? const Center(
                 child: CircularProgressIndicator(
-                  color: AppColors.tealPrimary,
+                  color: AppColors.forestGreen,
                   strokeWidth: 2.5,
                 ),
               )
@@ -451,14 +439,14 @@ class _LogMealScreenState extends State<LogMealScreen> {
                           width: 64,
                           height: 64,
                           decoration: BoxDecoration(
-                            color: AppColors.tealLight.withValues(alpha: 0.6),
+                            color: AppColors.paleMint,
                             shape: BoxShape.circle,
                           ),
                           child: const Center(
                             child: Icon(
                               Icons.camera_alt_outlined,
                               size: 28,
-                              color: AppColors.tealPrimary,
+                              color: AppColors.forestGreen,
                             ),
                           ),
                         ),
@@ -468,7 +456,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
                           style: AppTypography.cardTitle.copyWith(
                             fontSize: 17,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
+                            color: AppColors.neutralCharcoal,
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -507,10 +495,10 @@ class _LogMealScreenState extends State<LogMealScreen> {
               ),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.tealPrimary,
+              backgroundColor: AppColors.forestGreen,
               foregroundColor: Colors.white,
               elevation: 1.5,
-              shadowColor: AppColors.tealPrimary.withValues(alpha: 0.3),
+              shadowColor: AppColors.forestGreen.withValues(alpha: 0.3),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
               ),
@@ -526,7 +514,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
           height: 50,
           child: OutlinedButton.icon(
             onPressed: () => _pickImage(ImageSource.gallery),
-            icon: const Icon(Icons.photo_library_outlined, size: 19, color: AppColors.peachPrimary),
+            icon: const Icon(Icons.photo_library_outlined, size: 19, color: AppColors.forestGreen),
             label: const Text(
               'Choose from Gallery',
               style: TextStyle(
@@ -536,9 +524,9 @@ class _LogMealScreenState extends State<LogMealScreen> {
               ),
             ),
             style: OutlinedButton.styleFrom(
-              backgroundColor: AppColors.peachLight.withValues(alpha: 0.5),
-              foregroundColor: AppColors.peachPrimary,
-              side: const BorderSide(color: AppColors.peachBorder, width: 1.2),
+              backgroundColor: AppColors.cardWhite,
+              foregroundColor: AppColors.forestGreen,
+              side: const BorderSide(color: Color(0xFFD0DDD4), width: 1.2),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
               ),

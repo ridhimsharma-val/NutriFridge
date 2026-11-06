@@ -96,7 +96,7 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: AppColors.tealPrimary, width: 1.5),
+                    borderSide: const BorderSide(color: AppColors.forestGreen, width: 1.5),
                   ),
                 ),
               ),
@@ -126,7 +126,7 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
                         Navigator.of(ctx).pop();
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.tealPrimary,
+                        backgroundColor: AppColors.forestGreen,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -207,7 +207,7 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: AppColors.tealPrimary, width: 1.5),
+                        borderSide: const BorderSide(color: AppColors.forestGreen, width: 1.5),
                       ),
                     ),
                   ),
@@ -236,15 +236,15 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
                             });
                           }
                         },
-                        selectedColor: AppColors.tealLight,
+                        selectedColor: AppColors.paleMint,
                         backgroundColor: const Color(0xFFF2F6F3),
                         labelStyle: TextStyle(
-                          color: isSelected ? AppColors.tealPrimary : AppColors.textPrimary,
+                          color: isSelected ? AppColors.forestGreen : AppColors.textPrimary,
                           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                           fontSize: 13,
                         ),
                         side: BorderSide(
-                          color: isSelected ? AppColors.tealPrimary : Colors.transparent,
+                          color: isSelected ? AppColors.forestGreen : Colors.transparent,
                         ),
                       );
                     }).toList(),
@@ -279,7 +279,7 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
                             Navigator.of(ctx).pop();
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.tealPrimary,
+                            backgroundColor: AppColors.forestGreen,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                             padding: const EdgeInsets.symmetric(vertical: 14),
@@ -360,7 +360,7 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: AppColors.tealPrimary, width: 1.5),
+                        borderSide: const BorderSide(color: AppColors.forestGreen, width: 1.5),
                       ),
                     ),
                   ),
@@ -384,7 +384,7 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: AppColors.tealPrimary, width: 1.5),
+                        borderSide: const BorderSide(color: AppColors.forestGreen, width: 1.5),
                       ),
                     ),
                   ),
@@ -405,10 +405,10 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
                             });
                           }
                         },
-                        selectedColor: AppColors.tealLight,
+                        selectedColor: AppColors.paleMint,
                         backgroundColor: const Color(0xFFF2F6F3),
                         labelStyle: TextStyle(
-                          color: isSelected ? AppColors.tealPrimary : AppColors.textPrimary,
+                          color: isSelected ? AppColors.forestGreen : AppColors.textPrimary,
                           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                           fontSize: 13,
                         ),
@@ -450,7 +450,7 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
                             Navigator.of(ctx).pop();
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.tealPrimary,
+                            backgroundColor: AppColors.forestGreen,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                             padding: const EdgeInsets.symmetric(vertical: 14),
@@ -528,186 +528,177 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppColors.bgGradientTop,
-            Color(0xFFF7FAF8),
-            AppColors.bgGradientBottom,
-          ],
+    return Scaffold(
+      backgroundColor: AppColors.warmCream,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            size: 20,
+            color: AppColors.neutralCharcoal,
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        centerTitle: true,
+        title: Text(
+          'Review your meal',
+          style: AppTypography.sectionTitle.copyWith(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppColors.neutralCharcoal,
+          ),
         ),
       ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              size: 20,
-              color: AppColors.textPrimary,
-            ),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          centerTitle: true,
-          title: Text(
-            'Review your meal',
-            style: AppTypography.sectionTitle.copyWith(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              // Scrollable review body
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Subtitle
-                      Text(
-                        'Check what we found and adjust the portions.',
-                        style: AppTypography.bodyMedium.copyWith(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // 1. Meal Photo and Name Card
-                      _buildMealHeaderCard(),
-
-                      const SizedBox(height: 22),
-
-                      // 2. Detected Foods Section Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Detected foods',
-                            style: AppTypography.cardTitle.copyWith(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          Text(
-                            '${_detectedFoods.length} items',
-                            style: AppTypography.subtitle.copyWith(
-                              fontSize: 12.5,
-                              color: AppColors.textTertiary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-
-                      // 3. Detected Foods List
-                      _buildDetectedFoodsList(),
-
-                      const SizedBox(height: 12),
-
-                      // 4. Add Missing Food Action
-                      Center(
-                        child: TextButton.icon(
-                          onPressed: _addFoodItem,
-                          icon: const Icon(Icons.add_rounded, size: 18),
-                          label: const Text(
-                            'Add food item',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.tealPrimary,
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 14),
-
-                      // 5. Portion estimation disclaimer note
-                      Center(
-                        child: Text(
-                          'Portions are estimates. Review them before continuing.',
-                          textAlign: TextAlign.center,
-                          style: AppTypography.subtitle.copyWith(
-                            fontSize: 12,
-                            color: AppColors.textTertiary,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-                    ],
-                  ),
-                ),
-              ),
-
-              // Bottom Actions: Primary "Review Nutrition" & Secondary "Change photo"
-              Padding(
-                padding: const EdgeInsets.fromLTRB(22, 8, 22, 14),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Scrollable review body
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(
-                      width: double.infinity,
-                      height: 54,
-                      child: ElevatedButton(
-                        onPressed: (_detectedFoods.isNotEmpty && _mealName.trim().isNotEmpty)
-                            ? _onReviewNutrition
-                            : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.tealPrimary,
-                          foregroundColor: Colors.white,
-                          elevation: 2,
-                          shadowColor: AppColors.tealPrimary.withValues(alpha: 0.35),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: const Text(
-                          'Review Nutrition',
-                          style: TextStyle(
+                    // Subtitle
+                    Text(
+                      'Check what we found and adjust the portions.',
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 1. Meal Photo and Name Card
+                    _buildMealHeaderCard(),
+
+                    const SizedBox(height: 22),
+
+                    // 2. Detected Foods Section Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Detected foods',
+                          style: AppTypography.cardTitle.copyWith(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
-                            letterSpacing: 0.2,
+                            color: AppColors.neutralCharcoal,
                           ),
                         ),
-                      ),
+                        Text(
+                          '${_detectedFoods.length} items',
+                          style: AppTypography.subtitle.copyWith(
+                            fontSize: 12.5,
+                            color: AppColors.textTertiary,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 6),
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.textSecondary,
-                        minimumSize: const Size.fromHeight(38),
-                      ),
-                      child: const Text(
-                        'Change Photo',
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
+                    const SizedBox(height: 10),
+
+                    // 3. Detected Foods List
+                    _buildDetectedFoodsList(),
+
+                    const SizedBox(height: 12),
+
+                    // 4. Add Missing Food Action
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: _addFoodItem,
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text(
+                          'Add food item',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.forestGreen,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         ),
                       ),
                     ),
+
+                    const SizedBox(height: 14),
+
+                    // 5. Portion estimation disclaimer note
+                    Center(
+                      child: Text(
+                        'Portions are estimates. Review them before continuing.',
+                        textAlign: TextAlign.center,
+                        style: AppTypography.subtitle.copyWith(
+                          fontSize: 12,
+                          color: AppColors.textTertiary,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+
+            // Bottom Actions: Primary "Review Nutrition" & Secondary "Change photo"
+            Padding(
+              padding: const EdgeInsets.fromLTRB(22, 8, 22, 14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 54,
+                    child: ElevatedButton(
+                      onPressed: (_detectedFoods.isNotEmpty && _mealName.trim().isNotEmpty)
+                          ? _onReviewNutrition
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.forestGreen,
+                        disabledBackgroundColor: const Color(0xFFD6DDD8),
+                        foregroundColor: Colors.white,
+                        disabledForegroundColor: const Color(0xFF8B9D94),
+                        elevation: 2,
+                        shadowColor: AppColors.forestGreen.withValues(alpha: 0.35),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        'Review Nutrition',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.textSecondary,
+                      minimumSize: const Size.fromHeight(38),
+                    ),
+                    child: const Text(
+                      'Change Photo',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -731,7 +722,7 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
             height: 82,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              color: const Color(0xFFEFF3F0),
+              color: AppColors.paleMint,
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
@@ -746,7 +737,7 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
                       child: Icon(
                         Icons.restaurant_rounded,
                         size: 32,
-                        color: AppColors.tealAccent,
+                        color: AppColors.forestGreen,
                       ),
                     ),
             ),
@@ -782,6 +773,7 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
                               fontSize: 17,
                               fontWeight: FontWeight.w800,
                               letterSpacing: -0.3,
+                              color: AppColors.neutralCharcoal,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -790,7 +782,7 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
                         const Icon(
                           Icons.edit_outlined,
                           size: 15,
-                          color: AppColors.tealPrimary,
+                          color: AppColors.forestGreen,
                         ),
                       ],
                     ),
@@ -885,13 +877,13 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
                               errorBuilder: (context, error, stackTrace) => const Icon(
                                 Icons.restaurant_rounded,
                                 size: 20,
-                                color: AppColors.tealAccent,
+                                color: AppColors.sageAccent,
                               ),
                             )
                           : const Icon(
                               Icons.restaurant_rounded,
                               size: 20,
-                              color: AppColors.tealAccent,
+                              color: AppColors.sageAccent,
                             ),
                     ),
                   ),
@@ -907,7 +899,7 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
+                            color: AppColors.neutralCharcoal,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -916,7 +908,7 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.tealPrimary.withValues(alpha: 0.9),
+                            color: AppColors.forestGreen.withValues(alpha: 0.9),
                           ),
                         ),
                       ],
