@@ -116,7 +116,7 @@ class AiAssistantModalSheet extends StatelessWidget {
                   width: 30,
                   height: 30,
                   decoration: const BoxDecoration(
-                    color: AppColors.background,
+                    color: AppColors.warmCream,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -152,7 +152,7 @@ class AiAssistantModalSheet extends StatelessWidget {
                       width: 6,
                       height: 6,
                       decoration: const BoxDecoration(
-                        color: AppColors.tealPrimary,
+                        color: AppColors.forestGreen,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -191,7 +191,7 @@ class AiAssistantModalSheet extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: AppColors.tealSurface,
+              color: AppColors.paleMint,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -202,7 +202,7 @@ class AiAssistantModalSheet extends StatelessWidget {
                   child: Icon(
                     Icons.info_outline_rounded,
                     size: 16,
-                    color: AppColors.tealPrimary,
+                    color: AppColors.forestGreen,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -212,7 +212,7 @@ class AiAssistantModalSheet extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 12,
                       height: 1.35,
-                      color: AppColors.tealPrimary,
+                      color: AppColors.forestGreen,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -229,7 +229,7 @@ class AiAssistantModalSheet extends StatelessWidget {
             height: 48,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.tealPrimary,
+                backgroundColor: AppColors.forestGreen,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(

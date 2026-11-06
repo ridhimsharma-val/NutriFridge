@@ -61,7 +61,7 @@ class RecipeVideoCard extends StatelessWidget {
                           'OK',
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
-                            color: AppColors.tealPrimary,
+                            color: AppColors.forestGreen,
                           ),
                         ),
                       ),
