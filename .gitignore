@@ -50,3 +50,7 @@ app.*.map.json
 # Output packages
 *.apk
 *.zip
+
+# Supabase local environment credentials
+supabase.dev.json
+

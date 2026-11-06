@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/nutrition_data.dart';
+import '../../services/auth/auth_service.dart';
 import 'models/user_profile_data.dart';
 import 'widgets/app_preferences_card.dart';
 import 'widgets/dietary_restrictions_card.dart';
@@ -28,6 +29,47 @@ class ProfileScreen extends StatelessWidget {
 
   void _onProfileChanged(UserProfileData updatedProfile) {
     MockDataRepository.updateProfile(updatedProfile);
+  }
+
+  Future<void> _handleSignOut(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.pureWhite,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Sign Out',
+          style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Are you sure you want to sign out of NutriFridge?',
+          style: AppTypography.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              'Cancel',
+              style: AppTypography.bodyMedium.copyWith(color: AppColors.charcoalLight),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE02424),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
+            child: const Text('Sign Out'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await AuthService.instance.signOut();
+    }
   }
 
   @override
@@ -80,6 +122,46 @@ class ProfileScreen extends StatelessWidget {
                   AppPreferencesCard(
                     profile: profile,
                     onProfileChanged: _onProfileChanged,
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // 6. Sign Out Action Button
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: AppColors.pureWhite,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFFDE8E8), width: 1),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.charcoal.withAlpha(6),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: TextButton.icon(
+                      onPressed: () => _handleSignOut(context),
+                      icon: const Icon(
+                        Icons.logout_rounded,
+                        color: Color(0xFFE02424),
+                        size: 20,
+                      ),
+                      label: Text(
+                        'Sign Out',
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: const Color(0xFFE02424),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
                   ),
 
                   // Floating Bottom navigation clearance

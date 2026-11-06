@@ -132,4 +132,13 @@ class AppTypography {
         fontWeight: FontWeight.w600,
         letterSpacing: 0.1,
       );
+
+  // Convenience aliases for backward compatibility & design system consistency
+  static TextStyle get displaySmall => screenHeading;
+  static TextStyle get heading1 => displayLarge;
+  static TextStyle get heading2 => screenHeading;
+  static TextStyle get heading3 => sectionHeading;
+  static TextStyle get titleMedium => sectionTitle;
+  static TextStyle get bodyText => bodyMedium;
+  static TextStyle get caption => bodySmall;
 }

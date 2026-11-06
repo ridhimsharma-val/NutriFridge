@@ -37,10 +37,13 @@ class AppColors {
   static const Color cardCream = softCream;
   static const Color warmCream = softCream;
   static const Color cardBorder = subtleBorder;
+  static const Color cardSurface = pureWhite;
 
   // Primary & Forest Green
   static const Color forestGreen = primaryForest;
   static const Color forestGreenDark = Color(0xFF0E3F2E);
+  static const Color deepForest = primaryForest;
+  static const Color softGreen = paleGreenSurface;
 
   // Fresh Green / Sage Accent
   static const Color sageAccent = freshGreen;
@@ -48,6 +51,8 @@ class AppColors {
 
   // Text Hierarchy
   static const Color neutralCharcoal = darkText;
+  static const Color charcoal = darkText;
+  static const Color charcoalLight = mutedText;
   static const Color textPrimary = darkText;
   static const Color textSecondary = mutedText;
   static const Color textTertiary = Color(0xFF8FA499);

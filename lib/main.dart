@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'core/supabase/supabase_client.dart';
 import 'core/theme/app_colors.dart';
 import 'screens/splash/magic_fridge_splash.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Set system UI overlay style for mobile status bar
@@ -14,6 +15,9 @@ void main() {
       statusBarBrightness: Brightness.light,
     ),
   );
+
+  // Initialize Supabase backend client
+  await SupabaseManager.initialize();
 
   runApp(const NutriFridgeApp());
 }

@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../main_navigation_shell.dart';
+import '../auth/auth_gate.dart';
 import 'widgets/floating_ingredients_widget.dart';
 import 'widgets/freshness_ring_painter.dart';
 import 'widgets/fridge_cabinet_widget.dart';
@@ -67,7 +67,7 @@ class _MagicFridgeSplashScreenState extends State<MagicFridgeSplashScreen>
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
-            const MainNavigationShell(),
+            const AuthGate(),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(
             opacity: CurvedAnimation(
