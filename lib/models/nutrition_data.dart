@@ -166,8 +166,18 @@ class RecipeRecommendation {
     if (json['ingredients'] is List) {
       for (final item in json['ingredients'] as List) {
         if (item is Map) {
-          final name = (item['name'] ?? '').toString();
-          if (name.isNotEmpty) requiredIngs.add(name);
+          final name = (item['name'] ?? '').toString().trim();
+          final rawQty = item['quantity'] ?? item['amount'];
+          final rawUnit = (item['unit'] ?? '').toString().trim();
+          if (name.isNotEmpty) {
+            if (rawQty != null && rawUnit.isNotEmpty) {
+              requiredIngs.add('$name ($rawQty $rawUnit)');
+            } else if (rawQty != null) {
+              requiredIngs.add('$name ($rawQty)');
+            } else {
+              requiredIngs.add(name);
+            }
+          }
           final inFridge = item['availableInFridge'] == true || item['inFridge'] == true;
           if (!inFridge && name.isNotEmpty) {
             missingIngs.add(name);
@@ -496,36 +506,61 @@ class MockDataRepository {
     return '$hour:$minute $period';
   }
 
-  /// Automatically derives ingredient deduction mappings from name list against current inventory
+  /// Automatically derives ingredient deduction mappings from name list against current inventory.
+  /// Safely parses explicit quantities and units (e.g. "Paneer (100g)", "100g Paneer")
+  /// and strictly prevents defaulting mass/volume items to 1g/1ml.
   static List<MealIngredientDeduction> _deriveDeductionsFromIngredients(List<String>? ingredients) {
     if (ingredients == null || ingredients.isEmpty) return const [];
     final list = <MealIngredientDeduction>[];
     for (final raw in ingredients) {
       final clean = raw.trim();
       if (clean.isEmpty) continue;
-      final nameOnly = clean.contains('(') ? clean.substring(0, clean.indexOf('(')).trim() : clean;
-      final matched = FridgeCategoryRepository.findItemByName(nameOnly);
+
+      final parsed = MealTrackingService.parseIngredientQuantity(clean);
+      final matched = FridgeCategoryRepository.findItemByName(parsed.name);
       final isRealUuid = matched != null &&
           matched.id.isNotEmpty &&
           !matched.id.startsWith('item_') &&
           !matched.id.startsWith('food_') &&
           !matched.id.startsWith('dairy_');
-      if (matched != null && isRealUuid) {
-        list.add(MealIngredientDeduction(
-          name: nameOnly,
-          matchedFridgeItemId: matched.id,
-          requiredQuantity: 1,
-          requiredUnit: matched.unit,
-          deductQuantity: 1,
-          deductUnit: matched.unit,
-          doDeduct: true,
-        ));
-      } else {
-        list.add(MealIngredientDeduction(
-          name: nameOnly,
-          doDeduct: false,
-        ));
+
+      num? deductQty = parsed.quantity;
+      String? deductUnit = parsed.unit;
+
+      bool isUnitCompatible = false;
+      if (matched != null) {
+        if (deductUnit != null && deductUnit.isNotEmpty) {
+          isUnitCompatible = FridgeCategoryRepository.areUnitsCompatible(matched.unit, deductUnit);
+        } else {
+          // If unit was not specified in string, only allow deduction if item is countable (piece/item)
+          final normInv = FridgeCategoryRepository.normalizeUnit(matched.unit);
+          const countable = {'piece', 'pack', 'bottle', 'jar', 'tub', 'box', 'can', 'item'};
+          if (countable.contains(normInv)) {
+            deductUnit = matched.unit;
+            isUnitCompatible = true;
+          }
+        }
       }
+
+      // Strictly require positive explicit quantity and compatible units before deducting.
+      // Continuous items (mass 'g', volume 'ml') must NEVER default to 1.
+      final canDeductInMemory = forceInMemoryForTesting ||
+          !AuthService.instance.isAuthenticated ||
+          AuthService.instance.currentUser == null;
+      final doDeduct = isUnitCompatible &&
+          deductQty != null &&
+          deductQty > 0 &&
+          (isRealUuid || canDeductInMemory);
+
+      list.add(MealIngredientDeduction(
+        name: parsed.name,
+        matchedFridgeItemId: (doDeduct && isRealUuid) ? matched.id : null,
+        requiredQuantity: deductQty,
+        requiredUnit: deductUnit ?? matched?.unit ?? 'pieces',
+        deductQuantity: doDeduct ? deductQty : null,
+        deductUnit: doDeduct ? deductUnit : null,
+        doDeduct: doDeduct,
+      ));
     }
     return list;
   }
@@ -650,10 +685,12 @@ class MockDataRepository {
     String? imageUrl,
     String? idempotencyKey,
     List<MealIngredientDeduction>? ingredientDeductions,
+    bool? deductInventoryInMemory,
     bool isEstimate = true,
     String nutritionSource = 'ai_estimate',
   }) async {
     final effectiveKey = idempotencyKey ?? MealTrackingService.generateIdempotencyKey();
+    final shouldDeductInMemory = deductInventoryInMemory ?? (ingredientDeductions == null && ingredients != null && ingredients.isNotEmpty);
 
     // 1. Transactional Supabase RPC when authenticated and not in forced-memory test mode
     if (!forceInMemoryForTesting &&
@@ -757,6 +794,20 @@ class MockDataRepository {
       description: 'Your $mealType ($mealName) has been added to today\'s nutrition.',
       type: NotificationType.mealLogged,
     );
+
+    // 2f. Deduct in-memory inventory for offline/test environments if requested
+    if (shouldDeductInMemory) {
+      final deductionsToApply = ingredientDeductions ?? _deriveDeductionsFromIngredients(ingredients);
+      for (final d in deductionsToApply) {
+        if (d.doDeduct && d.deductQuantity != null && d.deductQuantity! > 0) {
+          FridgeCategoryRepository.deductItemQuantityByName(
+            name: d.name,
+            quantity: d.deductQuantity!,
+            unit: d.deductUnit,
+          );
+        }
+      }
+    }
 
     _notify();
     return MealTransactionResult(

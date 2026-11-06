@@ -1001,6 +1001,7 @@ class FridgeCategoryRepository {
     if (u == 'ml' || u == 'millilitre' || u == 'millilitres') return 'ml';
     if (u == 'l' || u == 'litre' || u == 'litres' || u == 'liter' || u == 'liters') return 'l';
     if (u == 'piece' || u == 'pieces' || u == 'pc' || u == 'pcs') return 'piece';
+    if (u == 'medium' || u == 'small' || u == 'large') return 'piece';
     if (u == 'pack' || u == 'packs' || u == 'pkt' || u == 'pkts') return 'pack';
     if (u == 'bottle' || u == 'bottles') return 'bottle';
     if (u == 'jar' || u == 'jars') return 'jar';

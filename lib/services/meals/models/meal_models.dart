@@ -2,6 +2,22 @@
 /// daily meal slot progression, and meal audit logging.
 library;
 
+/// Parsed ingredient representation with separate name, quantity, and unit.
+class ParsedIngredient {
+  final String name;
+  final num? quantity;
+  final String? unit;
+
+  const ParsedIngredient({
+    required this.name,
+    this.quantity,
+    this.unit,
+  });
+
+  @override
+  String toString() => 'ParsedIngredient(name: $name, quantity: $quantity, unit: $unit)';
+}
+
 /// Ingredient deduction mapping for the Supabase transactional RPC `public.log_meal_transaction`.
 class MealIngredientDeduction {
   final String name;

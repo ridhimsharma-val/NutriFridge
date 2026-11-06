@@ -282,3 +282,30 @@ The immutable helper `public.calculate_unit_deduction` enforces strict separatio
 3. Select **SQL Editor** from the left navigation bar.
 4. Click **New Query** and paste the complete contents of [`supabase/migrations/20261106_initial_schema.sql`](./migrations/20261106_initial_schema.sql).
 5. Click **Run** and verify that all 19 tables, indexes, RLS policies, table grants, and functions create successfully.
+
+---
+
+## 7. Incremental Migration: 20261107_fix_inventory_deduction.sql
+
+### Problem Addressed
+In deployed environments, `public.log_meal_transaction` could log a meal and insert an audit record into `public.meal_ingredients` claiming `was_deducted = true`, while leaving the row in `public.fridge_items` unchanged (e.g. remaining at 149g instead of deducting 50g to 99g).
+
+### Root Causes Resolved
+1. **Definer RLS Role Mismatch:** `public.fridge_items` RLS UPDATE and DELETE policies were scoped strictly `TO authenticated`. When `log_meal_transaction` ran as `SECURITY DEFINER` (owned by `postgres`), PostgreSQL applied default-deny to `postgres`, causing the `UPDATE` query to silently affect 0 rows.
+2. **Missing Affected Rows Validation:** The RPC set `v_was_deducted := (v_actual_deduct_qty > 0)` without inspecting whether the `UPDATE` or `DELETE` affected any rows.
+3. **Defense in Depth Ownership Filter:** The `UPDATE` query lacked `AND user_id = v_user_id`.
+
+### Corrections in Migration `20261107_fix_inventory_deduction.sql`
+- Re-aligns RLS policies on `public.fridge_items` `TO authenticated, postgres, service_role` with `USING (auth.uid() = user_id OR auth.uid() IS NULL)`.
+- Explicitly grants `SELECT, INSERT, UPDATE, DELETE ON public.fridge_items` to `postgres`.
+- In `public.log_meal_transaction`:
+  - Captures affected rows via `RETURNING quantity INTO v_updated_quantity` on `UPDATE`, and `RETURNING id INTO v_deleted_id` on `DELETE`.
+  - Asserts `IF NOT FOUND OR ... IS NULL THEN RAISE EXCEPTION ...`, guaranteeing an atomic transaction rollback if any inventory mutation affects 0 rows.
+  - Sets `was_deducted = true` ONLY after row effect is verified.
+
+### How to Apply Migration to Deployed Supabase Instance
+1. Open the [Supabase Dashboard](https://supabase.com/dashboard) and navigate to the project's **SQL Editor**.
+2. Create a **New Query**.
+3. Copy and paste the contents of [`supabase/migrations/20261107_fix_inventory_deduction.sql`](./migrations/20261107_fix_inventory_deduction.sql).
+4. Click **Run**.
+5. Verify successful execution (output: `Success. No rows returned`).

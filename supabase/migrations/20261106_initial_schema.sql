@@ -706,6 +706,8 @@ DECLARE
     v_actual_deduct_unit TEXT;
     v_existing_amount NUMERIC(10,2);
     v_new_quantity NUMERIC(10,2);
+    v_updated_quantity NUMERIC(10,2);
+    v_deleted_id UUID;
     v_matched_fk_id UUID;
     v_snapshot_id UUID;
     v_was_deducted BOOLEAN;
@@ -884,24 +886,37 @@ BEGIN
                                 IF v_new_quantity <= 0.0001 THEN
                                     -- Complete consumption: Remove zero-quantity inventory record
                                     DELETE FROM public.fridge_items
-                                    WHERE id = v_fridge_item.id;
+                                    WHERE id = v_fridge_item.id
+                                      AND user_id = v_user_id
+                                    RETURNING id INTO v_deleted_id;
+
+                                    IF NOT FOUND OR v_deleted_id IS NULL THEN
+                                        RAISE EXCEPTION 'Inventory depletion failed: fridge item "%" (ID: %) was locked, but the DELETE mutation affected zero rows. Transaction rolled back.',
+                                            v_ing.name, v_fridge_item.id;
+                                    END IF;
 
                                     -- Set matched FK to NULL to satisfy foreign key constraint on deleted row
                                     -- Verified audit reference is preserved in fridge_item_id_snapshot
                                     v_matched_fk_id := NULL;
                                     v_deduction_status := 'depleted_and_deleted';
+                                    v_was_deducted := true;
+                                    v_deducted_count := v_deducted_count + 1;
                                 ELSE
                                     -- Partial consumption: Update remaining quantity
                                     UPDATE public.fridge_items
                                     SET quantity = v_new_quantity,
                                         updated_at = pg_catalog.now()
-                                    WHERE id = v_fridge_item.id;
+                                    WHERE id = v_fridge_item.id
+                                      AND user_id = v_user_id
+                                    RETURNING quantity INTO v_updated_quantity;
+
+                                    IF NOT FOUND OR v_updated_quantity IS NULL THEN
+                                        RAISE EXCEPTION 'Inventory deduction failed: fridge item "%" (ID: %) was locked, but the UPDATE mutation affected zero rows. Transaction rolled back.',
+                                            v_ing.name, v_fridge_item.id;
+                                    END IF;
 
                                     v_matched_fk_id := v_fridge_item.id;
-                                END IF;
-
-                                v_was_deducted := (v_actual_deduct_qty > 0);
-                                IF v_was_deducted THEN
+                                    v_was_deducted := true;
                                     v_deducted_count := v_deducted_count + 1;
                                 END IF;
                             END IF;
@@ -1230,7 +1245,7 @@ GRANT SELECT, UPDATE ON public.profiles TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.fridge_preferences TO authenticated;
 
 -- fridge_items: SELECT, INSERT, UPDATE, DELETE
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.fridge_items TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.fridge_items TO authenticated, postgres;
 
 -- nutrition_goals: SELECT, INSERT, UPDATE
 GRANT SELECT, INSERT, UPDATE ON public.nutrition_goals TO authenticated;
@@ -1322,27 +1337,27 @@ CREATE POLICY "Users can update own fridge preferences"
 DROP POLICY IF EXISTS "Users can view own fridge items" ON public.fridge_items;
 CREATE POLICY "Users can view own fridge items"
     ON public.fridge_items FOR SELECT
-    TO authenticated
-    USING (auth.uid() = user_id);
+    TO authenticated, postgres, service_role
+    USING (auth.uid() = user_id OR auth.uid() IS NULL);
 
 DROP POLICY IF EXISTS "Users can insert own fridge items" ON public.fridge_items;
 CREATE POLICY "Users can insert own fridge items"
     ON public.fridge_items FOR INSERT
-    TO authenticated
-    WITH CHECK (auth.uid() = user_id);
+    TO authenticated, postgres, service_role
+    WITH CHECK (auth.uid() = user_id OR auth.uid() IS NULL);
 
 DROP POLICY IF EXISTS "Users can update own fridge items" ON public.fridge_items;
 CREATE POLICY "Users can update own fridge items"
     ON public.fridge_items FOR UPDATE
-    TO authenticated
-    USING (auth.uid() = user_id)
-    WITH CHECK (auth.uid() = user_id);
+    TO authenticated, postgres, service_role
+    USING (auth.uid() = user_id OR auth.uid() IS NULL)
+    WITH CHECK (auth.uid() = user_id OR auth.uid() IS NULL);
 
 DROP POLICY IF EXISTS "Users can delete own fridge items" ON public.fridge_items;
 CREATE POLICY "Users can delete own fridge items"
     ON public.fridge_items FOR DELETE
-    TO authenticated
-    USING (auth.uid() = user_id);
+    TO authenticated, postgres, service_role
+    USING (auth.uid() = user_id OR auth.uid() IS NULL);
 
 -- 13.4 NUTRITION GOALS (SELECT, INSERT, UPDATE)
 DROP POLICY IF EXISTS "Users can view own nutrition goals" ON public.nutrition_goals;

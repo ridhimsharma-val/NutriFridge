@@ -1,4 +1,5 @@
 import '../../../models/nutrition_data.dart';
+import '../../../services/meals/meal_tracking_service.dart';
 import '../../fridge/models/category_item.dart';
 import '../../home/services/meal_recommendation_service.dart';
 import 'recipe_preparation_step.dart';
@@ -595,8 +596,14 @@ class MealDetailInfo {
     if (spec != null) {
       rawReqs.addAll(spec.ingredients);
     } else if (rec.requiredIngredients.isNotEmpty) {
-      for (final ingName in rec.requiredIngredients) {
-        rawReqs.add({'name': ingName, 'quantity': 1, 'unit': 'serving'});
+      for (final ingStr in rec.requiredIngredients) {
+        final parsed = MealTrackingService.parseIngredientQuantity(ingStr);
+        rawReqs.add({
+          'name': parsed.name,
+          'quantity': parsed.quantity ?? 1,
+          'unit': parsed.unit ?? 'serving',
+          'hasExplicitQuantity': parsed.quantity != null,
+        });
       }
     } else {
       // Fallback to catalog match in MealRecommendationService
@@ -604,8 +611,14 @@ class MealDetailInfo {
           .where((r) => r.title.toLowerCase() == rec.title.toLowerCase())
           .firstOrNull;
       if (catalogMatch != null) {
-        for (final ingName in catalogMatch.requiredIngredients) {
-          rawReqs.add({'name': ingName, 'quantity': 1, 'unit': 'portion'});
+        for (final ingStr in catalogMatch.requiredIngredients) {
+          final parsed = MealTrackingService.parseIngredientQuantity(ingStr);
+          rawReqs.add({
+            'name': parsed.name,
+            'quantity': parsed.quantity ?? 1,
+            'unit': parsed.unit ?? 'portion',
+            'hasExplicitQuantity': parsed.quantity != null,
+          });
         }
       } else {
         rawReqs.addAll([
@@ -633,7 +646,10 @@ class MealDetailInfo {
         IngredientAvailability availability;
         String statusLabel;
 
-        if (isCompatible && availQty < reqQty) {
+        if (!isCompatible) {
+          availability = IngredientAvailability.partial;
+          statusLabel = 'Unit mismatch (${foundItem.quantity} in fridge)';
+        } else if (availQty < reqQty) {
           availability = IngredientAvailability.partial;
           statusLabel = 'Partially available: ${foundItem.quantity}';
         } else {

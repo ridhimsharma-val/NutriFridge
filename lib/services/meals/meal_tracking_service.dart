@@ -39,6 +39,71 @@ class MealTrackingService {
     return 'meal_${now}_$rand';
   }
 
+  static const Set<String> _knownUnits = {
+    'g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms',
+    'ml', 'milliliter', 'milliliters', 'l', 'liter', 'liters', 'litre', 'litres',
+    'piece', 'pieces', 'pc', 'pcs', 'slice', 'slices', 'cup', 'cups',
+    'tbsp', 'tsp', 'bowl', 'bowls', 'medium', 'item', 'items',
+    'serving', 'servings', 'portion', 'portions', 'pack', 'packs',
+    'box', 'boxes', 'bottle', 'bottles', 'jar', 'jars', 'can', 'cans', 'tub', 'tubs',
+  };
+
+  /// Parses an ingredient string to safely separate the item name, numeric quantity, and unit.
+  /// Prevents accidental quantity loss or defaulting to 1 for mass/volume items.
+  static ParsedIngredient parseIngredientQuantity(String input) {
+    final clean = input.trim();
+    if (clean.isEmpty) {
+      return const ParsedIngredient(name: '');
+    }
+
+    // 1. Parenthesized format: "Paneer (100g)", "Paneer (100 g)", "Milk (100 ml)", "Eggs (1 piece)"
+    final parenMatch = RegExp(r'^(.*?)\s*\(\s*([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z]+)?\s*\)$').firstMatch(clean);
+    if (parenMatch != null) {
+      final name = parenMatch.group(1)!.trim();
+      final qty = num.tryParse(parenMatch.group(2)!);
+      final rawUnit = parenMatch.group(3)?.trim();
+      return ParsedIngredient(name: name, quantity: qty, unit: rawUnit);
+    }
+
+    // 2. Prefix format: "100g Paneer", "100 g Paneer", "100ml Milk", "1 piece Egg", "2 Eggs"
+    final prefixMatch = RegExp(r'^\s*([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z]+)?\s+(?:of\s+)?(.*?)$').firstMatch(clean);
+    if (prefixMatch != null) {
+      final qty = num.tryParse(prefixMatch.group(1)!);
+      final rawWord = prefixMatch.group(2)?.trim();
+      final rest = prefixMatch.group(3)!.trim();
+
+      if (rawWord != null && _knownUnits.contains(rawWord.toLowerCase())) {
+        return ParsedIngredient(name: rest, quantity: qty, unit: rawWord);
+      } else if (rawWord != null) {
+        final combinedName = rest.isNotEmpty ? '$rawWord $rest' : rawWord;
+        return ParsedIngredient(name: combinedName, quantity: qty, unit: null);
+      }
+    }
+
+    // 3. Postfix or colon format: "Paneer: 100g", "Paneer - 100 g", "Paneer 100g"
+    final postfixMatch = RegExp(r'^(.*?)\s*[:\-–]\s*([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z]+)?$').firstMatch(clean);
+    if (postfixMatch != null) {
+      final name = postfixMatch.group(1)!.trim();
+      final qty = num.tryParse(postfixMatch.group(2)!);
+      final rawUnit = postfixMatch.group(3)?.trim();
+      return ParsedIngredient(name: name, quantity: qty, unit: rawUnit);
+    }
+
+    // 4. Trailing quantity + unit: "Paneer 100g", "Milk 100ml"
+    final trailingMatch = RegExp(r'^(.*?)\s+([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z]+)$').firstMatch(clean);
+    if (trailingMatch != null) {
+      final name = trailingMatch.group(1)!.trim();
+      final qty = num.tryParse(trailingMatch.group(2)!);
+      final rawUnit = trailingMatch.group(3)?.trim();
+      if (rawUnit != null && _knownUnits.contains(rawUnit.toLowerCase())) {
+        return ParsedIngredient(name: name, quantity: qty, unit: rawUnit);
+      }
+    }
+
+    // 5. Unspecified quantity
+    return ParsedIngredient(name: clean, quantity: null, unit: null);
+  }
+
   /// Normalizes incoming meal slot string to match database check constraint:
   /// ('breakfast', 'lunch', 'dinner', 'snack').
   static String normalizeMealSlot(String input) {

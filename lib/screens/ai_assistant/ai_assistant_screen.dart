@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/nutrition_data.dart';
 import '../../services/auth/auth_service.dart';
+import '../../services/meals/models/meal_models.dart';
 import '../fridge/models/category_item.dart';
 import 'models/ai_message.dart';
 import 'services/ai_assistant_service.dart';
@@ -1249,7 +1250,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     );
   }
 
-  void _confirmLogMeal(AiChatMessage message) {
+  void _confirmLogMeal(AiChatMessage message) async {
     if (message.meal == null) return;
 
     final meal = message.meal!;
@@ -1263,10 +1264,49 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     final fat = (nutrition['fatG'] as num? ?? nutrition['fat'] as num?)?.toInt() ?? 0;
 
     final List<String> ingredients = [];
+    final List<MealIngredientDeduction> deductions = [];
+    final selectedIngNames = message.selectedDeductionIngredients;
+
     if (meal['ingredients'] is List) {
       for (final ing in meal['ingredients']) {
         if (ing is Map && ing['name'] != null) {
-          ingredients.add(ing['name'] as String);
+          final ingName = (ing['name'] as String).trim();
+          final rawQty = ing['quantity'] ?? ing['amount'];
+          num? qty;
+          if (rawQty != null) {
+            qty = _parseQuantity(rawQty);
+          }
+          final rawUnitStr = ing['unit']?.toString().trim();
+          final String? unit = (rawUnitStr != null && rawUnitStr.isNotEmpty) ? rawUnitStr : null;
+
+          final formattedIng = (qty != null && unit != null)
+              ? '$ingName ($qty $unit)'
+              : (qty != null ? '$ingName ($qty)' : ingName);
+          ingredients.add(formattedIng);
+
+          final isSelected = selectedIngNames.contains(ingName);
+          final matched = FridgeCategoryRepository.findItemByName(ingName);
+          final isRealUuid = matched != null &&
+              matched.id.isNotEmpty &&
+              !matched.id.startsWith('item_') &&
+              !matched.id.startsWith('food_') &&
+              !matched.id.startsWith('dairy_');
+
+          final effectiveUnit = unit ?? matched?.unit ?? 'pieces';
+          final bool unitsCompatible = matched != null &&
+              FridgeCategoryRepository.areUnitsCompatible(matched.unit, effectiveUnit);
+
+          final doDeduct = isSelected && isRealUuid && qty != null && qty > 0 && unitsCompatible;
+
+          deductions.add(MealIngredientDeduction(
+            name: ingName,
+            requiredQuantity: qty,
+            requiredUnit: effectiveUnit,
+            matchedFridgeItemId: doDeduct ? matched.id : null,
+            deductQuantity: doDeduct ? qty : null,
+            deductUnit: doDeduct ? effectiveUnit : null,
+            doDeduct: doDeduct,
+          ));
         }
       }
     }
@@ -1275,19 +1315,36 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         ? mealType[0].toUpperCase() + mealType.substring(1)
         : 'Lunch';
 
-    // 1. Update MockDataRepository (nutrition totals, meal history, wellness)
-    MockDataRepository.logMeal(
-      mealType: formattedType,
-      mealName: name,
-      calories: calories,
-      protein: protein,
-      carbs: carbs,
-      fat: fat,
-      ingredients: ingredients,
-    );
-
-    // 2. Deduct ONLY the user-selected/confirmed fridge ingredients (in-memory test mode only)
     int deductedCount = 0;
+    try {
+      final result = await MockDataRepository.logMeal(
+        mealType: formattedType,
+        mealName: name,
+        calories: calories,
+        protein: protein,
+        carbs: carbs,
+        fat: fat,
+        ingredients: ingredients,
+        ingredientDeductions: deductions,
+      );
+
+      if (result != null) {
+        deductedCount = result.deductionsApplied;
+      }
+    } catch (e) {
+      debugPrint('[AiAssistantScreen] Meal logging error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to log meal: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+
+    // In offline / unauthenticated test mode, execute in-memory inventory deduction
     if (!AuthService.instance.isAuthenticated || AuthService.instance.currentUser == null) {
       final selectedIngNames = message.selectedDeductionIngredients;
 
@@ -1332,7 +1389,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
     // Mark confirmed
     final index = _messages.indexWhere((m) => m.id == message.id);
-    if (index != -1) {
+    if (index != -1 && mounted) {
       setState(() {
         _messages[index] = _messages[index].copyWith(isConfirmed: true);
         if (_pendingQuickActionIntent == 'log_meal') {
@@ -1342,28 +1399,30 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       });
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                deductedCount > 0
-                    ? 'Logged $name! +$calories kcal, and deducted $deductedCount ingredients from fridge.'
-                    : 'Logged $name! +$calories kcal, +${protein}g protein.',
-                style: const TextStyle(fontWeight: FontWeight.w600),
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  deductedCount > 0
+                      ? 'Logged $name! +$calories kcal, and deducted $deductedCount ingredients from fridge.'
+                      : 'Logged $name! +$calories kcal, +${protein}g protein.',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
+          backgroundColor: AppColors.forestGreen,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 3),
         ),
-        backgroundColor: AppColors.forestGreen,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+      );
+    }
   }
 
   @override

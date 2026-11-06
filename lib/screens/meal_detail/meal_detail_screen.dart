@@ -67,7 +67,9 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
             !matched.id.startsWith('item_') &&
             !matched.id.startsWith('food_') &&
             !matched.id.startsWith('dairy_');
-        final doDeduct = isAvail && isRealUuid && ing.requiredQuantity > 0;
+        final isUnitCompatible = matched != null &&
+            FridgeCategoryRepository.areUnitsCompatible(matched.unit, ing.requiredUnit);
+        final doDeduct = isAvail && isRealUuid && ing.requiredQuantity > 0 && isUnitCompatible;
 
         deductions.add(MealIngredientDeduction(
           name: ing.name,
