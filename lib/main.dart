@@ -28,15 +28,15 @@ class NutriFridgeApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        scaffoldBackgroundColor: AppColors.background,
+        scaffoldBackgroundColor: AppColors.warmCream,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.tealPrimary,
-          primary: AppColors.tealPrimary,
-          secondary: AppColors.peachPrimary,
+          seedColor: AppColors.forestGreen,
+          primary: AppColors.forestGreen,
+          secondary: AppColors.sageAccent,
           surface: AppColors.cardWhite,
           brightness: Brightness.light,
         ),
-        splashColor: AppColors.tealLight.withValues(alpha: 0.3),
+        splashColor: AppColors.paleMint.withValues(alpha: 0.3),
         highlightColor: Colors.transparent,
       ),
       builder: (context, child) {

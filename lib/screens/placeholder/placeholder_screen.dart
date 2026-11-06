@@ -17,7 +17,7 @@ class PlaceholderScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.warmCream,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -28,15 +28,15 @@ class PlaceholderScreen extends StatelessWidget {
                 Container(
                   width: 80,
                   height: 80,
-                  decoration: BoxDecoration(
-                    color: AppColors.tealLight,
+                  decoration: const BoxDecoration(
+                    color: AppColors.paleMint,
                     shape: BoxShape.circle,
-                    boxShadow: const [AppColors.softShadow],
+                    boxShadow: [AppColors.softShadow],
                   ),
                   child: Icon(
                     icon,
                     size: 38,
-                    color: AppColors.tealPrimary,
+                    color: AppColors.forestGreen,
                   ),
                 ),
                 const SizedBox(height: 20),

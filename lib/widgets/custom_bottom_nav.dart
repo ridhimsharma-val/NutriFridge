@@ -32,8 +32,8 @@ class CustomBottomNav extends StatelessWidget {
       onActionPressed: onActionPressed ?? onLogMealPressed,
       items: LiquidFloatNavItem.nutriFridgeItems,
       backgroundColor: AppColors.cardWhite,
-      activeColor: AppColors.tealPrimary,
-      inactiveColor: const Color(0xFF7E978B),
+      activeColor: AppColors.forestGreen,
+      inactiveColor: const Color(0xFF8FA499),
     );
   }
 }

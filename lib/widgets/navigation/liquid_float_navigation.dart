@@ -61,8 +61,8 @@ class LiquidFloatNavigationBar extends StatefulWidget {
     this.onActionPressed,
     this.items = LiquidFloatNavItem.nutriFridgeItems,
     this.backgroundColor = Colors.white,
-    this.activeColor = AppColors.tealPrimary,
-    this.inactiveColor = const Color(0xFF7E978B),
+    this.activeColor = AppColors.forestGreen,
+    this.inactiveColor = const Color(0xFF8FA499),
     this.shadowColor = const Color(0x14000000),
     this.animationDuration = const Duration(milliseconds: 340),
     this.animationCurve = const LiquidFloatCurve(),
@@ -303,30 +303,25 @@ class _LiquidFloatNavigationBarState extends State<LiquidFloatNavigationBar>
                                       hoverColor: Colors.transparent,
                                       child: Center(
                                         child: Container(
-                                          width: 44,
-                                          height: 44,
+                                          width: 48,
+                                          height: 48,
                                           decoration: BoxDecoration(
-                                            color: AppColors.tealSurface,
+                                            color: const Color(0xFF10B981),
                                             shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: widget.activeColor
-                                                  .withValues(alpha: 0.22),
-                                              width: 1.2,
-                                            ),
                                             boxShadow: [
                                               BoxShadow(
-                                                color: Colors.black
-                                                    .withValues(alpha: 0.04),
-                                                blurRadius: 8,
-                                                offset: const Offset(0, 2),
+                                                color: const Color(0xFF10B981)
+                                                    .withValues(alpha: 0.35),
+                                                blurRadius: 10,
+                                                offset: const Offset(0, 3),
                                               ),
                                             ],
                                           ),
-                                          child: Center(
+                                          child: const Center(
                                             child: Icon(
-                                              item.icon,
-                                              size: 24,
-                                              color: widget.activeColor,
+                                              Icons.add_rounded,
+                                              size: 26,
+                                              color: Colors.white,
                                             ),
                                           ),
                                         ),

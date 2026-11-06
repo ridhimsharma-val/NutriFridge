@@ -50,19 +50,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppColors.bgGradientTop,
-            Color(0xFFF6FAF7),
-            AppColors.bgGradientBottom,
-          ],
-        ),
-      ),
+      color: AppColors.warmCream,
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.warmCream,
         body: IndexedStack(
           index: _currentIndex,
           children: _screens,

@@ -14,19 +14,9 @@ class AddFoodPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppColors.bgGradientTop,
-            Color(0xFFF7FAF8),
-            AppColors.bgGradientBottom,
-          ],
-        ),
-      ),
+      color: AppColors.warmCream,
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.warmCream,
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -78,8 +68,8 @@ class AddFoodPage extends StatelessWidget {
                   title: 'Single Food',
                   subtitle: 'Scan one food item',
                   icon: Icons.camera_alt_rounded,
-                  iconColor: AppColors.tealPrimary,
-                  badgeBgColor: AppColors.tealLight,
+                  iconColor: AppColors.forestGreen,
+                  badgeBgColor: AppColors.paleMint,
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -95,8 +85,8 @@ class AddFoodPage extends StatelessWidget {
                   title: 'Multiple Foods',
                   subtitle: 'Detect several foods in one image',
                   icon: Icons.photo_library_rounded,
-                  iconColor: AppColors.peachPrimary,
-                  badgeBgColor: AppColors.peachLight,
+                  iconColor: AppColors.coralHighlight,
+                  badgeBgColor: AppColors.peachCard,
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -112,8 +102,8 @@ class AddFoodPage extends StatelessWidget {
                   title: 'Grocery / Receipt',
                   subtitle: 'Scan a grocery list or receipt',
                   icon: Icons.receipt_long_rounded,
-                  iconColor: const Color(0xFF2563EB),
-                  badgeBgColor: const Color(0xFFEFF6FF),
+                  iconColor: AppColors.sageAccent,
+                  badgeBgColor: AppColors.sageLight,
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -129,8 +119,8 @@ class AddFoodPage extends StatelessWidget {
                   title: 'Manual Entry',
                   subtitle: 'Enter food details yourself',
                   icon: Icons.edit_note_rounded,
-                  iconColor: const Color(0xFF0D9488),
-                  badgeBgColor: const Color(0xFFE6FFFA),
+                  iconColor: AppColors.forestGreen,
+                  badgeBgColor: AppColors.paleMint,
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(

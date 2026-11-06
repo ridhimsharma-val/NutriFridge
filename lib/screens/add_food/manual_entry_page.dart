@@ -31,7 +31,7 @@ class ManualEntryPage extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Added $foodName ($quantity) to $category!'),
-        backgroundColor: AppColors.tealPrimary,
+        backgroundColor: AppColors.forestGreen,
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ),
@@ -58,19 +58,9 @@ class ManualEntryPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppColors.bgGradientTop,
-            Color(0xFFF7FAF8),
-            AppColors.bgGradientBottom,
-          ],
-        ),
-      ),
+      color: AppColors.warmCream,
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.warmCream,
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,

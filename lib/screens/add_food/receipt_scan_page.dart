@@ -200,7 +200,7 @@ class _ReceiptScanPageState extends State<ReceiptScanPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Added ${selected.length} items to your fridge!'),
-        backgroundColor: AppColors.tealPrimary,
+        backgroundColor: AppColors.forestGreen,
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ),
@@ -212,19 +212,9 @@ class _ReceiptScanPageState extends State<ReceiptScanPage> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppColors.bgGradientTop,
-            Color(0xFFF7FAF8),
-            AppColors.bgGradientBottom,
-          ],
-        ),
-      ),
+      color: AppColors.warmCream,
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.warmCream,
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -300,7 +290,7 @@ class _ReceiptScanPageState extends State<ReceiptScanPage> {
                 icon: const Icon(Icons.camera_alt_outlined, size: 18),
                 label: const Text('Try Another Image'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.tealPrimary,
+                  backgroundColor: AppColors.forestGreen,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -337,7 +327,7 @@ class _ReceiptScanPageState extends State<ReceiptScanPage> {
                 style: AppTypography.bodyMedium.copyWith(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.tealPrimary,
+                  color: AppColors.forestGreen,
                 ),
               ),
             ],
@@ -358,7 +348,7 @@ class _ReceiptScanPageState extends State<ReceiptScanPage> {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: item.isSelected
-                        ? AppColors.tealAccent.withValues(alpha: 0.4)
+                        ? AppColors.sageAccent.withValues(alpha: 0.4)
                         : AppColors.cardBorder,
                     width: 1.2,
                   ),
@@ -456,10 +446,10 @@ class _ReceiptScanPageState extends State<ReceiptScanPage> {
             child: ElevatedButton(
               onPressed: selectedCount > 0 ? _onAddSelectedToFridge : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.tealPrimary,
+                backgroundColor: AppColors.forestGreen,
                 foregroundColor: Colors.white,
                 elevation: 2,
-                shadowColor: AppColors.tealPrimary.withValues(alpha: 0.4),
+                shadowColor: AppColors.forestGreen.withValues(alpha: 0.4),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
