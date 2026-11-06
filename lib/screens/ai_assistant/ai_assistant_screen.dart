@@ -5,6 +5,7 @@ import '../../core/services/app_image_picker.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/nutrition_data.dart';
+import '../../services/auth/auth_service.dart';
 import '../fridge/models/category_item.dart';
 import 'models/ai_message.dart';
 import 'services/ai_assistant_service.dart';
@@ -1285,44 +1286,46 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       ingredients: ingredients,
     );
 
-    // 2. Deduct ONLY the user-selected/confirmed fridge ingredients
+    // 2. Deduct ONLY the user-selected/confirmed fridge ingredients (in-memory test mode only)
     int deductedCount = 0;
-    final selectedIngNames = message.selectedDeductionIngredients;
+    if (!AuthService.instance.isAuthenticated || AuthService.instance.currentUser == null) {
+      final selectedIngNames = message.selectedDeductionIngredients;
 
-    for (final ingName in selectedIngNames) {
-      // Find ingredient details from meal['ingredients']
-      Map<String, dynamic>? matchedIng;
-      if (meal['ingredients'] is List) {
-        for (final ing in meal['ingredients']) {
-          if (ing is Map && (ing['name'] as String?)?.toLowerCase().trim() == ingName.toLowerCase().trim()) {
-            matchedIng = Map<String, dynamic>.from(ing);
-            break;
+      for (final ingName in selectedIngNames) {
+        // Find ingredient details from meal['ingredients']
+        Map<String, dynamic>? matchedIng;
+        if (meal['ingredients'] is List) {
+          for (final ing in meal['ingredients']) {
+            if (ing is Map && (ing['name'] as String?)?.toLowerCase().trim() == ingName.toLowerCase().trim()) {
+              matchedIng = Map<String, dynamic>.from(ing);
+              break;
+            }
           }
         }
-      }
 
-      num? qty;
-      String? unit;
-      if (matchedIng != null) {
-        final rawQty = matchedIng['quantity'] ?? matchedIng['amount'];
-        if (rawQty != null) {
-          qty = _parseQuantity(rawQty);
+        num? qty;
+        String? unit;
+        if (matchedIng != null) {
+          final rawQty = matchedIng['quantity'] ?? matchedIng['amount'];
+          if (rawQty != null) {
+            qty = _parseQuantity(rawQty);
+          }
+          unit = _parseUnit(matchedIng['unit']);
         }
-        unit = _parseUnit(matchedIng['unit']);
-      }
 
-      if (qty != null && qty > 0) {
-        final result = FridgeCategoryRepository.deductItemQuantityByName(
-          name: ingName,
-          quantity: qty,
-          unit: unit,
-        );
-        if (result.isSuccess) {
-          deductedCount++;
-        }
-      } else {
-        if (FridgeCategoryRepository.removeItemByName(ingName)) {
-          deductedCount++;
+        if (qty != null && qty > 0) {
+          final result = FridgeCategoryRepository.deductItemQuantityByName(
+            name: ingName,
+            quantity: qty,
+            unit: unit,
+          );
+          if (result.isSuccess) {
+            deductedCount++;
+          }
+        } else {
+          if (FridgeCategoryRepository.removeItemByName(ingName)) {
+            deductedCount++;
+          }
         }
       }
     }

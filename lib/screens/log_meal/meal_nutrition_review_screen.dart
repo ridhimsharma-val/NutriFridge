@@ -4,6 +4,9 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/nutrition_data.dart';
+import '../../services/auth/auth_service.dart';
+import '../../services/meals/meal_tracking_service.dart';
+import '../../services/meals/models/meal_models.dart';
 import 'models/detected_food_item.dart';
 import 'models/meal_nutrition_estimate.dart';
 import 'services/fridge_inventory_service.dart';
@@ -36,6 +39,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
   late MealNutritionEstimate _nutrition;
   bool _isMoreNutritionExpanded = false;
   bool _isLogging = false;
+  String? _idempotencyKey;
 
   final List<String> _mealTypes = const [
     'Breakfast',
@@ -166,7 +170,7 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
     );
   }
 
-  void _onConfirmAndLogMeal() {
+  void _onConfirmAndLogMeal() async {
     if (_isLogging) return;
 
     if (_mealName.trim().isEmpty) {
@@ -206,45 +210,94 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
 
     final nutrition = _nutrition;
 
-    // 1. Update mock nutrition totals and meal history
-    MockDataRepository.logMeal(
-      mealType: _selectedMealType,
-      mealName: _mealName.trim(),
-      calories: nutrition.calories,
-      protein: nutrition.proteinGrams,
-      carbs: nutrition.carbsGrams,
-      fat: nutrition.fatGrams,
-      ingredients: widget.detectedFoods.map((f) => '${f.name} (${f.formattedQuantity})').toList(),
-      timestamp: DateTime.now(),
-    );
+    _idempotencyKey ??= MealTrackingService.generateIdempotencyKey();
 
-    // 2. Deduct only user-confirmed, matching fridge inventory items
-    FridgeInventoryService.deductSelected(_inventoryStatuses);
+    try {
+      final deductions = <MealIngredientDeduction>[];
+      for (final status in _inventoryStatuses) {
+        final item = status.ingredient;
+        final matched = status.matchingItem;
+        final isRealUuid = matched != null &&
+            matched.id.isNotEmpty &&
+            !matched.id.startsWith('item_') &&
+            !matched.id.startsWith('food_') &&
+            !matched.id.startsWith('dairy_');
+        final doDeduct = status.isSelected && status.canDeduct && isRealUuid;
+        deductions.add(MealIngredientDeduction(
+          name: item.name,
+          requiredQuantity: item.amount,
+          requiredUnit: item.unit,
+          matchedFridgeItemId: doDeduct ? matched.id : null,
+          deductQuantity: doDeduct ? item.amount : null,
+          deductUnit: doDeduct ? item.unit : null,
+          doDeduct: doDeduct,
+        ));
+      }
 
-    // 3. Navigate back to Dashboard
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    }
+      await MockDataRepository.logMeal(
+        mealType: _selectedMealType,
+        mealName: _mealName.trim(),
+        calories: nutrition.calories,
+        protein: nutrition.proteinGrams,
+        carbs: nutrition.carbsGrams,
+        fat: nutrition.fatGrams,
+        ingredients: widget.detectedFoods.map((f) => '${f.name} (${f.formattedQuantity})').toList(),
+        timestamp: DateTime.now(),
+        idempotencyKey: _idempotencyKey,
+        ingredientDeductions: deductions,
+      );
 
-    if (mounted) {
+      // In unauthenticated / test mode only, deduct in-memory
+      if (!AuthService.instance.isAuthenticated || AuthService.instance.currentUser == null) {
+        FridgeInventoryService.deductSelected(_inventoryStatuses);
+      }
+
+      _idempotencyKey = null;
+
+      if (!mounted) return;
+
+      // 3. Navigate back to Dashboard
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+
+      if (mounted) {
+        setState(() {
+          _isLogging = false;
+        });
+      }
+
+      // 4. Show friendly confirmation
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Meal logged successfully.',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: AppColors.textPrimary,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLogging = false;
       });
-    }
-
-    // 4. Show friendly confirmation
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text(
-          'Meal logged successfully.',
-          style: TextStyle(fontWeight: FontWeight.w600),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to log meal: ${e.toString().replaceAll("Exception: ", "")}'),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'Retry',
+            textColor: Colors.white,
+            onPressed: _onConfirmAndLogMeal,
+          ),
         ),
-        backgroundColor: AppColors.textPrimary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+      );
+    }
   }
 
   @override

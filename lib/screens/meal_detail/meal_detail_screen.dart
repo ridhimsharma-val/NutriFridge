@@ -3,6 +3,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/transitions/hero_transition_route.dart';
 import '../../models/nutrition_data.dart';
+import '../../services/auth/auth_service.dart';
+import '../../services/meals/meal_tracking_service.dart';
+import '../../services/meals/models/meal_models.dart';
 import '../ai_assistant/ai_assistant_screen.dart';
 import '../fridge/models/category_item.dart';
 import '../home/services/meal_recommendation_service.dart';
@@ -36,71 +39,135 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
       widget.heroTag ??
       'meal-hero-image-${widget.recommendation.title.toLowerCase().replaceAll(RegExp(r'\s+'), '-')}';
 
+  String? _idempotencyKey;
+
   /// Directly logs the displayed meal with ingredient deductions and updates reactive repositories
-  void _handleLogMeal(BuildContext context, MealDetailInfo meal) {
+  void _handleLogMeal(MealDetailInfo meal) async {
     if (_isLogging) return;
     setState(() {
       _isLogging = true;
     });
 
-    // 1. Gather available ingredients for record
-    final availableIngredients = meal.ingredients
-        .where((i) => i.availability == IngredientAvailability.available)
-        .map((i) => i.name)
-        .toList();
+    _idempotencyKey ??= MealTrackingService.generateIdempotencyKey();
 
-    // 2. Record meal in the reactive MockDataRepository
-    MockDataRepository.logMeal(
-      mealType: meal.tag.isNotEmpty ? meal.tag.toLowerCase() : 'lunch',
-      mealName: meal.name,
-      calories: meal.calories ?? 0,
-      protein: meal.proteinGrams ?? 0,
-      carbs: meal.carbsGrams ?? 0,
-      fat: meal.fatGrams ?? 0,
-      ingredients: availableIngredients,
-    );
+    try {
+      // 1. Gather available ingredients for record
+      final availableIngredients = meal.ingredients
+          .where((i) => i.availability == IngredientAvailability.available)
+          .map((i) => i.name)
+          .toList();
 
-    // 3. Deduct available ingredients using existing inventory logic (never deduct missing)
-    for (final ing in meal.ingredients) {
-      if (ing.availability == IngredientAvailability.available) {
-        FridgeCategoryRepository.deductItemQuantityByName(
+      // 2. Build structured ingredient deductions for Supabase RPC
+      final deductions = <MealIngredientDeduction>[];
+      for (final ing in meal.ingredients) {
+        final matched = FridgeCategoryRepository.findItemByName(ing.name);
+        final isAvail = ing.availability == IngredientAvailability.available && matched != null;
+        final isRealUuid = matched != null &&
+            matched.id.isNotEmpty &&
+            !matched.id.startsWith('item_') &&
+            !matched.id.startsWith('food_') &&
+            !matched.id.startsWith('dairy_');
+        final doDeduct = isAvail && isRealUuid && ing.requiredQuantity > 0;
+
+        deductions.add(MealIngredientDeduction(
           name: ing.name,
-          quantity: ing.requiredQuantity,
-          unit: ing.requiredUnit,
+          requiredQuantity: ing.requiredQuantity,
+          requiredUnit: ing.requiredUnit,
+          matchedFridgeItemId: doDeduct ? matched.id : null,
+          deductQuantity: doDeduct ? ing.requiredQuantity : null,
+          deductUnit: doDeduct ? ing.requiredUnit : null,
+          doDeduct: doDeduct,
+        ));
+      }
+
+      // 3. Record meal via MockDataRepository (invoking Supabase RPC when authenticated)
+      final result = await MockDataRepository.logMeal(
+        mealType: meal.tag.isNotEmpty ? meal.tag.toLowerCase() : 'lunch',
+        mealName: meal.name,
+        calories: meal.calories ?? 0,
+        protein: meal.proteinGrams ?? 0,
+        carbs: meal.carbsGrams ?? 0,
+        fat: meal.fatGrams ?? 0,
+        ingredients: availableIngredients,
+        idempotencyKey: _idempotencyKey,
+        ingredientDeductions: deductions,
+        recipeId: widget.recommendation.id.isNotEmpty && !widget.recommendation.id.startsWith('recipe_')
+            ? widget.recommendation.id
+            : null,
+        imageUrl: meal.imageUrl,
+      );
+
+      // In unauthenticated / test mode only, deduct in-memory
+      if (!AuthService.instance.isAuthenticated || AuthService.instance.currentUser == null) {
+        for (final ing in meal.ingredients) {
+          if (ing.availability == IngredientAvailability.available) {
+            FridgeCategoryRepository.deductItemQuantityByName(
+              name: ing.name,
+              quantity: ing.requiredQuantity,
+              unit: ing.requiredUnit,
+            );
+          }
+        }
+      }
+
+      // 4. Invalidate recommendation and advance to next unlogged slot (only for new non-duplicate meals)
+      final isDuplicate = result?.alreadyProcessed == true;
+      if (!isDuplicate) {
+        MealRecommendationService.advanceAfterMealLogged(
+          loggedSlot: MealRecommendationService.parseMealSlot(meal.tag),
         );
       }
-    }
 
-    // 4. Invalidate recommendation and advance to next unlogged slot
-    MealRecommendationService.advanceAfterMealLogged(
-      loggedSlot: MealRecommendationService.parseMealSlot(meal.tag),
-    );
+      // Clear idempotency key on successful confirmation
+      _idempotencyKey = null;
 
-    // 5. Show clear success confirmation
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Logged ${meal.name}${meal.calories != null ? " (+${meal.calories} kcal)" : ""} to Today\'s Meals!',
-                style: const TextStyle(fontWeight: FontWeight.w600),
+      if (!mounted) return;
+
+      // 5. Show clear success confirmation
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  isDuplicate
+                      ? 'Meal was already logged with this transaction.'
+                      : 'Logged ${meal.name}${meal.calories != null ? " (+${meal.calories} kcal)" : ""} to Today\'s Meals!',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
+          backgroundColor: AppColors.primaryForest,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 3),
         ),
-        backgroundColor: AppColors.primaryForest,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+      );
 
-    // 5. Navigate back
-    Navigator.of(context).pop();
+      // 6. Navigate back
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLogging = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to log meal: ${e.toString().replaceAll("Exception: ", "")}'),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'Retry',
+            textColor: Colors.white,
+            onPressed: () => _handleLogMeal(meal),
+          ),
+        ),
+      );
+    }
   }
 
   /// Opens the AI Assistant passing a complete structured meal context
@@ -1070,7 +1137,7 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
             child: SizedBox(
               height: 50,
               child: ElevatedButton(
-                onPressed: _isLogging ? null : () => _handleLogMeal(context, meal),
+                onPressed: _isLogging ? null : () => _handleLogMeal(meal),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryForest,
                   foregroundColor: Colors.white,

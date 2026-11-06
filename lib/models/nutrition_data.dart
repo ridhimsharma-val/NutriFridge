@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart';
+import '../screens/fridge/models/category_item.dart';
 import '../screens/profile/models/user_profile_data.dart';
 import '../services/auth/auth_service.dart';
+import '../services/meals/meal_tracking_service.dart';
+import '../services/meals/models/meal_models.dart';
 import '../services/profile/profile_service.dart';
 import 'notification_data.dart';
 
@@ -473,24 +476,152 @@ class MockDataRepository {
     }
   }
 
-  /// Loads user profile and nutrition goals from Supabase for the authenticated user.
-  static Future<void> loadFromSupabase({String? userId}) async {
+  /// Flag to force in-memory mock repository behavior in widget tests
+  static bool forceInMemoryForTesting = false;
+
+  static bool _isCompleteSnapshot = true;
+  static int _mealsWithUnknownNutrition = 0;
+
+  /// Returns true if all logged meals for today's snapshot have complete, known nutrition values
+  static bool get isCompleteSnapshot => _isCompleteSnapshot;
+
+  /// Number of meals logged today with incomplete or unknown nutrition
+  static int get mealsWithUnknownNutrition => _mealsWithUnknownNutrition;
+
+  static String _formatTimeString(DateTime time) {
+    final rawHour = time.hour;
+    final hour = rawHour > 12 ? rawHour - 12 : (rawHour == 0 ? 12 : rawHour);
+    final minute = time.minute.toString().padLeft(2, '0');
+    final period = rawHour >= 12 ? 'PM' : 'AM';
+    return '$hour:$minute $period';
+  }
+
+  /// Automatically derives ingredient deduction mappings from name list against current inventory
+  static List<MealIngredientDeduction> _deriveDeductionsFromIngredients(List<String>? ingredients) {
+    if (ingredients == null || ingredients.isEmpty) return const [];
+    final list = <MealIngredientDeduction>[];
+    for (final raw in ingredients) {
+      final clean = raw.trim();
+      if (clean.isEmpty) continue;
+      final nameOnly = clean.contains('(') ? clean.substring(0, clean.indexOf('(')).trim() : clean;
+      final matched = FridgeCategoryRepository.findItemByName(nameOnly);
+      final isRealUuid = matched != null &&
+          matched.id.isNotEmpty &&
+          !matched.id.startsWith('item_') &&
+          !matched.id.startsWith('food_') &&
+          !matched.id.startsWith('dairy_');
+      if (matched != null && isRealUuid) {
+        list.add(MealIngredientDeduction(
+          name: nameOnly,
+          matchedFridgeItemId: matched.id,
+          requiredQuantity: 1,
+          requiredUnit: matched.unit,
+          deductQuantity: 1,
+          deductUnit: matched.unit,
+          doDeduct: true,
+        ));
+      } else {
+        list.add(MealIngredientDeduction(
+          name: nameOnly,
+          doDeduct: false,
+        ));
+      }
+    }
+    return list;
+  }
+
+  /// Loads user profile, nutrition goals, today's snapshot, meal slots, and meal history
+  /// from Supabase for the authenticated user.
+  static Future<void> loadFromSupabase({String? userId, bool force = false}) async {
     final effectiveUserId = userId ?? AuthService.instance.currentUser?.id;
     if (effectiveUserId == null) return;
 
     try {
+      // 1. Profile and nutrition goals
       final savedProfile = await ProfileService.instance.fetchProfileWithGoals(userId: effectiveUserId);
       if (savedProfile != null) {
         _currentProfile = savedProfile;
-        if (savedProfile.dailyCalorieTarget != null) {
-          _currentNutrition = _currentNutrition.copyWith(
-            targetCalories: savedProfile.dailyCalorieTarget!,
-          );
-        }
-        _notify();
       }
-    } catch (_) {
-      // Preserve current state gracefully on network failure
+      final targetCal = savedProfile?.dailyCalorieTarget ?? _currentNutrition.targetCalories;
+
+      // 2. Daily nutrition snapshot from public.daily_nutrition_snapshots
+      final snapshot = await MealTrackingService.instance.fetchDailyNutritionSnapshot(
+        userId: effectiveUserId,
+        date: DateTime.now(),
+      );
+
+      if (snapshot != null) {
+        _isCompleteSnapshot = snapshot.isComplete;
+        _mealsWithUnknownNutrition = snapshot.mealsWithUnknownNutrition;
+        _currentNutrition = DailyNutritionData(
+          consumedCalories: snapshot.totalCalories ?? 0,
+          targetCalories: snapshot.targetCalories > 0 ? snapshot.targetCalories : targetCal,
+          protein: _currentNutrition.protein.copyWith(
+            amountGrams: snapshot.proteinG ?? 0,
+          ),
+          carbs: _currentNutrition.carbs.copyWith(
+            amountGrams: snapshot.carbsG ?? 0,
+          ),
+          fat: _currentNutrition.fat.copyWith(
+            amountGrams: snapshot.fatG ?? 0,
+          ),
+        );
+      } else {
+        _isCompleteSnapshot = true;
+        _mealsWithUnknownNutrition = 0;
+        _currentNutrition = DailyNutritionData(
+          consumedCalories: 0,
+          targetCalories: targetCal,
+          protein: _currentNutrition.protein.copyWith(amountGrams: 0),
+          carbs: _currentNutrition.carbs.copyWith(amountGrams: 0),
+          fat: _currentNutrition.fat.copyWith(amountGrams: 0),
+        );
+      }
+
+      // 3. Completed meal slots from public.daily_meal_slots
+      final slots = await MealTrackingService.instance.fetchDailyMealSlots(
+        userId: effectiveUserId,
+        date: DateTime.now(),
+      );
+
+      final baseSlots = [
+        const MealItem(name: 'Breakfast', status: MealStatus.upcoming, iconEmoji: '🍳'),
+        const MealItem(name: 'Lunch', status: MealStatus.upcoming, iconEmoji: '🥗'),
+        const MealItem(name: 'Snack', status: MealStatus.upcoming, iconEmoji: '🍎'),
+        const MealItem(name: 'Dinner', status: MealStatus.upcoming, iconEmoji: '🍲'),
+      ];
+
+      if (slots.isNotEmpty) {
+        _currentMeals = baseSlots.map((base) {
+          final slotLower = base.name.toLowerCase();
+          final match = slots.firstWhere(
+            (s) => s.mealSlot.toLowerCase() == slotLower || (slotLower.contains('snack') && s.mealSlot.toLowerCase().contains('snack')),
+            orElse: () => DailyMealSlotRecord.empty(slotLower),
+          );
+          if (match.isCompleted) {
+            final timeStr = match.completedAt != null ? _formatTimeString(match.completedAt!) : 'Logged';
+            return base.copyWith(status: MealStatus.completed, time: timeStr);
+          }
+          return base;
+        }).toList();
+      } else {
+        _currentMeals = baseSlots;
+      }
+
+      // 4. Meal History from public.meals
+      final historyRecords = await MealTrackingService.instance.fetchMealHistory(
+        userId: effectiveUserId,
+        limit: 50,
+      );
+
+      _loggedMealsHistory.clear();
+      if (historyRecords.isNotEmpty) {
+        _loggedMealsHistory.addAll(historyRecords.map((m) => m.toMap()));
+      }
+
+      _notify();
+    } catch (e) {
+      debugPrint('[MockDataRepository] loadFromSupabase error: $e');
     }
   }
 
@@ -503,18 +634,59 @@ class MockDataRepository {
   /// Mock meal history log
   static List<Map<String, dynamic>> get loggedMealsHistory => List.unmodifiable(_loggedMealsHistory);
 
-  /// Logs a meal into the mock state, updating nutrition progress and meal status.
-  static void logMeal({
+  /// Logs a meal, transactionally executing Supabase RPC `public.log_meal_transaction`
+  /// when authenticated, or updating local in-memory state in test/offline modes.
+  static Future<MealTransactionResult?> logMeal({
     required String mealType,
     required String mealName,
     required int calories,
     required int protein,
     required int carbs,
     required int fat,
+    int? fiber,
     List<String>? ingredients,
     DateTime? timestamp,
-  }) {
-    // 1. Add nutrition totals
+    String? recipeId,
+    String? imageUrl,
+    String? idempotencyKey,
+    List<MealIngredientDeduction>? ingredientDeductions,
+    bool isEstimate = true,
+    String nutritionSource = 'ai_estimate',
+  }) async {
+    final effectiveKey = idempotencyKey ?? MealTrackingService.generateIdempotencyKey();
+
+    // 1. Transactional Supabase RPC when authenticated and not in forced-memory test mode
+    if (!forceInMemoryForTesting &&
+        AuthService.instance.isAuthenticated &&
+        AuthService.instance.currentUser != null) {
+      final deductions = ingredientDeductions ?? _deriveDeductionsFromIngredients(ingredients);
+      final result = await MealTrackingService.instance.logMealTransaction(
+        idempotencyKey: effectiveKey,
+        mealName: mealName,
+        mealType: mealType,
+        calories: calories,
+        proteinG: protein,
+        carbsG: carbs,
+        fatG: fat,
+        fiberG: fiber,
+        isEstimate: isEstimate,
+        nutritionSource: nutritionSource,
+        recipeId: recipeId,
+        imageUrl: imageUrl,
+        ingredients: deductions,
+      );
+
+      // Refresh authoritative PostgreSQL state
+      await Future.wait([
+        loadFromSupabase(force: true),
+        FridgeCategoryRepository.loadFromSupabase(force: true),
+      ]);
+
+      return result;
+    }
+
+    // 2. In-memory fallback (used in widget tests and offline mode)
+    // 2a. Add nutrition totals
     _currentNutrition = _currentNutrition.copyWith(
       consumedCalories: _currentNutrition.consumedCalories + calories,
       protein: _currentNutrition.protein.copyWith(
@@ -528,15 +700,11 @@ class MockDataRepository {
       ),
     );
 
-    // 2. Format current time
+    // 2b. Format current time
     final timeNow = timestamp ?? DateTime.now();
-    final rawHour = timeNow.hour;
-    final hour = rawHour > 12 ? rawHour - 12 : (rawHour == 0 ? 12 : rawHour);
-    final minute = timeNow.minute.toString().padLeft(2, '0');
-    final period = rawHour >= 12 ? 'PM' : 'AM';
-    final timeString = '$hour:$minute $period';
+    final timeString = _formatTimeString(timeNow);
 
-    // 3. Update matching meal item in Today's Meals
+    // 2c. Update matching meal item in Today's Meals
     final cleanType = mealType.trim().toLowerCase();
     final index = _currentMeals.indexWhere((m) {
       final itemLower = m.name.toLowerCase();
@@ -569,7 +737,7 @@ class MockDataRepository {
       );
     }
 
-    // 4. Save to history
+    // 2d. Save to history
     _loggedMealsHistory.add({
       'mealType': mealType,
       'mealName': mealName,
@@ -577,11 +745,13 @@ class MockDataRepository {
       'protein': protein,
       'carbs': carbs,
       'fat': fat,
+      'fiber': fiber,
       'ingredients': ingredients ?? const <String>[],
       'timestamp': timeNow,
+      'idempotencyKey': effectiveKey,
     });
 
-    // 5. Post synchronized in-app notification
+    // 2e. Post in-app notification
     NotificationRepository.addNotification(
       title: 'Meal logged',
       description: 'Your $mealType ($mealName) has been added to today\'s nutrition.',
@@ -589,6 +759,13 @@ class MockDataRepository {
     );
 
     _notify();
+    return MealTransactionResult(
+      status: 'success',
+      alreadyProcessed: false,
+      mealId: 'local_${DateTime.now().millisecondsSinceEpoch}',
+      localDate: DateTime.now().toIso8601String().substring(0, 10),
+      mealType: cleanType,
+    );
   }
 
   /// Seeds sample demo data for specific automated widget test suites
@@ -691,6 +868,8 @@ class MockDataRepository {
     _currentNutrition = _initialNutrition;
     _currentMeals = [];
     _loggedMealsHistory.clear();
+    _isCompleteSnapshot = true;
+    _mealsWithUnknownNutrition = 0;
     _currentProfile = const UserProfileData(
       displayName: '',
       dietaryPreference: null,

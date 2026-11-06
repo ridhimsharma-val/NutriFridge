@@ -539,6 +539,7 @@ class NutritionCard extends StatelessWidget {
   Widget _buildMealBreakdownList() {
     final meals = MockDataRepository.meals;
     final history = MockDataRepository.loggedMealsHistory;
+    final unknownCount = MockDataRepository.mealsWithUnknownNutrition;
 
     if (meals.isEmpty) {
       return Container(
@@ -561,7 +562,23 @@ class NutritionCard extends StatelessWidget {
     }
 
     return Column(
-      children: meals.map((meal) {
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (unknownCount > 0)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, size: 14, color: AppColors.textSecondary),
+                const SizedBox(width: 4),
+                Text(
+                  '$unknownCount meal(s) logged with estimated nutrition',
+                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, fontStyle: FontStyle.italic),
+                ),
+              ],
+            ),
+          ),
+        ...meals.map((meal) {
         final isCompleted = meal.isCompleted;
 
         // Find details from logged history if available
@@ -687,7 +704,8 @@ class NutritionCard extends StatelessWidget {
             ],
           ),
         );
-      }).toList(),
+      }),
+      ],
     );
   }
 
