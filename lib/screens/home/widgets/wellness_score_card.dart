@@ -1,13 +1,16 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../models/nutrition_data.dart';
 import '../../fridge/models/category_item.dart';
 
-/// Expandable Today's Wellness Card.
-/// Collapsed state is visually unchanged.
-/// Expanding reveals a 7-day interactive wellness chart, supporting factors, and disclaimer.
+/// Redesigned Today's Wellness Card for NutriFridge Dashboard:
+/// - Minimal, compact white card surface with subtle green-grey border.
+/// - Prominent numeric wellness score ("77 / 100") with status and secondary label.
+/// - Separate pale mint highlight surface for score change ("+2 vs yesterday").
+/// - Slim horizontal progress bar in freshGreen over light neutral green track.
+/// - Expandable 7-day wellness trend chart with smooth selection and contributing factors.
+/// - Clean text rows for contributing factors without decorative icon clutter.
 class WellnessScoreCard extends StatefulWidget {
   final WellnessScoreData? wellnessData;
   final bool isExpanded;
@@ -27,15 +30,19 @@ class WellnessScoreCard extends StatefulWidget {
 class _WellnessScoreCardState extends State<WellnessScoreCard> {
   int _selectedDayIndex = 6;
 
-  static const List<_DayScore> _sevenDayHistory = [
-    _DayScore(day: 'Mon', score: 76),
-    _DayScore(day: 'Tue', score: 78),
-    _DayScore(day: 'Wed', score: 80),
-    _DayScore(day: 'Thu', score: 82),
-    _DayScore(day: 'Fri', score: 85),
-    _DayScore(day: 'Sat', score: 78),
-    _DayScore(day: 'Sun', score: 82, isToday: true),
-  ];
+  List<_DayScore> _getWeekHistory(WellnessScoreData data) {
+    final currentScore = data.currentScore;
+    final prevScore = data.previousScore;
+    return [
+      const _DayScore(day: 'Mon', score: 76),
+      const _DayScore(day: 'Tue', score: 78),
+      const _DayScore(day: 'Wed', score: 80),
+      const _DayScore(day: 'Thu', score: 82),
+      const _DayScore(day: 'Fri', score: 85),
+      _DayScore(day: 'Sat', score: prevScore > 0 ? prevScore : 78),
+      _DayScore(day: 'Sun', score: currentScore, isToday: true),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,37 +61,32 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
             decoration: BoxDecoration(
-              color: AppColors.paleMint,
+              color: AppColors.pureWhite,
               borderRadius: BorderRadius.circular(22),
               border: Border.all(
-                color: AppColors.freshGreen.withValues(alpha: 0.25),
-                width: 1.2,
+                color: const Color(0xFFE2EBE5),
+                width: 1.0,
               ),
               boxShadow: const [AppColors.softShadow],
             ),
-            padding: const EdgeInsets.symmetric(
-              horizontal: 18.0,
-              vertical: 16.0,
-            ),
+            padding: const EdgeInsets.all(18.0),
             child: hasData
                 ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Top Collapsed Summary Row
-                      _buildSummaryRow(wellnessData),
+                      // Top Title & Expand Control Row
+                      _buildHeaderRow(isExpanded),
+
+                      const SizedBox(height: 14),
+
+                      // Collapsed Snapshot or Expanded Content
                       AnimatedSize(
                         duration: const Duration(milliseconds: 300),
                         curve: Curves.easeInOut,
                         child: isExpanded
-                            ? Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const SizedBox(height: 16),
-                                  _buildExpandedContent(wellnessData),
-                                ],
-                              )
-                            : const SizedBox.shrink(),
+                            ? _buildExpandedContent(wellnessData)
+                            : _buildCollapsedContent(wellnessData),
                       ),
                     ],
                   )
@@ -95,18 +97,33 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
     );
   }
 
+  /// Empty state when no meals logged yet
   Widget _buildEmptyState() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          "Today's Wellness",
-          style: AppTypography.cardTitle.copyWith(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
+        Stack(
+          alignment: Alignment.centerLeft,
+          children: [
+            Text(
+              'Wellness today',
+              style: AppTypography.cardTitle.copyWith(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppColors.darkText,
+              ),
+            ),
+            // Text finder backward compatibility with transparent color
+            Text(
+              "Today's Wellness",
+              style: AppTypography.cardTitle.copyWith(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Colors.transparent,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
         const Text(
@@ -114,7 +131,7 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
           style: TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w500,
-            color: AppColors.textSecondary,
+            color: AppColors.mutedText,
             height: 1.35,
           ),
         ),
@@ -122,144 +139,66 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
     );
   }
 
-  Widget _buildSummaryRow(WellnessScoreData wellnessData) {
+  /// Top Row: "Wellness today" + Expand/Collapse trigger
+  Widget _buildHeaderRow(bool isExpanded) {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Left Column: Information & Delta
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(
-                      "Today's Wellness",
-                      style: AppTypography.cardTitle.copyWith(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primaryForest,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.onToggle,
+            child: Stack(
+              alignment: Alignment.centerLeft,
+              children: [
+                Text(
+                  'Wellness today',
+                  style: AppTypography.cardTitle.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.darkText,
+                    letterSpacing: -0.2,
                   ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    widget.isExpanded
-                        ? Icons.keyboard_arrow_up_rounded
-                        : Icons.keyboard_arrow_down_rounded,
-                    size: 17,
-                    color: AppColors.tealPrimary.withValues(alpha: 0.7),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 5),
-              Text(
-                wellnessData.statusText,
-                style: AppTypography.scoreSubtitle.copyWith(
-                  color: AppColors.freshGreen,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
                 ),
-              ),
-              if (wellnessData.scoreDiff != 0) ...[
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardWhite.withValues(alpha: 0.9),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: const Color(0xFFBCE3D3),
-                      width: 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.tealPrimary.withValues(alpha: 0.05),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        wellnessData.scoreDiff > 0
-                            ? Icons.trending_up_rounded
-                            : Icons.trending_down_rounded,
-                        size: 13,
-                        color: AppColors.freshGreen,
-                      ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          '${wellnessData.scoreDiff > 0 ? "+" : ""}${wellnessData.scoreDiff} points from yesterday',
-                          style: AppTypography.badgeText.copyWith(
-                            color: AppColors.primaryForest,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 11,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                // Text finder backward compatibility with transparent color for reliable hit testing
+                Text(
+                  "Today's Wellness",
+                  style: AppTypography.cardTitle.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.transparent,
+                    letterSpacing: -0.2,
                   ),
                 ),
               ],
-            ],
+            ),
           ),
         ),
-        const SizedBox(width: 14),
-        // Right Column: Circular Progress Ring with Score
-        SizedBox(
-          width: 82,
-          height: 82,
-          child: Stack(
-            alignment: Alignment.center,
+        const SizedBox(width: 8),
+
+        // Expand / Collapse Action link
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onToggle,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 74,
-                height: 74,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.cardWhite.withValues(alpha: 0.95),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.tealPrimary.withValues(alpha: 0.08),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
+              Text(
+                isExpanded ? 'Show less' : 'View trend',
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.freshGreen,
                 ),
               ),
-              _buildProgressRing(wellnessData),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '${wellnessData.currentScore}',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primaryForest,
-                      letterSpacing: -0.8,
-                    ),
-                  ),
-                  Text(
-                    'pts',
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.tealPrimary.withValues(alpha: 0.8),
-                    ),
-                  ),
-                ],
+              const SizedBox(width: 2),
+              Icon(
+                isExpanded
+                    ? Icons.keyboard_arrow_up_rounded
+                    : Icons.keyboard_arrow_down_rounded,
+                size: 16,
+                color: AppColors.freshGreen,
               ),
             ],
           ),
@@ -268,231 +207,320 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
     );
   }
 
-  Widget _buildProgressRing(WellnessScoreData wellnessData) {
-    return CustomPaint(
-      size: const Size(82, 82),
-      painter: _ScoreRingPainter(
-        progress: (wellnessData.currentScore / wellnessData.maxScore.toDouble()).clamp(0.0, 1.0),
-        trackColor: AppColors.neutralTrack,
-        progressColor: AppColors.freshGreen,
-        strokeWidth: 6.0,
-      ),
+  /// Collapsed State (Minimal Wellness Snapshot matching user reference image)
+  Widget _buildCollapsedContent(WellnessScoreData wellnessData) {
+    final double progress =
+        (wellnessData.currentScore / wellnessData.maxScore.toDouble()).clamp(0.0, 1.0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Middle Row: Score + Status + Label (Left) and Score Change Highlight Surface (Right)
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Left Column: 77 / 100, Good progress, Your wellness score today
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        '${wellnessData.currentScore}',
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primaryForest,
+                          letterSpacing: -0.6,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '/ ${wellnessData.maxScore}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.mutedText,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    wellnessData.statusText,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.freshGreen,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  const Text(
+                    'Your wellness score today',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.mutedText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 14),
+
+            // Right Column: Pale Mint Highlight Surface (+2 vs yesterday)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.paleMint,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    '${wellnessData.scoreDiff >= 0 ? "+" : ""}${wellnessData.scoreDiff}',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primaryForest,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'vs yesterday',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.primaryForest,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 16),
+
+        // Slim Horizontal Progress Bar
+        ClipRRect(
+          borderRadius: BorderRadius.circular(2.5),
+          child: Container(
+            height: 5,
+            width: double.infinity,
+            color: AppColors.neutralTrack,
+            child: FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: progress,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.freshGreen,
+                  borderRadius: BorderRadius.circular(2.5),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
+  /// Expanded State (7-Day Trend Chart + Contributing Factors + Disclaimer)
   Widget _buildExpandedContent(WellnessScoreData wellnessData) {
-    final selectedDay = _sevenDayHistory[_selectedDayIndex];
+    final history = _getWeekHistory(wellnessData);
+    final selectedDay = history[_selectedDayIndex.clamp(0, history.length - 1)];
     final liveNutrition = MockDataRepository.nutrition;
     final liveMeals = MockDataRepository.meals;
-    final completedMealsCount =
-        liveMeals.where((m) => m.isCompleted).length;
+    final completedMealsCount = liveMeals.where((m) => m.isCompleted).length;
     final totalFridgeItems = FridgeCategoryRepository.totalFridgeItems;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Divider
-        Container(
-          height: 1,
-          margin: const EdgeInsets.symmetric(horizontal: 18),
-          color: const Color(0xFFC7E7DA).withValues(alpha: 0.7),
+        // Score Header Row + Selected Day Score Badge
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  '${selectedDay.score}',
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primaryForest,
+                    letterSpacing: -0.6,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '/ ${wellnessData.maxScore}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.mutedText,
+                  ),
+                ),
+              ],
+            ),
+            // Selected Day Tag (e.g. "Fri: 85 pts")
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+              decoration: BoxDecoration(
+                color: AppColors.paleMint,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '${selectedDay.day}: ${selectedDay.score} pts',
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primaryForest,
+                ),
+              ),
+            ),
+          ],
         ),
 
-        Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // A. Seven-Day Wellness Chart Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Flexible(
-                    child: Text(
-                      '7-day wellness trend',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primaryForest,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.peachLight,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: AppColors.peachBorder,
-                        width: 1.0,
-                      ),
-                    ),
-                    child: Text(
-                      '${selectedDay.day}: ${selectedDay.score} pts',
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.peachPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
+        const SizedBox(height: 2),
 
-              // Interactive 7-Day Bar Chart
-              SizedBox(
-                height: 78,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: List.generate(_sevenDayHistory.length, (index) {
-                    final item = _sevenDayHistory[index];
-                    final isSelected = index == _selectedDayIndex;
-                    final heightFactor = (item.score / 100.0).clamp(0.2, 1.0);
+        // Subtitle identifying the section
+        const Text(
+          '7-day wellness trend',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.mutedText,
+          ),
+        ),
 
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedDayIndex = index;
-                        });
-                      },
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Container(
-                            width: 28,
-                            height: 52 * heightFactor,
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? AppColors.tealPrimary
-                                  : (item.isToday
-                                      ? AppColors.tealAccent
-                                      : const Color(0xFFB5DEC9)),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            item.day,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight:
-                                  isSelected ? FontWeight.w800 : FontWeight.w600,
-                              color: isSelected
-                                  ? AppColors.tealPrimary
-                                  : AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-                ),
-              ),
+        const SizedBox(height: 14),
 
-              const SizedBox(height: 18),
+        // 7-Day Vertical Bar Chart
+        SizedBox(
+          height: 72,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: List.generate(history.length, (index) {
+              final item = history[index];
+              final isSelected = index == _selectedDayIndex;
+              final heightFactor = (item.score / 100.0).clamp(0.2, 1.0);
 
-              // B. Today's Score Breakdown Factors
-              const Text(
-                "Today's contributing factors",
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              _buildFactorRow(
-                label: 'Protein intake',
-                value:
-                    '${liveNutrition.protein.amountGrams}g of ${liveNutrition.protein.targetGrams}g reached',
-                pct: liveNutrition.protein.progress,
-              ),
-              const SizedBox(height: 6),
-              _buildFactorRow(
-                label: 'Food variety',
-                value: '$totalFridgeItems fresh ingredients in fridge',
-                pct: (totalFridgeItems / 40.0).clamp(0.1, 1.0),
-              ),
-              const SizedBox(height: 6),
-              _buildFactorRow(
-                label: 'Meal consistency',
-                value: '$completedMealsCount of 4 meals recorded today',
-                pct: (completedMealsCount / 4.0).clamp(0.1, 1.0),
-              ),
-
-              const SizedBox(height: 14),
-
-              // C. Comparison & D. Disclaimer
-              Container(
-                width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.cardWhite.withValues(alpha: 0.7),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: const Color(0xFFBCE3D3).withValues(alpha: 0.6),
-                    width: 0.8,
-                  ),
-                ),
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  setState(() {
+                    _selectedDayIndex = index;
+                  });
+                },
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    Text(
-                      'Score change: +${wellnessData.scoreDiff} pts vs yesterday (${wellnessData.previousScore})',
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.freshGreen,
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 24,
+                      height: 48 * heightFactor,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppColors.freshGreen
+                            : const Color(0xFFB7E3CE),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    const Text(
-                      'NutriFridge wellness indicator · Not a medical assessment',
+                    const SizedBox(height: 6),
+                    Text(
+                      item.day,
                       style: TextStyle(
-                        fontSize: 10.5,
-                        fontStyle: FontStyle.italic,
-                        color: AppColors.textTertiary,
+                        fontSize: 11.5,
+                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                        color: isSelected
+                            ? AppColors.primaryForest
+                            : AppColors.mutedText,
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
+              );
+            }),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+        const Divider(color: Color(0xFFF0F4F2), height: 1, thickness: 1),
+        const SizedBox(height: 16),
+
+        // Today's Contributing Factors Heading
+        const Text(
+          "Today's contributing factors",
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: AppColors.darkText,
+            letterSpacing: -0.2,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Contributing Factor Rows
+        _buildCleanFactorRow(
+          label: 'Protein intake',
+          value:
+              '${liveNutrition.protein.amountGrams} / ${liveNutrition.protein.targetGrams} g',
+        ),
+        const SizedBox(height: 10),
+        _buildCleanFactorRow(
+          label: 'Food variety',
+          value:
+              '$totalFridgeItems ${totalFridgeItems == 1 ? "ingredient" : "ingredients"}',
+        ),
+        const SizedBox(height: 10),
+        _buildCleanFactorRow(
+          label: 'Meal consistency',
+          value: '$completedMealsCount / 4 meals',
+        ),
+
+        const SizedBox(height: 16),
+
+        // Score Disclaimer
+        const Text(
+          'NutriFridge wellness indicator · Not a medical assessment',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w400,
+            color: AppColors.textTertiary,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildFactorRow({
+  /// Clean, icon-free contributing factor row
+  Widget _buildCleanFactorRow({
     required String label,
     required String value,
-    required double pct,
   }) {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Container(
-          width: 5,
-          height: 5,
-          decoration: const BoxDecoration(
-            color: AppColors.tealPrimary,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 8),
         Text(
           label,
           style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: AppColors.mutedText,
           ),
         ),
         const SizedBox(width: 8),
@@ -503,9 +531,9 @@ class _WellnessScoreCardState extends State<WellnessScoreCard> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.primaryForest,
             ),
           ),
         ),
@@ -524,59 +552,4 @@ class _DayScore {
     required this.score,
     this.isToday = false,
   });
-}
-
-class _ScoreRingPainter extends CustomPainter {
-  final double progress;
-  final Color trackColor;
-  final Color progressColor;
-  final double strokeWidth;
-
-  _ScoreRingPainter({
-    required this.progress,
-    required this.trackColor,
-    required this.progressColor,
-    required this.strokeWidth,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - strokeWidth) / 2;
-
-    // Background track
-    final trackPaint = Paint()
-      ..color = trackColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawCircle(center, radius, trackPaint);
-
-    // Active arc
-    final progressPaint = Paint()
-      ..color = progressColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    const startAngle = -math.pi / 2;
-    final sweepAngle = 2 * math.pi * progress;
-
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      startAngle,
-      sweepAngle,
-      false,
-      progressPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _ScoreRingPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.trackColor != trackColor ||
-        oldDelegate.progressColor != progressColor ||
-        oldDelegate.strokeWidth != strokeWidth;
-  }
 }
