@@ -13,8 +13,12 @@ class AiAssistantService {
   /// In-memory conversation session history to prevent resetting across screen navigations
   static List<AiChatMessage> sessionMessages = [];
 
+  /// Current pending quick-action intent (e.g. 'log_meal', 'add_groceries', 'recipe_ideas')
+  static String? activeQuickActionIntent;
+
   /// Resets the conversation session back to the clean introductory welcome message
   static void resetSession() {
+    activeQuickActionIntent = null;
     sessionMessages = [
       AiChatMessage(
         id: 'msg_welcome_${DateTime.now().millisecondsSinceEpoch}',

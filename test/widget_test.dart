@@ -4002,4 +4002,174 @@ void main() {
       expect(find.byType(TopFreezerRefrigerator), findsOneWidget);
     });
   });
+
+  group('NUTRIFRIDGE — AI Assistant Welcome Screen and Quick Action Refinement', () {
+    testWidgets('Header removes companion status, segmented pill is removed, and quick actions initiate clarifying conversations', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+      tester.view.devicePixelRatio = 3.0;
+
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        AiAssistantService.mockHandler = null;
+      });
+
+      FridgeCategoryRepository.reset();
+      MockDataRepository.reset();
+      AiAssistantService.resetSession();
+
+      String lastActionHint = '';
+      AiAssistantService.mockHandler = (request) async {
+        lastActionHint = request['actionHint'] as String? ?? '';
+        final msg = (request['message'] as String? ?? '').toLowerCase();
+        if (lastActionHint == 'log_meal' || msg.contains('paneer rice')) {
+          return {
+            'success': true,
+            'action': 'log_meal',
+            'assistantMessage': 'I found your Paneer Rice meal.',
+            'requiresConfirmation': true,
+            'meal': {
+              'name': 'Paneer Rice',
+              'mealType': 'lunch',
+              'nutrition': {
+                'calories': 420,
+                'proteinG': 20,
+                'carbsG': 50,
+                'fatG': 14,
+                'isEstimate': true,
+              },
+              'ingredients': [
+                {'name': 'Paneer', 'quantity': 100, 'unit': 'g'},
+              ],
+            },
+          };
+        } else if (lastActionHint == 'add_food_multiple' || msg.contains('apples')) {
+          return {
+            'success': true,
+            'action': 'add_inventory_items',
+            'assistantMessage': 'Prepared to add 2 apples.',
+            'requiresConfirmation': true,
+            'inventoryItems': [
+              {'name': 'Apple', 'category': 'Fruits', 'quantity': 2, 'unit': 'pieces', 'expiryDaysEstimate': 7},
+            ],
+          };
+        } else if (lastActionHint == 'meal_recommendation') {
+          return {
+            'success': true,
+            'action': 'assistant_reply',
+            'assistantMessage': 'Based on your fridge, you can prepare a fresh fruit salad or paneer stir fry!',
+          };
+        }
+        return {
+          'success': true,
+          'action': 'assistant_reply',
+          'assistantMessage': 'How can I assist you?',
+        };
+      };
+
+      await tester.pumpWidget(const MaterialApp(home: AiAssistantScreen()));
+      await tester.pumpAndSettle();
+
+      // 1. Header displays NutriFridge AI without the companion status line
+      expect(find.text('NutriFridge AI'), findsOneWidget);
+      expect(find.text('AI Companion • Ready'), findsNothing);
+
+      // 2. Chat / Voice segmented control is completely removed
+      expect(find.text('Chat'), findsNothing);
+      expect(find.text('Voice'), findsNothing);
+
+      // 3. Welcome section with greeting, title, and three quick actions
+      expect(find.text('Hi there!'), findsOneWidget);
+      expect(find.text("What's on your plate today?"), findsOneWidget);
+      expect(find.text('Log my meal'), findsOneWidget);
+      expect(find.text('Add groceries'), findsOneWidget);
+      expect(find.text('Recipe ideas'), findsOneWidget);
+
+      // 4. Test Log my meal quick action: starts clarifying flow without logging
+      final initialMealHistoryCount = MockDataRepository.loggedMealsHistory.length;
+      final initialCalories = MockDataRepository.nutrition.consumedCalories;
+      await tester.tap(find.text('Log my meal'));
+      await tester.pumpAndSettle();
+
+      // Verify clarifying question appears
+      expect(find.textContaining('What did you eat today? Tell me the meal name or upload a photo'), findsOneWidget);
+      // Verify nothing is logged yet
+      expect(MockDataRepository.loggedMealsHistory.length, initialMealHistoryCount);
+      expect(MockDataRepository.nutrition.consumedCalories, initialCalories);
+
+      // Respond with meal details
+      await tester.enterText(find.byType(TextField), 'Paneer rice');
+      await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+      await tester.pumpAndSettle();
+
+      // Action hint sent was 'log_meal'
+      expect(lastActionHint, 'log_meal');
+      // Proposed meal card is shown, awaiting confirmation
+      expect(find.text('Paneer Rice'), findsOneWidget);
+      expect(find.text('Confirm & Log Meal'), findsOneWidget);
+
+      // Confirm meal log
+      await tester.tap(find.text('Confirm & Log Meal'));
+      await tester.pumpAndSettle();
+
+      expect(MockDataRepository.nutrition.consumedCalories, initialCalories + 420);
+      expect(MockDataRepository.loggedMealsHistory.length, initialMealHistoryCount + 1);
+
+      // Wait for SnackBar dismiss
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+
+      // 5. Test Reset / New Conversation resets context and restores welcome hero
+      await tester.tap(find.byTooltip('Reset Conversation'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Log my meal'), findsOneWidget);
+      expect(find.text('Add groceries'), findsOneWidget);
+      expect(find.text('Recipe ideas'), findsOneWidget);
+
+      // 6. Test Add groceries quick action: starts clarifying flow without mutating inventory
+      final initialFridgeItems = FridgeCategoryRepository.totalFridgeItems;
+      await tester.tap(find.text('Add groceries'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('What groceries would you like to add to your fridge?'), findsOneWidget);
+      expect(FridgeCategoryRepository.totalFridgeItems, initialFridgeItems);
+
+      // Respond with grocery items
+      await tester.enterText(find.byType(TextField), '2 apples');
+      await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+      await tester.pumpAndSettle();
+
+      expect(lastActionHint, 'add_food_multiple');
+      expect(find.text('Proposed Fridge Additions'), findsOneWidget);
+      expect(find.text('Add to Fridge'), findsOneWidget);
+
+      await tester.tap(find.text('Add to Fridge'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Added to Fridge ✓'), findsOneWidget);
+      expect(FridgeCategoryRepository.totalFridgeItems, initialFridgeItems + 1);
+
+      // Wait for SnackBar dismiss
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+
+      // 7. Reset and test Recipe ideas quick action
+      await tester.tap(find.byTooltip('Reset Conversation'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Recipe ideas'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining("What would you like to cook? Tell me the ingredients you want to use"), findsOneWidget);
+
+      // User replies requesting suggestions
+      await tester.enterText(find.byType(TextField), 'What can I cook with ingredients in my fridge?');
+      await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+      await tester.pumpAndSettle();
+
+      expect(lastActionHint, 'meal_recommendation');
+      expect(find.textContaining('Based on your fridge, you can prepare a fresh fruit salad or paneer stir fry!'), findsOneWidget);
+    });
+  });
 }

@@ -38,6 +38,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   String? _selectedImageBase64;
   String? _selectedImageMimeType;
   String? _selectedImageName;
+  String? _pendingQuickActionIntent;
 
   @override
   void initState() {
@@ -46,6 +47,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     if (AiAssistantService.sessionMessages.isEmpty) {
       AiAssistantService.resetSession();
     }
+    _pendingQuickActionIntent = AiAssistantService.activeQuickActionIntent;
     _messages.addAll(AiAssistantService.sessionMessages);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -76,6 +78,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   void _syncSession() {
     AiAssistantService.sessionMessages = List.from(_messages);
+    AiAssistantService.activeQuickActionIntent = _pendingQuickActionIntent;
   }
 
   void _scrollToBottom() {
@@ -195,14 +198,37 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
     _scrollToBottom();
 
+    final currentIntent = _pendingQuickActionIntent;
+
+    // Resolve actionHint based on pending quick-action intent
+    String resolvedActionHint = 'auto';
+    if (currentIntent == 'log_meal') {
+      resolvedActionHint = 'log_meal';
+    } else if (currentIntent == 'add_groceries') {
+      resolvedActionHint = 'add_food_multiple';
+    } else if (currentIntent == 'recipe_ideas') {
+      resolvedActionHint = 'meal_recommendation';
+    }
+
+    final Map<String, dynamic> combinedPayload = {
+      ...?extraPayload,
+    };
+    if (currentIntent != null) {
+      combinedPayload['quickActionIntent'] = currentIntent;
+    }
+    if (widget.mealContext != null) {
+      combinedPayload['mealContext'] = widget.mealContext!.toJson();
+    }
+
     try {
       // Call live n8n backend or intelligent local processing
       final response = await AiAssistantService.sendRequest(
         message: text,
         imageBase64: imageToSend,
         mimeType: mimeToSend,
+        actionHint: resolvedActionHint,
         history: _messages,
-        extraPayload: extraPayload ?? (widget.mealContext != null ? {'mealContext': widget.mealContext!.toJson()} : null),
+        extraPayload: combinedPayload.isNotEmpty ? combinedPayload : null,
       );
 
       if (!mounted) return;
@@ -986,7 +1012,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       if (mounted) {
         setState(() {
           _isConfirmingInventory = false;
+          if (_pendingQuickActionIntent == 'add_groceries') {
+            _pendingQuickActionIntent = null;
+          }
         });
+        _syncSession();
       }
     }
   }
@@ -1302,6 +1332,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     if (index != -1) {
       setState(() {
         _messages[index] = _messages[index].copyWith(isConfirmed: true);
+        if (_pendingQuickActionIntent == 'log_meal') {
+          _pendingQuickActionIntent = null;
+        }
         _syncSession();
       });
     }
@@ -1381,72 +1414,55 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                 ),
               ),
 
-            // Mode toggle pill (Chat / Voice) centered matching reference
-            Padding(
-              padding: const EdgeInsets.only(top: 6, bottom: 4),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEBE6DE),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: AppColors.cardWhite,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: const [
-                            BoxShadow(color: Color(0x0C000000), blurRadius: 4, offset: Offset(0, 1)),
-                          ],
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.chat_bubble_outline_rounded, size: 13, color: AppColors.forestGreen),
-                            SizedBox(width: 5),
-                            Text(
-                              'Chat',
-                              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.forestGreen),
-                            ),
-                          ],
+            // Active Quick Action Context Banner (when quick-action clarification flow is active)
+            if (_pendingQuickActionIntent != null && widget.mealContext == null)
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 6, 16, 2),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(
+                  color: AppColors.paleMint,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.freshGreen.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.forum_outlined, size: 14, color: AppColors.primaryForest),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _getIntentBannerText(_pendingQuickActionIntent!),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryForest,
                         ),
                       ),
-                      InkWell(
-                        onTap: _handleVoiceInputPlaceholder,
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.graphic_eq_rounded, size: 13, color: AppColors.textSecondary),
-                              SizedBox(width: 5),
-                              Text(
-                                'Voice',
-                                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
-                              ),
-                            ],
-                          ),
-                        ),
+                    ),
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _pendingQuickActionIntent = null;
+                          _syncSession();
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: const Padding(
+                        padding: EdgeInsets.all(2.0),
+                        child: Icon(Icons.close_rounded, size: 14, color: AppColors.textSecondary),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            ),
 
             // Messages timeline
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                itemCount: _messages.length + (_isSending ? 1 : 0) + (_messages.length <= 1 ? 1 : 0),
+                itemCount: _messages.length + (_isSending ? 1 : 0) + (_showWelcomeHero ? 1 : 0),
                 itemBuilder: (context, index) {
-                  if (_messages.length <= 1) {
+                  if (_showWelcomeHero) {
                     if (index == 0) {
                       return _buildWelcomeHero();
                     }
@@ -1476,6 +1492,21 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         ),
       ),
     );
+  }
+
+  bool get _showWelcomeHero => _messages.length <= 1 && _pendingQuickActionIntent == null;
+
+  String _getIntentBannerText(String intent) {
+    switch (intent) {
+      case 'log_meal':
+        return 'Context: Meal Logging';
+      case 'add_groceries':
+        return 'Context: Adding Groceries';
+      case 'recipe_ideas':
+        return 'Context: Recipe Ideas';
+      default:
+        return 'Context: Active Flow';
+    }
   }
 
   PreferredSizeWidget _buildAppBar() {
@@ -1531,45 +1562,14 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'NutriFridge AI',
-                  style: AppTypography.cardTitle.copyWith(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.neutralCharcoal,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: AppColors.sageAccent,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    const Flexible(
-                      child: Text(
-                        'AI Companion • Ready',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            child: Text(
+              'NutriFridge AI',
+              style: AppTypography.cardTitle.copyWith(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: AppColors.neutralCharcoal,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -1580,6 +1580,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           tooltip: 'Reset Conversation',
           onPressed: () {
             setState(() {
+              _pendingQuickActionIntent = null;
               AiAssistantService.resetSession();
               _messages.clear();
               _messages.addAll(AiAssistantService.sessionMessages);
@@ -1592,10 +1593,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   Widget _buildWelcomeHero() {
     return Padding(
-      padding: const EdgeInsets.only(top: 10, bottom: 20),
+      padding: const EdgeInsets.only(top: 8, bottom: 20),
       child: Column(
         children: [
-
           const Text(
             'Hi there!',
             style: TextStyle(
@@ -1604,14 +1604,14 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           const Text(
             "What's on your plate today?",
             style: TextStyle(
-              fontSize: 20,
+              fontSize: 21,
               fontWeight: FontWeight.w800,
               color: AppColors.neutralCharcoal,
-              letterSpacing: -0.3,
+              letterSpacing: -0.4,
             ),
             textAlign: TextAlign.center,
           ),
@@ -1621,9 +1621,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             runSpacing: 8,
             alignment: WrapAlignment.center,
             children: [
-              _buildSuggestionPill('Log my meal', 'I had a grilled chicken salad with avocado'),
-              _buildSuggestionPill('Add groceries', 'Add 2 apples and 1L milk to fridge'),
-              _buildSuggestionPill('Recipe ideas', 'What can I cook with ingredients in my fridge?'),
+              _buildSuggestionPill('Log my meal'),
+              _buildSuggestionPill('Add groceries'),
+              _buildSuggestionPill('Recipe ideas'),
             ],
           ),
         ],
@@ -1631,17 +1631,14 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     );
   }
 
-  Widget _buildSuggestionPill(String label, String prompt) {
+  Widget _buildSuggestionPill(String label) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          _textController.text = prompt;
-          _handleSend();
-        },
+        onTap: () => _handleQuickActionTap(label),
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: AppColors.cardWhite,
             borderRadius: BorderRadius.circular(16),
@@ -1649,15 +1646,15 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             boxShadow: const [
               BoxShadow(
                 color: Color(0x06000000),
-                blurRadius: 6,
-                offset: Offset(0, 2),
+                blurRadius: 4,
+                offset: Offset(0, 1),
               ),
             ],
           ),
           child: Text(
             label,
             style: const TextStyle(
-              fontSize: 12,
+              fontSize: 12.5,
               fontWeight: FontWeight.w600,
               color: AppColors.forestGreen,
             ),
@@ -1665,6 +1662,55 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         ),
       ),
     );
+  }
+
+  void _handleQuickActionTap(String actionLabel) {
+    String clarifyingQuestion;
+    String intent;
+    switch (actionLabel) {
+      case 'Log my meal':
+        intent = 'log_meal';
+        clarifyingQuestion =
+            "What did you eat today? Tell me the meal name or upload a photo, and I'll help you log it with its nutritional information.";
+        break;
+      case 'Add groceries':
+        intent = 'add_groceries';
+        clarifyingQuestion =
+            "What groceries would you like to add to your fridge? Tell me the items and quantities, or upload a grocery photo or receipt.";
+        break;
+      case 'Recipe ideas':
+        intent = 'recipe_ideas';
+        clarifyingQuestion =
+            "What would you like to cook? Tell me the ingredients you want to use, or I can suggest recipes based on what's currently in your fridge.";
+        break;
+      default:
+        intent = 'general';
+        clarifyingQuestion = 'How can I help you today?';
+    }
+
+    final userMessage = AiChatMessage(
+      id: 'msg_user_${DateTime.now().millisecondsSinceEpoch}',
+      text: actionLabel,
+      isUser: true,
+      timestamp: DateTime.now(),
+    );
+
+    final assistantMessage = AiChatMessage(
+      id: 'msg_ai_${DateTime.now().millisecondsSinceEpoch + 1}',
+      text: clarifyingQuestion,
+      isUser: false,
+      timestamp: DateTime.now(),
+      action: 'assistant_reply',
+    );
+
+    setState(() {
+      _pendingQuickActionIntent = intent;
+      _messages.add(userMessage);
+      _messages.add(assistantMessage);
+      _syncSession();
+    });
+
+    _scrollToBottom();
   }
 
   Widget _buildMessageItem(AiChatMessage message) {
