@@ -24,6 +24,7 @@ import 'package:nutrifridge/screens/fridge/widgets/food_details_sheet.dart';
 import 'package:nutrifridge/screens/home/services/meal_recommendation_service.dart';
 import 'package:nutrifridge/screens/profile/models/user_profile_data.dart';
 
+import 'package:nutrifridge/screens/meal_detail/meal_detail_screen.dart';
 import 'package:nutrifridge/screens/add_food/add_food_page.dart';
 import 'package:nutrifridge/screens/home/home_screen.dart';
 
@@ -1686,35 +1687,35 @@ void main() {
     expect(find.text('Onion'), findsOneWidget);
     expect(find.text('Not in fridge'), findsOneWidget);
 
-    // 7. Verify AI Cooking Section ("Cook it your way")
-    expect(find.text('Cook it your way'), findsOneWidget);
-    expect(find.text('Get a recipe tailored to your ingredients and preferences.'), findsOneWidget);
-    expect(find.text('Get AI Recipe'), findsOneWidget);
-    expect(find.text('Ask NutriFridge AI'), findsOneWidget);
-
-    // Tap "Get AI Recipe" -> Opens AI Assistant Modal Sheet
-    await tester.ensureVisible(find.text('Get AI Recipe'));
-    await tester.tap(find.text('Get AI Recipe'));
-    await tester.pumpAndSettle();
-
-    // Verify AI Assistant Modal Sheet & Context Handoff
-    expect(find.text('NutriFridge Assistant'), findsOneWidget);
-    expect(find.text('Recipe Request for Paneer Rice Bowl'), findsOneWidget);
-    expect(find.textContaining('Give me a recipe for Paneer Rice Bowl'), findsOneWidget);
-    expect(find.text('Send to Assistant'), findsOneWidget);
-
-    // Send to Assistant & dismiss
-    await tester.tap(find.text('Send to Assistant'));
-    await tester.pumpAndSettle(const Duration(seconds: 3));
-    expect(find.text('NutriFridge Assistant'), findsNothing);
+    // 7. Verify Recipe-Specific Preparation Section (replacing old generic card)
+    expect(find.text('Preparation'), findsOneWidget);
+    expect(find.text('5 steps'), findsOneWidget);
+    expect(find.textContaining('Cut fresh paneer into bite-sized cubes'), findsOneWidget);
 
     // 8. Verify Video Section shows honest neutral message when no videos exist
     await tester.drag(find.byType(SingleChildScrollView), const Offset(0, -320));
     await tester.pumpAndSettle();
     expect(find.text("Watch how it's made"), findsOneWidget);
-    expect(find.text('No video tutorials available for this recipe.'), findsOneWidget);
+    expect(find.text('Video suggestions will appear here when available.'), findsOneWidget);
 
-    // 9. Back Navigation -> Returns to Dashboard in previous state
+    // 9. Verify Action Buttons at the very bottom of the scroll
+    expect(find.text('Cook with AI'), findsOneWidget);
+    expect(find.text('Log Meal'), findsOneWidget);
+
+    // Tap "Cook with AI" -> Opens AI Assistant with contextual meal banner
+    await tester.ensureVisible(find.text('Cook with AI'));
+    await tester.tap(find.text('Cook with AI'));
+    await tester.pumpAndSettle();
+
+    // Verify AI Assistant Screen & Context Handoff
+    expect(find.text('Discussing: Paneer Rice Bowl'), findsOneWidget);
+    expect(find.text('Recipe context active · 1 serving'), findsOneWidget);
+
+    // Go back from AI Assistant to Meal Detail
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+    await tester.pumpAndSettle();
+
+    // 10. Back Navigation -> Returns to Dashboard in previous state
     await tester.ensureVisible(find.byIcon(Icons.arrow_back_rounded));
     await tester.tap(find.byIcon(Icons.arrow_back_rounded));
     await tester.pumpAndSettle();
@@ -3503,8 +3504,8 @@ void main() {
       // Hero image continues to exist on Meal Detail
       expect(heroFinder, findsOneWidget);
       expect(find.text('Ingredients'), findsOneWidget);
-      expect(find.text('Cook it your way'), findsOneWidget);
-      expect(find.text('Get AI Recipe'), findsOneWidget);
+      expect(find.text('Preparation'), findsOneWidget);
+      expect(find.text('Cook with AI'), findsOneWidget);
 
       // Tap back -> back to dashboard
       await tester.tap(find.byIcon(Icons.arrow_back_rounded));
@@ -3799,6 +3800,154 @@ void main() {
 
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('Complete Meal Detail Page Refinement Tests', () {
+    testWidgets('TEST A — Nutrition and preparation instructions change dynamically per meal', (WidgetTester tester) async {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MockDataRepository.seedSampleDataForTesting();
+
+      // 1. Test Paneer Rice Bowl
+      const paneerRec = RecipeRecommendation(
+        title: 'Paneer Rice Bowl',
+        calories: 520,
+        proteinGrams: 24,
+        carbsGrams: 62,
+        fatGrams: 18,
+        prepTimeMinutes: 20,
+        fridgeItemsUsed: 4,
+        imageUrl: 'assets/images/paneer_rice_bowl.jpg',
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: MealDetailScreen(recommendation: paneerRec),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify Paneer Rice Bowl specific details
+      expect(find.text('Paneer Rice Bowl'), findsOneWidget);
+      expect(find.text('520'), findsOneWidget);
+      expect(find.text('24'), findsOneWidget);
+      expect(find.text('20 mins prep'), findsOneWidget);
+      expect(find.text('Per 1 serving · AI estimate'), findsOneWidget);
+      expect(find.text('5 steps'), findsOneWidget);
+      expect(find.textContaining('Cut fresh paneer into bite-sized cubes'), findsOneWidget);
+
+      // 2. Test Fruit & Yogurt Bowl in a fresh pump
+      const yogurtRec = RecipeRecommendation(
+        title: 'Fruit & Yogurt Bowl',
+        calories: 280,
+        proteinGrams: 15,
+        carbsGrams: 44,
+        fatGrams: 5,
+        prepTimeMinutes: 5,
+        fridgeItemsUsed: 2,
+        imageUrl: 'assets/images/foods/curd.png',
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: MealDetailScreen(recommendation: yogurtRec),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify Fruit & Yogurt Bowl specific details
+      expect(find.text('Fruit & Yogurt Bowl'), findsOneWidget);
+      expect(find.text('280'), findsOneWidget);
+      expect(find.text('15'), findsOneWidget);
+      expect(find.text('5 mins prep'), findsOneWidget);
+      expect(find.text('4 steps'), findsOneWidget);
+      expect(find.textContaining('Add 200g chilled fresh curd or Greek yogurt'), findsOneWidget);
+      expect(find.textContaining('Cut fresh paneer into bite-sized cubes'), findsNothing);
+    });
+
+    testWidgets('TEST B — Unknown recipe shows subtle no-instructions and unknown nutrition states without fabricating 0s', (WidgetTester tester) async {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MockDataRepository.seedSampleDataForTesting();
+
+      const unknownRec = RecipeRecommendation(
+        title: 'Custom Homemade Special',
+        calories: 0,
+        proteinGrams: 0,
+        carbsGrams: 0,
+        fatGrams: 0,
+        prepTimeMinutes: 0,
+        fridgeItemsUsed: 0,
+        imageUrl: 'assets/images/paneer_rice_bowl.jpg',
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: MealDetailScreen(recommendation: unknownRec),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Check preparation subtle state
+      expect(find.text("Preparation instructions aren't available for this recipe yet."), findsOneWidget);
+      // Check nutrition unavailable message
+      expect(find.text('Nutritional information is currently unavailable for this recipe.'), findsOneWidget);
+      // Check YouTube empty state
+      expect(find.text('Video suggestions will appear here when available.'), findsOneWidget);
+    });
+
+    testWidgets('TEST C — Direct Log Meal button updates mock repository and performs inventory deductions for available ingredients only', (WidgetTester tester) async {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MockDataRepository.seedSampleDataForTesting();
+
+      // Initial state: Paneer has 250 g in Dairy Products
+      final initialPaneer = FridgeCategoryRepository.findItemByName('Paneer', exact: true);
+      expect(initialPaneer, isNotNull);
+      expect(initialPaneer!.quantity, '250 g');
+
+      // Initial state: Onion is not in fridge
+      final initialOnion = FridgeCategoryRepository.findItemByName('Onion', exact: true);
+      expect(initialOnion, isNull);
+
+      final initialConsumedCalories = MockDataRepository.nutrition.consumedCalories;
+
+      const testRec = RecipeRecommendation(
+        title: 'Paneer Rice Bowl',
+        calories: 520,
+        proteinGrams: 24,
+        carbsGrams: 62,
+        fatGrams: 18,
+        prepTimeMinutes: 20,
+        fridgeItemsUsed: 4,
+        imageUrl: 'assets/images/paneer_rice_bowl.jpg',
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: MealDetailScreen(recommendation: testRec),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Scroll to bottom to reach the action buttons
+      await tester.ensureVisible(find.text('Log Meal'));
+      expect(find.text('Log Meal'), findsOneWidget);
+
+      // Tap Log Meal
+      await tester.tap(find.text('Log Meal'));
+      await tester.pumpAndSettle();
+
+      // 1. Verify meal logged in MockDataRepository
+      expect(MockDataRepository.nutrition.consumedCalories, initialConsumedCalories + 520);
+      expect(MockDataRepository.loggedMealsHistory.any((m) => m['mealName'] == 'Paneer Rice Bowl'), isTrue);
+
+      // 2. Verify Paneer inventory was deducted (250 g - 200 g = 50 g remaining)
+      final remainingPaneer = FridgeCategoryRepository.findItemByName('Paneer', exact: true);
+      expect(remainingPaneer, isNotNull);
+      expect(remainingPaneer!.quantity, '50 g');
+
+      // 3. Verify Onion was never created or corrupted
+      final remainingOnion = FridgeCategoryRepository.findItemByName('Onion', exact: true);
+      expect(remainingOnion, isNull);
     });
   });
 }

@@ -4,7 +4,11 @@ class RecipeVideoItem {
   final String title;
   final String channelName;
   final String duration;
-  final String thumbnailAsset;
+  final String? thumbnailUrl;
+  final String? thumbnailAsset;
+  final String videoUrl;
+  final String? viewCount;
+  final String? publishedAt;
   final bool isSamplePlaceholder;
 
   const RecipeVideoItem({
@@ -12,9 +16,29 @@ class RecipeVideoItem {
     required this.title,
     required this.channelName,
     required this.duration,
-    required this.thumbnailAsset,
-    this.isSamplePlaceholder = true,
+    this.thumbnailUrl,
+    this.thumbnailAsset,
+    required this.videoUrl,
+    this.viewCount,
+    this.publishedAt,
+    this.isSamplePlaceholder = false,
   });
+
+  factory RecipeVideoItem.fromJson(Map<String, dynamic> json) {
+    final id = (json['id'] ?? json['videoId'] ?? '').toString();
+    return RecipeVideoItem(
+      id: id,
+      title: (json['title'] ?? '').toString(),
+      channelName: (json['channelName'] ?? json['channel'] ?? json['creator'] ?? '').toString(),
+      duration: (json['duration'] ?? '').toString(),
+      thumbnailUrl: json['thumbnailUrl']?.toString(),
+      thumbnailAsset: json['thumbnailAsset']?.toString(),
+      videoUrl: (json['videoUrl'] ?? (id.isNotEmpty ? 'https://www.youtube.com/watch?v=$id' : '')).toString(),
+      viewCount: json['viewCount']?.toString(),
+      publishedAt: json['publishedAt']?.toString(),
+      isSamplePlaceholder: false,
+    );
+  }
 
   /// Sample video recommendations for automated tests or fixtures
   static const List<RecipeVideoItem> sampleVideosForTesting = [
@@ -24,6 +48,7 @@ class RecipeVideoItem {
       channelName: 'Fresh Kitchen Tales',
       duration: '8:24',
       thumbnailAsset: 'assets/images/paneer_rice_bowl.jpg',
+      videoUrl: 'https://www.youtube.com/watch?v=vid_1',
       isSamplePlaceholder: true,
     ),
     RecipeVideoItem(
@@ -32,14 +57,7 @@ class RecipeVideoItem {
       channelName: 'NutriCook Daily',
       duration: '11:05',
       thumbnailAsset: 'assets/images/foods/paneer_curry.jpg',
-      isSamplePlaceholder: true,
-    ),
-    RecipeVideoItem(
-      id: 'vid_3',
-      title: 'Quick Fridge-to-Table Paneer Veggie Bowl',
-      channelName: 'Simple Healthy Meals',
-      duration: '6:48',
-      thumbnailAsset: 'assets/images/foods/dal_rice.jpg',
+      videoUrl: 'https://www.youtube.com/watch?v=vid_2',
       isSamplePlaceholder: true,
     ),
   ];

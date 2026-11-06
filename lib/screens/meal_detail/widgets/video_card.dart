@@ -14,17 +14,55 @@ class RecipeVideoCard extends StatelessWidget {
     this.onTap,
   });
 
+  Widget _buildThumbnail() {
+    if (video.thumbnailUrl != null && video.thumbnailUrl!.isNotEmpty) {
+      if (video.thumbnailUrl!.startsWith('http://') || video.thumbnailUrl!.startsWith('https://')) {
+        return Image.network(
+          video.thumbnailUrl!,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildFallbackThumbnail(),
+        );
+      } else {
+        return Image.asset(
+          video.thumbnailUrl!,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildFallbackThumbnail(),
+        );
+      }
+    } else if (video.thumbnailAsset != null && video.thumbnailAsset!.isNotEmpty) {
+      return Image.asset(
+        video.thumbnailAsset!,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _buildFallbackThumbnail(),
+      );
+    }
+    return _buildFallbackThumbnail();
+  }
+
+  Widget _buildFallbackThumbnail() {
+    return Container(
+      color: const Color(0xFFFBECE4),
+      child: const Center(
+        child: Icon(
+          Icons.play_circle_outline_rounded,
+          size: 36,
+          color: AppColors.coralPeach,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
       width: 220,
       margin: const EdgeInsets.only(right: 14),
       decoration: BoxDecoration(
-        color: AppColors.cardWhite,
+        color: AppColors.pureWhite,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppColors.cardBorder,
-          width: 1.2,
+          color: const Color(0xFFE2EBE5),
+          width: 1.0,
         ),
         boxShadow: const [AppColors.softShadow],
       ),
@@ -33,39 +71,17 @@ class RecipeVideoCard extends StatelessWidget {
         child: InkWell(
           onTap: onTap ??
               () {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    title: const Text(
-                      'Recipe Video',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
                     content: Text(
-                      'Sample Video: YouTube streaming for "${video.title}" will open here.',
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        color: AppColors.textSecondary,
-                      ),
+                      'Opening YouTube: ${video.title}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text(
-                          'OK',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.forestGreen,
-                          ),
-                        ),
-                      ),
-                    ],
+                    backgroundColor: AppColors.primaryForest,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    duration: const Duration(seconds: 2),
                   ),
                 );
               },
@@ -82,21 +98,8 @@ class RecipeVideoCard extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Image.asset(
-                        video.thumbnailAsset,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          color: const Color(0xFFFBECE4),
-                          child: const Center(
-                            child: Icon(
-                              Icons.play_circle_outline_rounded,
-                              size: 32,
-                              color: AppColors.peachPrimary,
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Dark gradient for contrast
+                      _buildThumbnail(),
+                      // Subtle gradient for contrast
                       Container(
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
@@ -115,10 +118,10 @@ class RecipeVideoCard extends StatelessWidget {
                           width: 36,
                           height: 36,
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.45),
+                            color: Colors.black.withValues(alpha: 0.5),
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.8),
+                              color: Colors.white.withValues(alpha: 0.9),
                               width: 1.5,
                             ),
                           ),
@@ -130,28 +133,29 @@ class RecipeVideoCard extends StatelessWidget {
                         ),
                       ),
                       // Duration badge bottom right
-                      Positioned(
-                        right: 8,
-                        bottom: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.72),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            video.duration,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
+                      if (video.duration.isNotEmpty)
+                        Positioned(
+                          right: 8,
+                          bottom: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.72),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              video.duration,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -168,6 +172,7 @@ class RecipeVideoCard extends StatelessWidget {
                       style: AppTypography.cardTitle.copyWith(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
+                        color: AppColors.darkText,
                         height: 1.25,
                       ),
                       maxLines: 2,
@@ -179,7 +184,7 @@ class RecipeVideoCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
-                        color: AppColors.textTertiary,
+                        color: AppColors.mutedText,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

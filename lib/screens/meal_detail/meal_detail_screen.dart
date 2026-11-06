@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/transitions/hero_transition_route.dart';
 import '../../models/nutrition_data.dart';
+import '../ai_assistant/ai_assistant_screen.dart';
 import '../fridge/models/category_item.dart';
+import 'models/meal_ai_context.dart';
 import 'models/meal_detail_data.dart';
-import 'widgets/ai_assistant_modal.dart';
 import 'widgets/video_card.dart';
 
-/// Cinematic Food Experience — Meal Detail Page.
-/// Opens from the Dashboard recommendation card and presents immersive food
-/// photography, nutrition overview, fridge ingredient matching, AI cooking handoff,
-/// and YouTube recipe inspiration.
-class MealDetailScreen extends StatelessWidget {
+/// Comprehensive, Data-Driven Recipe Experience — Meal Detail Page.
+/// Features authentic food photography, per-serving nutrition with transparent provenance,
+/// dynamic fact-based recommendation reasons, inventory-checked ingredients,
+/// recipe-specific preparation instructions, YouTube carousel integration,
+/// and contextual Cook with AI / direct Log Meal actions positioned at the end of the scroll.
+class MealDetailScreen extends StatefulWidget {
   final RecipeRecommendation recommendation;
   final String? heroTag;
 
@@ -21,20 +24,53 @@ class MealDetailScreen extends StatelessWidget {
     this.heroTag,
   });
 
-  String get _heroTag =>
-      heroTag ??
-      'meal-hero-image-${recommendation.title.toLowerCase().replaceAll(RegExp(r'\s+'), '-')}';
+  @override
+  State<MealDetailScreen> createState() => _MealDetailScreenState();
+}
 
+class _MealDetailScreenState extends State<MealDetailScreen> {
+  bool _isLogging = false;
+
+  String get _heroTag =>
+      widget.heroTag ??
+      'meal-hero-image-${widget.recommendation.title.toLowerCase().replaceAll(RegExp(r'\s+'), '-')}';
+
+  /// Directly logs the displayed meal with ingredient deductions and updates reactive repositories
   void _handleLogMeal(BuildContext context, MealDetailInfo meal) {
+    if (_isLogging) return;
+    setState(() {
+      _isLogging = true;
+    });
+
+    // 1. Gather available ingredients for record
+    final availableIngredients = meal.ingredients
+        .where((i) => i.availability == IngredientAvailability.available)
+        .map((i) => i.name)
+        .toList();
+
+    // 2. Record meal in the reactive MockDataRepository
     MockDataRepository.logMeal(
-      mealType: meal.tag.toLowerCase(),
+      mealType: meal.tag.isNotEmpty ? meal.tag.toLowerCase() : 'lunch',
       mealName: meal.name,
-      calories: meal.calories,
-      protein: meal.proteinGrams,
-      carbs: meal.carbsGrams,
-      fat: meal.fatGrams,
+      calories: meal.calories ?? 0,
+      protein: meal.proteinGrams ?? 0,
+      carbs: meal.carbsGrams ?? 0,
+      fat: meal.fatGrams ?? 0,
+      ingredients: availableIngredients,
     );
 
+    // 3. Deduct available ingredients using existing inventory logic (never deduct missing)
+    for (final ing in meal.ingredients) {
+      if (ing.availability == IngredientAvailability.available) {
+        FridgeCategoryRepository.deductItemQuantityByName(
+          name: ing.name,
+          quantity: ing.requiredQuantity,
+          unit: ing.requiredUnit,
+        );
+      }
+    }
+
+    // 4. Show clear success confirmation
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -44,16 +80,66 @@ class MealDetailScreen extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Logged ${meal.name} (+${meal.calories} kcal) to Today\'s Meals!',
+                'Logged ${meal.name}${meal.calories != null ? " (+${meal.calories} kcal)" : ""} to Today\'s Meals!',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
           ],
         ),
-        backgroundColor: AppColors.forestGreen,
+        backgroundColor: AppColors.primaryForest,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         duration: const Duration(seconds: 3),
+      ),
+    );
+
+    // 5. Navigate back
+    Navigator.of(context).pop();
+  }
+
+  /// Opens the AI Assistant passing a complete structured meal context
+  void _handleCookWithAi(BuildContext context, MealDetailInfo meal) {
+    final availableFridgeMap = <String, String>{};
+    for (final ing in meal.ingredients) {
+      if (ing.availability == IngredientAvailability.available && ing.availableQuantityInFridge != null) {
+        availableFridgeMap[ing.name] = ing.availableQuantityInFridge!;
+      }
+    }
+
+    final missingIngList = meal.ingredients
+        .where((i) => i.availability == IngredientAvailability.missing)
+        .map((i) => i.name)
+        .toList();
+
+    final nutritionSummary = (meal.calories != null)
+        ? '${meal.calories} kcal, ${meal.proteinGrams ?? "--"}g protein, ${meal.carbsGrams ?? "--"}g carbs, ${meal.fatGrams ?? "--"}g fat'
+        : 'Nutrition unavailable';
+
+    final mealContext = MealAiContext(
+      mealId: widget.recommendation.id.isNotEmpty
+          ? widget.recommendation.id
+          : 'meal_${meal.name.toLowerCase().replaceAll(RegExp(r'\s+'), '_')}',
+      mealTitle: meal.name,
+      mealDescription: widget.recommendation.explanation ?? 'Recipe recommendation based on available ingredients.',
+      mealType: meal.tag,
+      nutritionSummary: nutritionSummary,
+      servingSize: meal.servingSize,
+      requiredIngredients: meal.ingredients.map((i) => '${i.name} (${i.recipeQuantityText})').toList(),
+      availableFridgeQuantities: availableFridgeMap,
+      missingIngredients: missingIngList,
+      preparationSteps: meal.preparationSteps.map((s) => s.instruction).toList(),
+      recommendationReasons: meal.whyReasons,
+    );
+
+    final prompt =
+        'I\'m viewing ${meal.name}. Help me prepare this recipe using the ingredients available in my fridge. Suggest alternatives for anything missing.';
+
+    Navigator.of(context).push(
+      HeroTransitionRoute(
+        page: AiAssistantScreen(
+          initialPrompt: prompt,
+          mealContext: mealContext,
+        ),
       ),
     );
   }
@@ -63,17 +149,16 @@ class MealDetailScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: FridgeCategoryRepository.notifier,
       builder: (context, _) {
-        final meal = MealDetailInfo.fromRecommendation(recommendation);
+        final meal = MealDetailInfo.fromRecommendation(widget.recommendation);
 
         return Scaffold(
-          backgroundColor: AppColors.warmCream,
-          bottomNavigationBar: _buildBottomBar(context, meal),
+          backgroundColor: AppColors.softCream,
           body: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. Cinematic Food Hero
+                // Food Photograph & Hero
                 _buildHero(context, meal),
 
                 // Content Surface
@@ -84,30 +169,35 @@ class MealDetailScreen extends StatelessWidget {
                     children: [
                       const SizedBox(height: 18),
 
-                      // 2. Meal Information & Nutrition Overview
+                      // 1. Meal Information & Nutrition Overview
                       _buildNutritionOverview(meal),
 
                       const SizedBox(height: 22),
 
-                      // 3. Why This Meal?
+                      // 2. Why This Meal?
                       _buildWhyThisMeal(meal),
 
                       const SizedBox(height: 22),
 
-                      // 4. Ingredients Available in Your Fridge
+                      // 3. Ingredients Section
                       _buildIngredientsSection(meal),
 
                       const SizedBox(height: 22),
 
-                      // 5. AI Cooking Section ("Cook it your way")
-                      _buildAiCookingSection(context, meal),
+                      // 4. Recipe-Specific Preparation Instructions
+                      _buildPreparationSection(meal),
 
                       const SizedBox(height: 24),
 
-                      // 6. Watch How It's Made — Video Carousel
+                      // 5. Watch How It's Made — YouTube Video Recommendations
                       _buildVideoCarousel(meal),
 
-                      const SizedBox(height: 36),
+                      const SizedBox(height: 28),
+
+                      // 6. Action Buttons positioned at the very end of the scrollable content
+                      _buildActionButtons(context, meal),
+
+                      const SizedBox(height: 32),
                     ],
                   ),
                 ),
@@ -120,14 +210,14 @@ class MealDetailScreen extends StatelessWidget {
   }
 
   // ==========================================
-  // 1. CINEMATIC FOOD HERO
+  // FOOD HERO
   // ==========================================
   Widget _buildHero(BuildContext context, MealDetailInfo meal) {
     final topPadding = MediaQuery.of(context).padding.top;
 
     return Stack(
       children: [
-        // Food Photograph (Hero shared-element from Design 01)
+        // Food Photograph
         Hero(
           tag: _heroTag,
           child: ClipRRect(
@@ -139,14 +229,12 @@ class MealDetailScreen extends StatelessWidget {
                   ? Image.asset(
                       meal.imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _buildFallbackHeroImage(),
+                      errorBuilder: (context, error, stackTrace) => _buildFallbackHeroImage(),
                     )
                   : Image.network(
                       meal.imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _buildFallbackHeroImage(),
+                      errorBuilder: (context, error, stackTrace) => _buildFallbackHeroImage(),
                     ),
             ),
           ),
@@ -197,7 +285,7 @@ class MealDetailScreen extends StatelessWidget {
               child: const Center(
                 child: Icon(
                   Icons.arrow_back_rounded,
-                  color: AppColors.neutralCharcoal,
+                  color: AppColors.darkText,
                   size: 20,
                 ),
               ),
@@ -231,7 +319,7 @@ class MealDetailScreen extends StatelessWidget {
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.2,
-                    color: AppColors.forestGreen,
+                    color: AppColors.primaryForest,
                   ),
                 ),
               ),
@@ -262,25 +350,30 @@ class MealDetailScreen extends StatelessWidget {
         child: Icon(
           Icons.restaurant_rounded,
           size: 64,
-          color: AppColors.peachAccent,
+          color: AppColors.coralPeach,
         ),
       ),
     );
   }
 
   // ==========================================
-  // 2. MEAL INFORMATION & NUTRITION OVERVIEW
+  // 1. MEAL INFORMATION & NUTRITION OVERVIEW
   // ==========================================
   Widget _buildNutritionOverview(MealDetailInfo meal) {
+    final bool hasNutrition = meal.calories != null ||
+        meal.proteinGrams != null ||
+        meal.carbsGrams != null ||
+        meal.fatGrams != null;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       decoration: BoxDecoration(
-        color: AppColors.cardWhite,
+        color: AppColors.pureWhite,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AppColors.cardBorder,
-          width: 1.2,
+          color: const Color(0xFFE2EBE5),
+          width: 1.0,
         ),
         boxShadow: const [AppColors.softShadow],
       ),
@@ -291,80 +384,120 @@ class MealDetailScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(
-                  'Nutrition & prep',
-                  style: AppTypography.greeting.copyWith(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.neutralCharcoal,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Nutrition & prep',
+                      style: AppTypography.greeting.copyWith(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.darkText,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Per ${meal.servingSize} · ${meal.nutritionSourceLabel}',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.mutedText,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.paleMint,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: const Color(0xFFD4E7D9),
-                    width: 1.0,
+              if (meal.prepTimeMinutes != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.paleMint,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFFD4E7D9),
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Text(
+                    '${meal.prepTimeMinutes} mins prep',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryForest,
+                    ),
                   ),
                 ),
-                child: Text(
-                  '${meal.prepTimeMinutes} mins prep',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.forestGreen,
-                  ),
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 14),
           const Divider(color: Color(0xFFF0F4F2), height: 1),
           const SizedBox(height: 14),
 
-          // Macro Grid (Clean typography inspired by the design reference)
-          Row(
-            children: [
-              Expanded(
-                child: _buildNutritionMetric(
-                  label: 'Calories',
-                  value: '${meal.calories}',
-                  unit: 'kcal',
-                  accentColor: AppColors.freshGreen,
+          if (hasNutrition)
+            Row(
+              children: [
+                Expanded(
+                  child: _buildNutritionMetric(
+                    label: 'Calories',
+                    value: meal.calories != null ? '${meal.calories}' : '--',
+                    unit: 'kcal',
+                    accentColor: AppColors.primaryForest,
+                  ),
+                ),
+                Container(width: 1, height: 34, color: const Color(0xFFF0F4F2)),
+                Expanded(
+                  child: _buildNutritionMetric(
+                    label: 'Protein',
+                    value: meal.proteinGrams != null ? '${meal.proteinGrams}' : '--',
+                    unit: 'g',
+                    accentColor: AppColors.freshGreen,
+                  ),
+                ),
+                Container(width: 1, height: 34, color: const Color(0xFFF0F4F2)),
+                Expanded(
+                  child: _buildNutritionMetric(
+                    label: 'Carbs',
+                    value: meal.carbsGrams != null ? '${meal.carbsGrams}' : '--',
+                    unit: 'g',
+                    accentColor: AppColors.coralPeach,
+                  ),
+                ),
+                Container(width: 1, height: 34, color: const Color(0xFFF0F4F2)),
+                Expanded(
+                  child: _buildNutritionMetric(
+                    label: 'Fat',
+                    value: meal.fatGrams != null ? '${meal.fatGrams}' : '--',
+                    unit: 'g',
+                    accentColor: AppColors.freshGreen,
+                  ),
+                ),
+                if (meal.fiberGrams != null) ...[
+                  Container(width: 1, height: 34, color: const Color(0xFFF0F4F2)),
+                  Expanded(
+                    child: _buildNutritionMetric(
+                      label: 'Fiber',
+                      value: '${meal.fiberGrams}',
+                      unit: 'g',
+                      accentColor: AppColors.primaryForest,
+                    ),
+                  ),
+                ],
+              ],
+            )
+          else
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'Nutritional information is currently unavailable for this recipe.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.mutedText,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
-              Container(width: 1, height: 34, color: const Color(0xFFF0F4F2)),
-              Expanded(
-                child: _buildNutritionMetric(
-                  label: 'Protein',
-                  value: '${meal.proteinGrams}',
-                  unit: 'g',
-                  accentColor: AppColors.freshGreen,
-                ),
-              ),
-              Container(width: 1, height: 34, color: const Color(0xFFF0F4F2)),
-              Expanded(
-                child: _buildNutritionMetric(
-                  label: 'Carbs',
-                  value: '${meal.carbsGrams}',
-                  unit: 'g',
-                  accentColor: AppColors.coralPeach,
-                ),
-              ),
-              Container(width: 1, height: 34, color: const Color(0xFFF0F4F2)),
-              Expanded(
-                child: _buildNutritionMetric(
-                  label: 'Fat',
-                  value: '${meal.fatGrams}',
-                  unit: 'g',
-                  accentColor: AppColors.vibrantLime,
-                ),
-              ),
-            ],
-          ),
+            ),
         ],
       ),
     );
@@ -413,7 +546,7 @@ class MealDetailScreen extends StatelessWidget {
           style: const TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w500,
-            color: AppColors.textSecondary,
+            color: AppColors.mutedText,
           ),
         ),
       ],
@@ -421,7 +554,7 @@ class MealDetailScreen extends StatelessWidget {
   }
 
   // ==========================================
-  // 3. WHY THIS MEAL?
+  // 2. WHY THIS MEAL? (DYNAMIC RECOMMENDATION REASONS)
   // ==========================================
   Widget _buildWhyThisMeal(MealDetailInfo meal) {
     if (meal.whyReasons.isEmpty) return const SizedBox.shrink();
@@ -431,18 +564,22 @@ class MealDetailScreen extends StatelessWidget {
       children: [
         Text(
           'Why this meal?',
-          style: AppTypography.sectionTitle.copyWith(fontSize: 16.5, color: AppColors.neutralCharcoal),
+          style: AppTypography.sectionTitle.copyWith(
+            fontSize: 16.5,
+            fontWeight: FontWeight.w700,
+            color: AppColors.darkText,
+          ),
         ),
         const SizedBox(height: 8),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: AppColors.cardWhite,
+            color: AppColors.pureWhite,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: AppColors.cardBorder,
-              width: 1.2,
+              color: const Color(0xFFE2EBE5),
+              width: 1.0,
             ),
             boxShadow: const [AppColors.softShadow],
           ),
@@ -450,7 +587,7 @@ class MealDetailScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: meal.whyReasons.map((reason) {
               return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3.5),
+                padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -459,7 +596,7 @@ class MealDetailScreen extends StatelessWidget {
                       width: 6,
                       height: 6,
                       decoration: const BoxDecoration(
-                        color: AppColors.sageAccent,
+                        color: AppColors.freshGreen,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -470,7 +607,7 @@ class MealDetailScreen extends StatelessWidget {
                           fontSize: 13,
                           height: 1.4,
                           fontWeight: FontWeight.w500,
-                          color: AppColors.neutralCharcoal,
+                          color: AppColors.darkText,
                         ),
                       ),
                     ),
@@ -485,7 +622,7 @@ class MealDetailScreen extends StatelessWidget {
   }
 
   // ==========================================
-  // 4. INGREDIENTS AVAILABLE IN YOUR FRIDGE
+  // 3. INGREDIENTS SECTION (MATCHING INVENTORY)
   // ==========================================
   Widget _buildIngredientsSection(MealDetailInfo meal) {
     return Column(
@@ -496,7 +633,11 @@ class MealDetailScreen extends StatelessWidget {
           children: [
             Text(
               'Ingredients',
-              style: AppTypography.sectionTitle.copyWith(fontSize: 16.5, color: AppColors.neutralCharcoal),
+              style: AppTypography.sectionTitle.copyWith(
+                fontSize: 16.5,
+                fontWeight: FontWeight.w700,
+                color: AppColors.darkText,
+              ),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
@@ -510,7 +651,7 @@ class MealDetailScreen extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.forestGreen,
+                  color: AppColors.primaryForest,
                 ),
               ),
             ),
@@ -519,11 +660,11 @@ class MealDetailScreen extends StatelessWidget {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: AppColors.cardWhite,
+            color: AppColors.pureWhite,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: AppColors.cardBorder,
-              width: 1.2,
+              color: const Color(0xFFE2EBE5),
+              width: 1.0,
             ),
             boxShadow: const [AppColors.softShadow],
           ),
@@ -552,12 +693,12 @@ class MealDetailScreen extends StatelessWidget {
     Color indicatorColor;
     switch (item.availability) {
       case IngredientAvailability.available:
-        indicatorColor = AppColors.forestGreen;
+        indicatorColor = AppColors.freshGreen;
         break;
       case IngredientAvailability.partial:
-        indicatorColor = AppColors.coralHighlight;
+        indicatorColor = AppColors.coralPeach;
         break;
-      case IngredientAvailability.notTracked:
+      case IngredientAvailability.missing:
         indicatorColor = const Color(0xFF94A3B8);
         break;
     }
@@ -567,7 +708,7 @@ class MealDetailScreen extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Subtle Status Indicator dot
+          // Availability dot
           Container(
             width: 7,
             height: 7,
@@ -589,15 +730,15 @@ class MealDetailScreen extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.neutralCharcoal,
+                    color: AppColors.darkText,
                   ),
                 ),
                 Text(
-                  item.recipeQuantity,
+                  'Required: ${item.recipeQuantityText}',
                   style: const TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w400,
-                    color: AppColors.textSecondary,
+                    color: AppColors.mutedText,
                   ),
                 ),
               ],
@@ -609,25 +750,25 @@ class MealDetailScreen extends StatelessWidget {
           Flexible(
             child: Container(
               padding: EdgeInsets.symmetric(
-                horizontal: item.availability == IngredientAvailability.partial ? 6 : 0,
-                vertical: item.availability == IngredientAvailability.partial ? 2 : 0,
+                horizontal: item.availability == IngredientAvailability.partial ? 8 : 0,
+                vertical: item.availability == IngredientAvailability.partial ? 2.5 : 0,
               ),
               decoration: item.availability == IngredientAvailability.partial
                   ? BoxDecoration(
-                      color: AppColors.peachLight,
+                      color: const Color(0xFFFFECE5),
                       borderRadius: BorderRadius.circular(6),
                     )
                   : null,
               child: Text(
                 item.statusLabel,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w600,
                   color: item.availability == IngredientAvailability.available
-                      ? AppColors.forestGreen
+                      ? AppColors.primaryForest
                       : (item.availability == IngredientAvailability.partial
-                          ? AppColors.peachText
-                          : AppColors.textTertiary),
+                          ? const Color(0xFFD35400)
+                          : AppColors.mutedText),
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -639,361 +780,312 @@ class MealDetailScreen extends StatelessWidget {
   }
 
   // ==========================================
-  // 5. AI COOKING SECTION — "Cook it your way"
+  // 4. RECIPE-SPECIFIC PREPARATION SECTION
   // ==========================================
-  Widget _buildAiCookingSection(BuildContext context, MealDetailInfo meal) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.cardWhite,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0xFFE2EBE5),
-          width: 1.2,
-        ),
-        boxShadow: const [AppColors.softShadow],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
+  Widget _buildPreparationSection(MealDetailInfo meal) {
+    final steps = meal.preparationSteps;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Preparation',
+              style: AppTypography.sectionTitle.copyWith(
+                fontSize: 16.5,
+                fontWeight: FontWeight.w700,
+                color: AppColors.darkText,
+              ),
+            ),
+            if (steps.isNotEmpty)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
                 decoration: BoxDecoration(
                   color: AppColors.paleMint,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: const Color(0xFFD4E7D9), width: 0.8),
                 ),
-                child: const Text(
-                  'NutriFridge AI',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.3,
-                    color: AppColors.forestGreen,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // Section Title
-          Text(
-            'Cook it your way',
-            style: AppTypography.cardTitle.copyWith(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: AppColors.neutralCharcoal,
-            ),
-          ),
-          const SizedBox(height: 3),
-
-          // Supporting Text
-          const Text(
-            'Get a recipe tailored to your ingredients and preferences.',
-            style: TextStyle(
-              fontSize: 12.5,
-              height: 1.35,
-              fontWeight: FontWeight.w400,
-              color: AppColors.textSecondary,
-            ),
-          ),
-
-          const SizedBox(height: 14),
-
-          // Cooking Step Cards inspired by reference design
-          _buildStepCard(
-            stepNumber: '1',
-            text: 'Exact portion measurements for 1 serving',
-            onTap: () => AiAssistantModalSheet.show(context, mealName: meal.name),
-          ),
-          const SizedBox(height: 8),
-          _buildStepCard(
-            stepNumber: '2',
-            text: 'Simple stove-top preparation steps',
-            onTap: () => AiAssistantModalSheet.show(context, mealName: meal.name),
-          ),
-          const SizedBox(height: 8),
-          _buildStepCard(
-            stepNumber: '3',
-            text: 'Smart substitutions using available fridge items',
-            onTap: () => AiAssistantModalSheet.show(context, mealName: meal.name),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Primary Button: "Get AI Recipe"
-          SizedBox(
-            width: double.infinity,
-            height: 46,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.forestGreen,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(13),
-                ),
-              ),
-              onPressed: () => AiAssistantModalSheet.show(
-                context,
-                mealName: meal.name,
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.auto_awesome_rounded, size: 16, color: Colors.white),
-                  SizedBox(width: 8),
-                  Text(
-                    'Get AI Recipe',
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          // Secondary text/link: "Ask NutriFridge AI"
-          Center(
-            child: GestureDetector(
-              onTap: () => AiAssistantModalSheet.show(
-                context,
-                mealName: meal.name,
-              ),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(vertical: 4),
                 child: Text(
-                  'Ask NutriFridge AI',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.forestGreen,
-                    decoration: TextDecoration.underline,
-                    decorationColor: AppColors.forestGreen,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStepCard({
-    required String stepNumber,
-    required String text,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF9F7F2),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFEBE6DC), width: 0.8),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(7),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x08000000), blurRadius: 4, offset: Offset(0, 1)),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    stepNumber,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.forestGreen,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  text,
+                  '${steps.length} steps',
                   style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.neutralCharcoal,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primaryForest,
                   ),
                 ),
               ),
-              const Icon(
-                Icons.play_arrow_rounded,
-                size: 18,
-                color: AppColors.forestGreen,
-              ),
-            ],
-          ),
+          ],
         ),
-      ),
-    );
-  }
+        const SizedBox(height: 8),
 
-  // ==========================================
-  // 6. WATCH HOW IT'S MADE — VIDEO CAROUSEL
-  // ==========================================
-  Widget _buildVideoCarousel(MealDetailInfo meal) {
-    if (meal.videos.isEmpty) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Watch how it's made",
-            style: AppTypography.sectionTitle.copyWith(fontSize: 16.5, color: AppColors.neutralCharcoal),
-          ),
-          const SizedBox(height: 12),
+        if (steps.isEmpty)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: AppColors.cardWhite,
+              color: AppColors.pureWhite,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.cardBorder, width: 1.2),
+              border: Border.all(color: const Color(0xFFE2EBE5), width: 1.0),
               boxShadow: const [AppColors.softShadow],
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.videocam_off_outlined, size: 22, color: AppColors.textSecondary),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'No video tutorials available for this recipe.',
-                    style: AppTypography.bodySmall.copyWith(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
+            child: const Text(
+              "Preparation instructions aren't available for this recipe yet.",
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.mutedText,
+              ),
+            ),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.pureWhite,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: const Color(0xFFE2EBE5),
+                width: 1.0,
+              ),
+              boxShadow: const [AppColors.softShadow],
+            ),
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: steps.length,
+              separatorBuilder: (context, index) => const Divider(
+                color: Color(0xFFF4F7F5),
+                height: 1,
+                indent: 16,
+                endIndent: 16,
+              ),
+              itemBuilder: (context, index) {
+                final step = steps[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Step Number Circle
+                      Container(
+                        width: 24,
+                        height: 24,
+                        margin: const EdgeInsets.only(top: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.paleMint,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFFC8E6C9),
+                            width: 1,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${step.stepNumber}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primaryForest,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+
+                      // Step Instruction & Metadata
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              step.instruction,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                height: 1.4,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.darkText,
+                              ),
+                            ),
+                            if (step.time != null || step.tip != null || step.temperature != null) ...[
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [
+                                  if (step.time != null)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF3F7F4),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        '⏱ ${step.time}',
+                                        style: const TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.primaryForest,
+                                        ),
+                                      ),
+                                    ),
+                                  if (step.temperature != null)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF3F7F4),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        '🔥 ${step.temperature}',
+                                        style: const TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.coralPeach,
+                                        ),
+                                      ),
+                                    ),
+                                  if (step.tip != null)
+                                    Text(
+                                      'Tip: ${step.tip}',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontStyle: FontStyle.italic,
+                                        color: AppColors.mutedText,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                );
+              },
             ),
           ),
-        ],
-      );
-    }
-
-    final videos = meal.videos;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          "Watch how it's made",
-          style: AppTypography.sectionTitle.copyWith(fontSize: 16.5, color: AppColors.neutralCharcoal),
-        ),
-        const SizedBox(height: 2),
-        const Text(
-          'Cooking videos for this meal.',
-          style: TextStyle(
-            fontSize: 12.5,
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // Horizontal Video Carousel
-        SizedBox(
-          height: 195,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            itemCount: videos.length,
-            itemBuilder: (context, index) {
-              final video = videos[index];
-              return RecipeVideoCard(video: video);
-            },
-          ),
-        ),
       ],
     );
   }
 
   // ==========================================
-  // 7. FLOATING ACTION DOCK
+  // 5. WATCH HOW IT'S MADE — VIDEO CAROUSEL
   // ==========================================
-  Widget _buildBottomBar(BuildContext context, MealDetailInfo meal) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.cardWhite,
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0C000000),
-            blurRadius: 14,
-            offset: Offset(0, -3),
+  Widget _buildVideoCarousel(MealDetailInfo meal) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Watch how it's made",
+          style: AppTypography.sectionTitle.copyWith(
+            fontSize: 16.5,
+            fontWeight: FontWeight.w700,
+            color: AppColors.darkText,
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        if (meal.videos.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppColors.pureWhite,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2EBE5), width: 1.0),
+              boxShadow: const [AppColors.softShadow],
+            ),
+            child: const Text(
+              'Video suggestions will appear here when available.',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.mutedText,
+              ),
+            ),
+          )
+        else
+          SizedBox(
+            height: 195,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: meal.videos.length,
+              itemBuilder: (context, index) {
+                final video = meal.videos[index];
+                return RecipeVideoCard(video: video);
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ==========================================
+  // 6. ACTION BUTTONS AT END OF SCROLL
+  // ==========================================
+  Widget _buildActionButtons(BuildContext context, MealDetailInfo meal) {
+    return SafeArea(
+      top: false,
+      child: Row(
+        children: [
+          // Left Action: Cook with AI
+          Expanded(
+            child: SizedBox(
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () => _handleCookWithAi(context, meal),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.vibrantLime,
+                  foregroundColor: AppColors.primaryForest,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                ),
+                child: const Text(
+                  'Cook with AI',
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Right Action: Log Meal
+          Expanded(
+            child: SizedBox(
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _isLogging ? null : () => _handleLogMeal(context, meal),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryForest,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: AppColors.primaryForest.withValues(alpha: 0.6),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                ),
+                child: Text(
+                  _isLogging ? 'Logging...' : 'Log Meal',
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
-        border: Border(
-          top: BorderSide(color: AppColors.cardBorder, width: 1),
-        ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          children: [
-            // Left Action: Cook with AI
-            Expanded(
-              child: SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () => AiAssistantModalSheet.show(context, mealName: meal.name),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.vibrantLime,
-                    foregroundColor: AppColors.primaryForest,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                  ),
-                  child: const Text(
-                    'Cook with AI',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Right Action: Log Meal
-            Expanded(
-              child: SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () => _handleLogMeal(context, meal),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryForest,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                  ),
-                  child: const Text(
-                    'Log Meal',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -8,16 +8,19 @@ import '../../models/nutrition_data.dart';
 import '../fridge/models/category_item.dart';
 import 'models/ai_message.dart';
 import 'services/ai_assistant_service.dart';
+import '../meal_detail/models/meal_ai_context.dart';
 
 /// Full-featured, interactive AI Assistant screen for NutriFridge.
 /// Acts as the single primary entry point for natural-language food addition,
 /// meal logging with ingredient fridge deduction, and contextual nutrition Q&A.
 class AiAssistantScreen extends StatefulWidget {
   final String? initialPrompt;
+  final MealAiContext? mealContext;
 
   const AiAssistantScreen({
     super.key,
     this.initialPrompt,
+    this.mealContext,
   });
 
   @override
@@ -49,9 +52,17 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       _scrollToBottom();
     });
 
-    if (widget.initialPrompt != null && widget.initialPrompt!.isNotEmpty) {
+    final promptToRun = widget.initialPrompt ??
+        (widget.mealContext != null
+            ? "I'm viewing ${widget.mealContext!.mealTitle}. Help me prepare this recipe using the ingredients available in my fridge. Suggest alternatives for anything missing."
+            : null);
+
+    if (promptToRun != null && promptToRun.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _handleSend(promptOverride: widget.initialPrompt);
+        _handleSend(
+          promptOverride: promptToRun,
+          extraPayload: widget.mealContext != null ? {'mealContext': widget.mealContext!.toJson()} : null,
+        );
       });
     }
   }
@@ -153,6 +164,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     String? promptOverride,
     String? imageOverride,
     bool isRetry = false,
+    Map<String, dynamic>? extraPayload,
   }) async {
     if (_isSending) return;
 
@@ -190,6 +202,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         imageBase64: imageToSend,
         mimeType: mimeToSend,
         history: _messages,
+        extraPayload: extraPayload ?? (widget.mealContext != null ? {'mealContext': widget.mealContext!.toJson()} : null),
       );
 
       if (!mounted) return;
@@ -1325,6 +1338,49 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // Contextual meal indicator when opened from Meal Detail
+            if (widget.mealContext != null)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.paleMint,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFC8E6C9), width: 1),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.restaurant_menu_rounded, size: 16, color: AppColors.primaryForest),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Discussing: ${widget.mealContext!.mealTitle}',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primaryForest,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            'Recipe context active · ${widget.mealContext!.servingSize}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.freshGreen,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // Mode toggle pill (Chat / Voice) centered matching reference
             Padding(
               padding: const EdgeInsets.only(top: 6, bottom: 4),
