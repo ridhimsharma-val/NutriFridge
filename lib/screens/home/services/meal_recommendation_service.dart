@@ -91,6 +91,9 @@ class MealRecommendationService {
   static final ValueNotifier<RecipeRecommendation?> recommendationNotifier =
       ValueNotifier<RecipeRecommendation?>(null);
 
+  static final ValueNotifier<bool> isChangingSuggestionNotifier =
+      ValueNotifier<bool>(false);
+
   static RecommendationStatus _currentStatus = RecommendationStatus.empty;
   static RecommendationStatus get currentStatus => _currentStatus;
 
@@ -100,16 +103,32 @@ class MealRecommendationService {
   static String? _errorMessage;
   static String? get errorMessage => _errorMessage;
 
+  static String? _alternativeMessage;
+  static String? get alternativeMessage => _alternativeMessage;
+
+  static bool _isChangingSuggestion = false;
+  static bool get isChangingSuggestion => _isChangingSuggestion;
+
   // --- In-flight & Caching State ---
   static bool _isFetching = false;
+  static Future<RecipeRecommendation?>? _activeFetchFuture;
   static int _fetchCallCount = 0;
   static int get fetchCallCount => _fetchCallCount;
+
+  static int _currentRequestId = 0;
 
   static MealTimeSlot? _cachedSlot;
   static String? _cachedInventoryFingerprint;
   static String? _cachedProfileFingerprint;
 
-  static bool _inventoryListenerAttached = false;
+  static final Set<String> _rejectedRecipeIds = <String>{};
+  static Set<String> get rejectedRecipeIds => Set.unmodifiable(_rejectedRecipeIds);
+
+  static final Set<MealTimeSlot> _sessionCompletedSlots = <MealTimeSlot>{};
+  static int _lastLoggedMealsCount = 0;
+  static Set<MealTimeSlot> _lastCompletedSlots = {};
+
+  static bool _listenersAttached = false;
   static bool _isInitialized = false;
   static Future<void>? _initFuture;
 
@@ -146,20 +165,29 @@ class MealRecommendationService {
   Future<void> _performInitialization() async {
     try {
       _wireRepositories();
-      if (!_inventoryListenerAttached) {
-        _inventoryListenerAttached = true;
+      if (!_listenersAttached) {
+        _listenersAttached = true;
         FridgeCategoryRepository.notifier.addListener(_onInventoryChanged);
+        MockDataRepository.notifier.addListener(_onMockDataChanged);
       }
       _isInitialized = true;
     } catch (e, st) {
       debugPrint('Error during MealRecommendationService initialization: $e\n$st');
       _isInitialized = false;
-      _inventoryListenerAttached = false;
+      _listenersAttached = false;
     }
   }
 
   static void _wireRepositories() {
-    MockDataRepository.recommendationProvider = () => _currentRecommendation ?? getRecommendation();
+    MockDataRepository.recommendationProvider = () {
+      if (_currentRecommendation != null) return _currentRecommendation;
+      if (_currentStatus == RecommendationStatus.loading ||
+          _currentStatus == RecommendationStatus.error ||
+          _currentStatus == RecommendationStatus.noMatch) {
+        return null;
+      }
+      return getRecommendation();
+    };
     MockDataRepository.recommendationStatusProvider = () => currentStatus;
     MockDataRepository.onResetRecommendation = () => reset();
   }
@@ -169,6 +197,7 @@ class MealRecommendationService {
       _currentRecommendation = null;
       _currentStatus = RecommendationStatus.empty;
       _cachedInventoryFingerprint = null;
+      _alternativeMessage = null;
       statusNotifier.value = RecommendationStatus.empty;
       recommendationNotifier.value = null;
       return;
@@ -178,12 +207,98 @@ class MealRecommendationService {
     if (newFingerprint != _cachedInventoryFingerprint) {
       // Invalidate cache and re-fetch recommendation
       _cachedInventoryFingerprint = null;
-      fetchRecommendation();
+      _alternativeMessage = null;
+      fetchRecommendation(forceRefresh: true);
     }
   }
 
-  /// Determines the relevant meal time slot for a given timestamp.
-  /// Configurable windows:
+  static void _onMockDataChanged() {
+    if (FridgeCategoryRepository.totalFridgeItems == 0) return;
+
+    final currentHistory = MockDataRepository.loggedMealsHistory;
+    final currentCompleted = getCompletedMealSlotsToday();
+
+    // 1. Profile change check
+    final newProfileFingerprint = _generateProfileFingerprint();
+    final profileChanged = newProfileFingerprint != _cachedProfileFingerprint;
+
+    // 2. Meal logging / slot completion check
+    final mealsLoggedChanged = currentHistory.length != _lastLoggedMealsCount ||
+        !setEquals(currentCompleted, _lastCompletedSlots);
+
+    if (mealsLoggedChanged) {
+      _lastLoggedMealsCount = currentHistory.length;
+      _lastCompletedSlots = Set.from(currentCompleted);
+
+      // Invalidate previous recommendation and slot cache
+      _currentRecommendation = null;
+      _cachedSlot = null;
+      _rejectedRecipeIds.clear();
+      _alternativeMessage = null;
+      recommendationNotifier.value = null;
+
+      // Automatically advance to the next unlogged upcoming slot
+      fetchRecommendation(forceRefresh: true);
+      return;
+    }
+
+    if (profileChanged) {
+      _cachedProfileFingerprint = null;
+      _rejectedRecipeIds.clear();
+      _alternativeMessage = null;
+      fetchRecommendation(forceRefresh: true);
+    }
+  }
+
+  /// Parses a string representation of a meal slot name.
+  static MealTimeSlot? parseMealSlot(String? name) {
+    if (name == null || name.isEmpty) return null;
+    final clean = name.trim().toLowerCase();
+    if (clean.contains('breakfast')) return MealTimeSlot.breakfast;
+    if (clean.contains('lunch')) return MealTimeSlot.lunch;
+    if (clean.contains('snack')) return MealTimeSlot.snack;
+    if (clean.contains('dinner')) return MealTimeSlot.dinner;
+    return null;
+  }
+
+  /// Determines which meal slots have already been completed today.
+  static Set<MealTimeSlot> getCompletedMealSlotsToday([DateTime? now]) {
+    final today = now ?? currentTimeProvider();
+    final completed = <MealTimeSlot>{};
+
+    // 1. Inspect MockDataRepository.meals
+    for (final meal in MockDataRepository.meals) {
+      if (meal.status == MealStatus.completed || meal.isCompleted) {
+        final slot = parseMealSlot(meal.name);
+        if (slot != null) {
+          completed.add(slot);
+        }
+      }
+    }
+
+    // 2. Inspect MockDataRepository.loggedMealsHistory
+    for (final entry in MockDataRepository.loggedMealsHistory) {
+      final dt = entry['timestamp'];
+      bool isToday = true;
+      if (dt is DateTime) {
+        isToday = dt.year == today.year && dt.month == today.month && dt.day == today.day;
+      }
+      if (isToday) {
+        final type = (entry['mealType'] ?? '').toString();
+        final slot = parseMealSlot(type);
+        if (slot != null) {
+          completed.add(slot);
+        }
+      }
+    }
+
+    // 3. Include any session-marked slots
+    completed.addAll(_sessionCompletedSlots);
+
+    return completed;
+  }
+
+  /// Determines the raw meal time slot for a given timestamp based on clock windows:
   /// - Morning (05:00 - 10:59): Breakfast
   /// - Afternoon (11:00 - 14:59): Lunch
   /// - Evening / Snacks (15:00 - 18:29): Snack
@@ -206,6 +321,49 @@ class MealRecommendationService {
       return MealTimeSlot.breakfast;
     }
   }
+
+  /// Determines the next appropriate unlogged meal slot based on both
+  /// current local time and today's completed meal slots.
+  /// Progression order: Breakfast -> Lunch -> Snacks -> Dinner -> tomorrow's Breakfast.
+  static MealTimeSlot resolveActiveMealSlot([DateTime? time]) {
+    final dt = time ?? currentTimeProvider();
+    final completed = getCompletedMealSlotsToday(dt);
+
+    // Late night (23:00 - 04:59) -> upcoming Breakfast
+    if (isLateNightWindow(dt)) {
+      return MealTimeSlot.breakfast;
+    }
+
+    final clockSlot = getMealTimeSlot(dt);
+
+    // If clock slot has NOT yet been completed today, recommend it
+    if (!completed.contains(clockSlot)) {
+      return clockSlot;
+    }
+
+    // Clock slot is already completed today:
+    // Advance to the next unlogged upcoming slot today
+    const order = [
+      MealTimeSlot.breakfast,
+      MealTimeSlot.lunch,
+      MealTimeSlot.snack,
+      MealTimeSlot.dinner,
+    ];
+
+    final currentIndex = order.indexOf(clockSlot);
+    for (int i = currentIndex + 1; i < order.length; i++) {
+      if (!completed.contains(order[i])) {
+        return order[i];
+      }
+    }
+
+    // No suitable remaining slot exists today (e.g. Dinner completed or all completed)
+    // -> Advance to tomorrow's Breakfast
+    return MealTimeSlot.breakfast;
+  }
+
+  /// Alias for resolveActiveMealSlot
+  static MealTimeSlot getNextUnloggedMealSlot([DateTime? time]) => resolveActiveMealSlot(time);
 
   /// Alias for test readability
   static MealTimeSlot determineMealSlot([DateTime? time]) => getMealTimeSlot(time);
@@ -239,14 +397,47 @@ class MealRecommendationService {
   static Future<RecipeRecommendation?> fetchRecommendation({
     bool forceRefresh = false,
     DateTime? time,
+    MealTimeSlot? targetSlot,
+    bool isAlternativeRequest = false,
+    Set<String>? excludedRecipeIds,
   }) async {
     ensureInitialized();
 
+    if (_activeFetchFuture != null && !forceRefresh && !isAlternativeRequest) {
+      return _activeFetchFuture;
+    }
+
+    final future = _performFetchRecommendation(
+      forceRefresh: forceRefresh,
+      time: time,
+      targetSlot: targetSlot,
+      isAlternativeRequest: isAlternativeRequest,
+      excludedRecipeIds: excludedRecipeIds,
+    );
+
+    _activeFetchFuture = future;
+    try {
+      return await future;
+    } finally {
+      if (_activeFetchFuture == future) {
+        _activeFetchFuture = null;
+      }
+    }
+  }
+
+  static Future<RecipeRecommendation?> _performFetchRecommendation({
+    bool forceRefresh = false,
+    DateTime? time,
+    MealTimeSlot? targetSlot,
+    bool isAlternativeRequest = false,
+    Set<String>? excludedRecipeIds,
+  }) async {
     // 1. Emptiness Check: Fridge contains zero items
     if (FridgeCategoryRepository.totalFridgeItems == 0) {
       _currentRecommendation = null;
       _currentStatus = RecommendationStatus.empty;
       _errorMessage = null;
+      _alternativeMessage = null;
       _cachedSlot = null;
       _cachedInventoryFingerprint = null;
       _cachedProfileFingerprint = null;
@@ -255,12 +446,13 @@ class MealRecommendationService {
       return null;
     }
 
-    final slot = getMealTimeSlot(time);
+    final slot = targetSlot ?? resolveActiveMealSlot(time);
     final invFingerprint = _generateInventoryFingerprint();
     final profileFingerprint = _generateProfileFingerprint();
 
-    // 2. Cache Validation
+    // 2. Cache Validation (skip if forceRefresh or alternative request)
     if (!forceRefresh &&
+        !isAlternativeRequest &&
         _currentRecommendation != null &&
         _cachedSlot == slot &&
         _cachedInventoryFingerprint == invFingerprint &&
@@ -270,13 +462,9 @@ class MealRecommendationService {
       return _currentRecommendation;
     }
 
-    // 3. Prevent duplicate simultaneous in-flight requests (TEST 12)
-    if (_isFetching) {
-      return _currentRecommendation;
-    }
-
     _isFetching = true;
     _fetchCallCount++;
+    final thisRequestId = ++_currentRequestId;
     _currentStatus = RecommendationStatus.loading;
     statusNotifier.value = RecommendationStatus.loading;
 
@@ -286,39 +474,79 @@ class MealRecommendationService {
       final userPreferences = AiAssistantService.getProfilePreferences();
       final nutritionContext = AiAssistantService.getNutritionContext();
 
+      final exclusions = excludedRecipeIds ?? _rejectedRecipeIds;
+      final completedSlots = getCompletedMealSlotsToday(now);
+      final nextSlot = getNextUnloggedMealSlot(now);
+
+      final remainingCalories = (MockDataRepository.nutrition.targetCalories -
+              MockDataRepository.nutrition.consumedCalories)
+          .clamp(0, 9999);
+      final remainingProtein = (MockDataRepository.nutrition.protein.targetGrams -
+              MockDataRepository.nutrition.protein.amountGrams)
+          .clamp(0, 999);
+      final remainingCarbs = (MockDataRepository.nutrition.carbs.targetGrams -
+              MockDataRepository.nutrition.carbs.amountGrams)
+          .clamp(0, 999);
+      final remainingFat = (MockDataRepository.nutrition.fat.targetGrams -
+              MockDataRepository.nutrition.fat.amountGrams)
+          .clamp(0, 999);
+
       final requestPayload = {
+        'userId': MockDataRepository.profile.displayName.isNotEmpty
+            ? MockDataRepository.profile.displayName
+            : 'guest_user',
         'actionHint': 'meal_recommendation',
-        'message': 'Generate a meal recommendation for ${slot.displayName} based on current fridge inventory.',
+        'message': isAlternativeRequest
+            ? 'Suggest an alternative meal recommendation for ${slot.displayName} based on current fridge inventory, excluding previously rejected recipes.'
+            : 'Generate a meal recommendation for ${slot.displayName} based on current fridge inventory.',
         'currentMealPeriod': slot.displayName,
+        'targetMealSlot': slot.displayName,
+        'nextMealSlot': nextSlot.displayName,
+        'completedMealSlots': completedSlots.map((s) => s.displayName).toList(),
+        'todayLoggedMeals': MockDataRepository.loggedMealsHistory,
         'clientLocalTime': now.toIso8601String(),
         'inventoryContext': inventoryContext,
         'userPreferences': userPreferences,
         'todayNutrition': nutritionContext,
+        'remainingTargets': {
+          'calories': remainingCalories,
+          'proteinG': remainingProtein,
+          'carbsG': remainingCarbs,
+          'fatG': remainingFat,
+        },
+        'excludedRecipeIds': exclusions.toList(),
+        'rejectedRecipeIds': exclusions.toList(),
+        'isAlternative': isAlternativeRequest,
       };
 
       Map<String, dynamic> response = await AiAssistantService.sendRequest(
         message: requestPayload['message'] as String,
         actionHint: 'meal_recommendation',
-        extraPayload: {
-          'currentMealPeriod': slot.displayName,
-          'clientLocalTime': now.toIso8601String(),
-        },
+        extraPayload: requestPayload,
       );
+
+      // Discard stale responses if newer request has been triggered
+      if (thisRequestId != _currentRequestId) {
+        return _currentRecommendation;
+      }
 
       // If n8n backend rejects 'meal_recommendation' with HTTP 400 (e.g. un-updated live deployment),
       // gracefully fall back to actionHint: 'auto' with recommendation context
       if (response['error'] != null &&
           response['error'].toString().contains('400') &&
           response['action'] == 'error') {
-        debugPrint('[MealRecommendationService] Live n8n rejected meal_recommendation; falling back to actionHint: auto');
+        debugPrint(
+            '[MealRecommendationService] Live n8n rejected meal_recommendation; falling back to actionHint: auto');
+        final fallbackPayload = Map<String, dynamic>.from(requestPayload);
+        fallbackPayload['actionHint'] = 'auto';
         response = await AiAssistantService.sendRequest(
           message: requestPayload['message'] as String,
           actionHint: 'auto',
-          extraPayload: {
-            'currentMealPeriod': slot.displayName,
-            'clientLocalTime': now.toIso8601String(),
-          },
+          extraPayload: fallbackPayload,
         );
+        if (thisRequestId != _currentRequestId) {
+          return _currentRecommendation;
+        }
       }
 
       // 4. Handle Backend failure (TEST 11)
@@ -326,13 +554,17 @@ class MealRecommendationService {
           response['ok'] == false ||
           response['action'] == 'error' ||
           (response['error'] != null && response['meal'] == null)) {
-        _currentRecommendation = null;
+        if (!isAlternativeRequest) {
+          _currentRecommendation = null;
+        }
         _currentStatus = RecommendationStatus.error;
         _errorMessage = response['assistantMessage'] as String? ??
             response['error'] as String? ??
             'Unable to reach NutriFridge AI. Please check your connection and tap retry.';
         statusNotifier.value = RecommendationStatus.error;
-        recommendationNotifier.value = null;
+        if (!isAlternativeRequest) {
+          recommendationNotifier.value = null;
+        }
         _isFetching = false;
         return null;
       }
@@ -342,60 +574,184 @@ class MealRecommendationService {
         final mealJson = Map<String, dynamic>.from(response['meal'] as Map);
         final rec = RecipeRecommendation.fromJson(mealJson);
 
-        _currentRecommendation = rec;
-        _currentStatus = RecommendationStatus.loaded;
-        _errorMessage = null;
-        _cachedSlot = slot;
-        _cachedInventoryFingerprint = invFingerprint;
-        _cachedProfileFingerprint = profileFingerprint;
-        statusNotifier.value = RecommendationStatus.loaded;
-        recommendationNotifier.value = rec;
-        _isFetching = false;
-        return rec;
+        if (!exclusions.contains(rec.id) && !exclusions.contains(rec.title)) {
+          _currentRecommendation = rec;
+          _currentStatus = RecommendationStatus.loaded;
+          _errorMessage = null;
+          _alternativeMessage = null;
+          _cachedSlot = slot;
+          _cachedInventoryFingerprint = invFingerprint;
+          _cachedProfileFingerprint = profileFingerprint;
+          statusNotifier.value = RecommendationStatus.loaded;
+          recommendationNotifier.value = rec;
+          _isFetching = false;
+          return rec;
+        }
       }
 
-      // 6. Handle no match condition
+      // 6. Handle explicit no-match condition from backend
       if (response['action'] == 'no_match' || response['noMatch'] == true) {
-        _currentRecommendation = null;
-        _currentStatus = RecommendationStatus.noMatch;
-        _errorMessage = response['assistantMessage'] as String? ??
-            "We couldn't find a suitable meal with your current ingredients.";
-        statusNotifier.value = RecommendationStatus.noMatch;
-        recommendationNotifier.value = null;
-        _isFetching = false;
-        return null;
+        if (!isAlternativeRequest) {
+          _currentRecommendation = null;
+          _currentStatus = RecommendationStatus.noMatch;
+          _errorMessage = response['assistantMessage'] as String? ??
+              "We couldn't find a suitable meal with your current ingredients.";
+          statusNotifier.value = RecommendationStatus.noMatch;
+          recommendationNotifier.value = null;
+          _isFetching = false;
+          return null;
+        }
       }
 
       // 7. Dynamic local catalog fallback (for offline or unhandled mock actions)
-      final localRec = _computeLocalRecommendation(slot);
+      final localRec = _computeLocalRecommendation(
+        slot,
+        excludedRecipeIds: exclusions,
+      );
+
       if (localRec != null) {
         _currentRecommendation = localRec;
         _currentStatus = RecommendationStatus.loaded;
         _errorMessage = null;
+        _alternativeMessage = null;
         _cachedSlot = slot;
         _cachedInventoryFingerprint = invFingerprint;
         _cachedProfileFingerprint = profileFingerprint;
         statusNotifier.value = RecommendationStatus.loaded;
         recommendationNotifier.value = localRec;
       } else {
-        _currentRecommendation = null;
-        _currentStatus = RecommendationStatus.noMatch;
-        statusNotifier.value = RecommendationStatus.noMatch;
-        recommendationNotifier.value = null;
+        if (isAlternativeRequest && _currentRecommendation != null) {
+          // Keep current recommendation visible, notify user
+          _currentStatus = RecommendationStatus.loaded;
+          _alternativeMessage = 'No other suitable suggestion is available right now.';
+          statusNotifier.value = RecommendationStatus.loaded;
+          recommendationNotifier.value = _currentRecommendation;
+        } else {
+          _currentRecommendation = null;
+          _currentStatus = RecommendationStatus.noMatch;
+          statusNotifier.value = RecommendationStatus.noMatch;
+          recommendationNotifier.value = null;
+        }
       }
       _isFetching = false;
       return _currentRecommendation;
     } catch (e) {
-      _currentStatus = RecommendationStatus.error;
-      _errorMessage = 'Unable to reach NutriFridge AI. Please check your connection and tap retry.';
-      statusNotifier.value = RecommendationStatus.error;
-      _isFetching = false;
+      if (thisRequestId == _currentRequestId) {
+        if (!isAlternativeRequest) {
+          _currentRecommendation = null;
+          _currentStatus = RecommendationStatus.error;
+          _errorMessage =
+              'Unable to reach NutriFridge AI. Please check your connection and tap retry.';
+          statusNotifier.value = RecommendationStatus.error;
+          recommendationNotifier.value = null;
+        }
+        _isFetching = false;
+      }
       return null;
+    } finally {
+      _isFetching = false;
     }
   }
 
+  /// Requests another valid recommendation for the current meal slot without
+  /// logging meals, mutating inventory, altering calories, or completing slots.
+  static Future<bool> changeSuggestion({
+    void Function(String message)? onMessage,
+  }) async {
+    ensureInitialized();
+
+    // Prevent duplicate simultaneous requests on rapid taps (TEST F)
+    if (_isFetching || _isChangingSuggestion) {
+      return false;
+    }
+
+    final currentRec = _currentRecommendation;
+    if (currentRec == null) {
+      return false;
+    }
+
+    // 1. Preserve current meal slot
+    final slot = _cachedSlot ?? resolveActiveMealSlot();
+
+    // 2. Exclude currently displayed recipe and preserve session rejects
+    if (currentRec.id.isNotEmpty) {
+      _rejectedRecipeIds.add(currentRec.id);
+    }
+    _rejectedRecipeIds.add(currentRec.title);
+
+    _isChangingSuggestion = true;
+    isChangingSuggestionNotifier.value = true;
+    _alternativeMessage = null;
+
+    try {
+      final exclusions = Set<String>.from(_rejectedRecipeIds);
+      final newRec = await fetchRecommendation(
+        forceRefresh: true,
+        targetSlot: slot,
+        isAlternativeRequest: true,
+        excludedRecipeIds: exclusions,
+      );
+
+      if (newRec != null &&
+          newRec.id != currentRec.id &&
+          newRec.title != currentRec.title) {
+        _currentRecommendation = newRec;
+        _currentStatus = RecommendationStatus.loaded;
+        _alternativeMessage = null;
+        statusNotifier.value = RecommendationStatus.loaded;
+        recommendationNotifier.value = newRec;
+        return true;
+      } else {
+        // Alternative unavailable: keep current recommendation visible!
+        _currentRecommendation = currentRec;
+        _currentStatus = RecommendationStatus.loaded;
+        _alternativeMessage = 'No other suitable suggestion is available right now.';
+        statusNotifier.value = RecommendationStatus.loaded;
+        recommendationNotifier.value = currentRec;
+        onMessage?.call('No other suitable suggestion is available right now.');
+        return false;
+      }
+    } catch (_) {
+      _currentRecommendation = currentRec;
+      _currentStatus = RecommendationStatus.loaded;
+      _alternativeMessage = 'No other suitable suggestion is available right now.';
+      statusNotifier.value = RecommendationStatus.loaded;
+      recommendationNotifier.value = currentRec;
+      onMessage?.call('No other suitable suggestion is available right now.');
+      return false;
+    } finally {
+      _isChangingSuggestion = false;
+      isChangingSuggestionNotifier.value = false;
+    }
+  }
+
+  /// Invalidates the previous recommendation, marks slot completed,
+  /// and requests the next unlogged meal slot recommendation.
+  static Future<RecipeRecommendation?> advanceAfterMealLogged({
+    MealTimeSlot? loggedSlot,
+    DateTime? time,
+  }) async {
+    ensureInitialized();
+    if (loggedSlot != null) {
+      _sessionCompletedSlots.add(loggedSlot);
+    }
+    _currentRecommendation = null;
+    _cachedSlot = null;
+    _cachedInventoryFingerprint = null;
+    _rejectedRecipeIds.clear();
+    _alternativeMessage = null;
+    recommendationNotifier.value = null;
+
+    final nextSlot = resolveActiveMealSlot(time);
+    return fetchRecommendation(
+      forceRefresh: true,
+      targetSlot: nextSlot,
+      time: time,
+    );
+  }
+
   /// Synchronous recommendation resolver
-  static RecipeRecommendation? getRecommendation({DateTime? time}) {
+  static RecipeRecommendation? getRecommendation({DateTime? time, MealTimeSlot? targetSlot}) {
     ensureInitialized();
 
     if (FridgeCategoryRepository.totalFridgeItems == 0) {
@@ -403,17 +759,15 @@ class MealRecommendationService {
       return null;
     }
 
-    if (_currentStatus == RecommendationStatus.error ||
-        _currentStatus == RecommendationStatus.noMatch) {
-      return null;
-    }
-
-    if (_currentRecommendation != null) {
+    final slot = targetSlot ?? resolveActiveMealSlot(time);
+    if (_currentRecommendation != null && _cachedSlot == slot) {
       return _currentRecommendation;
     }
 
-    final slot = getMealTimeSlot(time);
-    final localRec = _computeLocalRecommendation(slot);
+    final localRec = _computeLocalRecommendation(
+      slot,
+      excludedRecipeIds: _rejectedRecipeIds,
+    );
     if (localRec != null) {
       _currentRecommendation = localRec;
       _currentStatus = RecommendationStatus.loaded;
@@ -432,11 +786,20 @@ class MealRecommendationService {
         ? RecommendationStatus.empty
         : RecommendationStatus.loading;
     _errorMessage = null;
+    _alternativeMessage = null;
     _isFetching = false;
+    _activeFetchFuture = null;
+    _isChangingSuggestion = false;
+    isChangingSuggestionNotifier.value = false;
     _fetchCallCount = 0;
+    _currentRequestId = 0;
     _cachedSlot = null;
     _cachedInventoryFingerprint = null;
     _cachedProfileFingerprint = null;
+    _rejectedRecipeIds.clear();
+    _sessionCompletedSlots.clear();
+    _lastLoggedMealsCount = 0;
+    _lastCompletedSlots.clear();
     statusNotifier.value = _currentStatus;
     recommendationNotifier.value = null;
     resetClock();
@@ -710,7 +1073,10 @@ class MealRecommendationService {
     ),
   ];
 
-  static RecipeRecommendation? _computeLocalRecommendation(MealTimeSlot slot) {
+  static RecipeRecommendation? _computeLocalRecommendation(
+    MealTimeSlot slot, {
+    Set<String> excludedRecipeIds = const {},
+  }) {
     if (FridgeCategoryRepository.totalFridgeItems == 0) return null;
 
     final profile = MockDataRepository.profile;
@@ -719,6 +1085,10 @@ class MealRecommendationService {
     final List<MealRecipeDefinition> otherCandidates = [];
 
     for (final recipe in recipeCatalog) {
+      if (excludedRecipeIds.contains(recipe.id) ||
+          excludedRecipeIds.contains(recipe.title)) {
+        continue;
+      }
       if (!_isDietaryCompliant(recipe, profile)) {
         continue;
       }

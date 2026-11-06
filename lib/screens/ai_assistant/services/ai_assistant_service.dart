@@ -101,7 +101,6 @@ class AiAssistantService {
     final Map<String, dynamic> payload = {
       'requestId': 'req_${DateTime.now().millisecondsSinceEpoch}',
       'source': source,
-      'actionHint': actionHint,
       'message': message,
       'imageBase64': imageBase64,
       'mimeType': mimeType,
@@ -111,6 +110,7 @@ class AiAssistantService {
       'todayNutrition': getNutritionContext(),
       'locale': 'en-IN',
       ...?extraPayload,
+      'actionHint': actionHint,
     };
 
     if (mockHandler != null) {

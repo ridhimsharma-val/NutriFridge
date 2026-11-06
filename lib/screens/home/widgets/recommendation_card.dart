@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../models/nutrition_data.dart';
 import '../../fridge/models/category_item.dart';
+import '../services/meal_recommendation_service.dart';
 
 class RecommendationCard extends StatelessWidget {
   final RecipeRecommendation? recommendation;
@@ -12,6 +13,9 @@ class RecommendationCard extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onOpenAssistant;
   final String? heroTag;
+  final VoidCallback? onChangeSuggestion;
+  final bool? isChangingSuggestion;
+  final String? alternativeMessage;
 
   const RecommendationCard({
     super.key,
@@ -22,6 +26,9 @@ class RecommendationCard extends StatelessWidget {
     this.onTap,
     this.onOpenAssistant,
     this.heroTag,
+    this.onChangeSuggestion,
+    this.isChangingSuggestion,
+    this.alternativeMessage,
   });
 
   String get _heroTag =>
@@ -633,6 +640,74 @@ class RecommendationCard extends StatelessWidget {
                         ],
                       ],
                     ),
+                  ),
+                  const SizedBox(height: 10),
+                  // "Change suggestion" secondary text action
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      InkWell(
+                        key: const ValueKey('change_suggestion_button'),
+                        onTap: (isChangingSuggestion ?? MealRecommendationService.isChangingSuggestion)
+                            ? null
+                            : (onChangeSuggestion ?? () => MealRecommendationService.changeSuggestion()),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4.0),
+                          child: (isChangingSuggestion ?? MealRecommendationService.isChangingSuggestion)
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const SizedBox(
+                                      width: 12,
+                                      height: 12,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 1.8,
+                                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.freshGreen),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 7),
+                                    Text(
+                                      'Finding alternative...',
+                                      style: AppTypography.subtitle.copyWith(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : const Text(
+                                  'Change suggestion',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.freshGreen,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: AppColors.freshGreen,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      if ((alternativeMessage ?? MealRecommendationService.alternativeMessage) != null &&
+                          (alternativeMessage ?? MealRecommendationService.alternativeMessage)!.isNotEmpty)
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 8.0),
+                            child: Text(
+                              (alternativeMessage ?? MealRecommendationService.alternativeMessage)!,
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textSecondary,
+                              ),
+                              textAlign: TextAlign.end,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),

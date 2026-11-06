@@ -53,11 +53,14 @@ class _HomeScreenState extends State<HomeScreen> {
         FridgeCategoryRepository.notifier,
         MealRecommendationService.statusNotifier,
         MealRecommendationService.recommendationNotifier,
+        MealRecommendationService.isChangingSuggestionNotifier,
       ]),
       builder: (context, _) {
         final recommendation = MockDataRepository.recommendation;
         final recStatus = MockDataRepository.recommendationStatus;
         final errorMessage = MealRecommendationService.errorMessage;
+        final alternativeMessage = MealRecommendationService.alternativeMessage;
+        final isChanging = MealRecommendationService.isChangingSuggestion;
         final wellness = MockDataRepository.wellness;
         final nutrition = MockDataRepository.nutrition;
         final meals = MockDataRepository.meals;
@@ -89,6 +92,24 @@ class _HomeScreenState extends State<HomeScreen> {
                     recommendation: recommendation,
                     status: recStatus,
                     errorMessage: errorMessage,
+                    isChangingSuggestion: isChanging,
+                    alternativeMessage: alternativeMessage,
+                    onChangeSuggestion: () {
+                      MealRecommendationService.changeSuggestion(
+                        onMessage: (msg) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(msg),
+                                behavior: SnackBarBehavior.floating,
+                                duration: const Duration(seconds: 3),
+                              ),
+                            );
+                          }
+                        },
+                      );
+                    },
                     onRetry: () =>
                         MealRecommendationService.fetchRecommendation(forceRefresh: true),
                     onOpenAssistant: () {

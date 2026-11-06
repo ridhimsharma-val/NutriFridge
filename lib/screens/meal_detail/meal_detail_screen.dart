@@ -5,6 +5,7 @@ import '../../core/transitions/hero_transition_route.dart';
 import '../../models/nutrition_data.dart';
 import '../ai_assistant/ai_assistant_screen.dart';
 import '../fridge/models/category_item.dart';
+import '../home/services/meal_recommendation_service.dart';
 import 'models/meal_ai_context.dart';
 import 'models/meal_detail_data.dart';
 import 'widgets/video_card.dart';
@@ -70,7 +71,12 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
       }
     }
 
-    // 4. Show clear success confirmation
+    // 4. Invalidate recommendation and advance to next unlogged slot
+    MealRecommendationService.advanceAfterMealLogged(
+      loggedSlot: MealRecommendationService.parseMealSlot(meal.tag),
+    );
+
+    // 5. Show clear success confirmation
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

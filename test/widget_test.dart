@@ -44,7 +44,33 @@ void main() {
 
       if (request['actionHint'] == 'meal_recommendation') {
         final slot = (request['currentMealPeriod'] as String? ?? 'Lunch').toLowerCase();
+        final excluded = (request['excludedRecipeIds'] as List?)?.map((e) => e.toString()).toSet() ?? {};
         if (slot.contains('breakfast')) {
+          if (excluded.contains('rec_banana_smoothie')) {
+            return {
+              'ok': true,
+              'action': 'meal_recommendation',
+              'meal': {
+                'id': 'rec_apple_oatmeal',
+                'name': 'Apple Cinnamon Oatmeal',
+                'mealType': 'breakfast',
+                'description': 'Warm cinnamon oatmeal with crisp apples.',
+                'calories': 310,
+                'proteinG': 11,
+                'carbsG': 56,
+                'fatG': 5,
+                'preparationTimeMinutes': 8,
+                'ingredients': [
+                  {'name': 'Apple', 'quantity': 1, 'unit': 'piece', 'availableInFridge': true},
+                  {'name': 'Milk', 'quantity': 200, 'unit': 'ml', 'availableInFridge': true},
+                ],
+                'missingIngredients': [],
+                'availableIngredientCount': 2,
+                'reason': 'Uses fresh apples from your fridge.',
+                'imageKey': 'apple_slices',
+              },
+            };
+          }
           return {
             'ok': true,
             'action': 'meal_recommendation',
@@ -69,6 +95,31 @@ void main() {
             },
           };
         } else if (slot.contains('snack')) {
+          if (excluded.contains('rec_pb_apple_slices')) {
+            return {
+              'ok': true,
+              'action': 'meal_recommendation',
+              'meal': {
+                'id': 'rec_fresh_fruit_medley',
+                'name': 'Fresh Fruit Medley',
+                'mealType': 'snack',
+                'description': 'A vibrant mix of fresh seasonal fruit.',
+                'calories': 180,
+                'proteinG': 3,
+                'carbsG': 42,
+                'fatG': 1,
+                'preparationTimeMinutes': 5,
+                'ingredients': [
+                  {'name': 'Apple', 'quantity': 1, 'unit': 'piece', 'availableInFridge': true},
+                  {'name': 'Banana', 'quantity': 1, 'unit': 'piece', 'availableInFridge': true},
+                ],
+                'missingIngredients': [],
+                'availableIngredientCount': 2,
+                'reason': 'Uses fruit available in your fridge.',
+                'imageKey': 'fruit_bowl',
+              },
+            };
+          }
           return {
             'ok': true,
             'action': 'meal_recommendation',
@@ -93,6 +144,32 @@ void main() {
             },
           };
         } else if (slot.contains('dinner')) {
+          if (excluded.contains('rec_veg_pasta')) {
+            return {
+              'ok': true,
+              'action': 'meal_recommendation',
+              'meal': {
+                'id': 'rec_stir_fry_paneer',
+                'name': 'Stir-Fried Veggies & Paneer',
+                'mealType': 'dinner',
+                'description': 'Warm sautéed veggies with paneer.',
+                'calories': 360,
+                'proteinG': 20,
+                'carbsG': 16,
+                'fatG': 22,
+                'preparationTimeMinutes': 15,
+                'ingredients': [
+                  {'name': 'Paneer', 'quantity': 100, 'unit': 'g', 'availableInFridge': true},
+                  {'name': 'Broccoli', 'quantity': 1, 'unit': 'piece', 'availableInFridge': true},
+                  {'name': 'Capsicum', 'quantity': 50, 'unit': 'g', 'availableInFridge': true},
+                ],
+                'missingIngredients': [],
+                'availableIngredientCount': 3,
+                'reason': 'Uses paneer and vegetables from your fridge.',
+                'imageKey': 'paneer_curry',
+              },
+            };
+          }
           return {
             'ok': true,
             'action': 'meal_recommendation',
@@ -118,6 +195,61 @@ void main() {
             },
           };
         } else {
+          final invObj = request['inventoryContext'];
+          final bool hasPaneer = invObj is List
+              ? invObj.any((item) => (item is Map && (item['name'] ?? '').toString().toLowerCase().trim() == 'paneer'))
+              : (invObj?.toString() ?? '').toLowerCase().contains('paneer');
+          if (!hasPaneer) {
+            return {
+              'ok': true,
+              'action': 'meal_recommendation',
+              'meal': {
+                'id': 'rec_comfort_dal_rice',
+                'name': 'Comfort Dal Rice',
+                'mealType': 'lunch',
+                'description': 'Warm lentil curry served over steamed rice.',
+                'calories': 420,
+                'proteinG': 14,
+                'carbsG': 72,
+                'fatG': 6,
+                'preparationTimeMinutes': 15,
+                'ingredients': [
+                  {'name': 'Rice', 'quantity': 150, 'unit': 'g', 'availableInFridge': true},
+                  {'name': 'Tomato', 'quantity': 1, 'unit': 'piece', 'availableInFridge': true},
+                ],
+                'missingIngredients': [],
+                'availableIngredientCount': 2,
+                'reason': 'Uses fresh ingredients from your fridge.',
+                'imageKey': 'dal_rice',
+              },
+            };
+          }
+          if (excluded.contains('rec_paneer_rice_bowl')) {
+            return {
+              'ok': true,
+              'action': 'meal_recommendation',
+              'meal': {
+                'id': 'rec_paneer_curry',
+                'name': 'Paneer Capsicum Curry',
+                'mealType': 'lunch',
+                'description': 'Savory paneer curry with crisp capsicum.',
+                'calories': 460,
+                'proteinG': 22,
+                'carbsG': 20,
+                'fatG': 28,
+                'preparationTimeMinutes': 20,
+                'ingredients': [
+                  {'name': 'Paneer', 'quantity': 150, 'unit': 'g', 'availableInFridge': true},
+                  {'name': 'Capsicum', 'quantity': 50, 'unit': 'g', 'availableInFridge': true},
+                  {'name': 'Tomato', 'quantity': 1, 'unit': 'piece', 'availableInFridge': true},
+                ],
+                'missingIngredients': [],
+                'availableIngredientCount': 3,
+                'reason': 'Uses paneer and capsicum from your fridge.',
+                'imageKey': 'paneer_curry',
+              },
+            };
+          }
           return {
             'ok': true,
             'action': 'meal_recommendation',
@@ -1581,6 +1713,8 @@ void main() {
     expect(find.text("Today's meals"), findsNothing);
 
     // Tap "See" to expand Nutrition Today
+    await tester.ensureVisible(find.text('See'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('See'));
     await tester.pumpAndSettle();
 
@@ -1593,12 +1727,16 @@ void main() {
     expect(find.text('Collapse'), findsOneWidget);
 
     // Tap "Collapse" to collapse Nutrition Today
+    await tester.ensureVisible(find.text('Collapse'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Collapse'));
     await tester.pumpAndSettle();
     expect(find.text("Today's meals"), findsNothing);
 
     // 5. Dual Independent Expansion
     // Expand Wellness
+    await tester.ensureVisible(find.text("Today's Wellness"));
+    await tester.pumpAndSettle();
     await tester.tap(find.text("Today's Wellness"));
     await tester.pumpAndSettle();
 
@@ -4170,6 +4308,303 @@ void main() {
 
       expect(lastActionHint, 'meal_recommendation');
       expect(find.textContaining('Based on your fridge, you can prepare a fresh fruit salad or paneer stir fry!'), findsOneWidget);
+    });
+  });
+
+  group('NUTRIFRIDGE — Meal Recommendation Progression & Change Suggestion Tests', () {
+    test('Scenario A — Breakfast is recommended and logged -> Lunch appears', () async {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 8, 0); // 08:00 AM
+
+      final rec1 = await MealRecommendationService.fetchRecommendation(forceRefresh: true);
+      expect(rec1, isNotNull);
+      expect(rec1!.mealType, 'BREAKFAST');
+      expect(rec1.title, 'Banana Oat Smoothie');
+
+      // Log Breakfast
+      MockDataRepository.logMeal(
+        mealType: 'breakfast',
+        mealName: rec1.title,
+        calories: rec1.calories,
+        protein: rec1.proteinGrams,
+        carbs: rec1.carbsGrams,
+        fat: rec1.fatGrams,
+        ingredients: ['Banana', 'Milk'],
+      );
+
+      // Verify active slot progresses to Lunch
+      expect(MealRecommendationService.resolveActiveMealSlot(), MealTimeSlot.lunch);
+
+      final rec2 = await MealRecommendationService.fetchRecommendation();
+      expect(rec2, isNotNull);
+      expect(rec2!.mealType, 'LUNCH');
+      expect(rec2.title, 'Paneer Rice Bowl');
+    });
+
+    test('Scenario B — Lunch is recommended and logged -> Snacks appears (edge case within lunch window)', () async {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      // Clock is 13:00 (Lunch window: 11:00-14:59)
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 13, 0);
+
+      final rec1 = await MealRecommendationService.fetchRecommendation(forceRefresh: true);
+      expect(rec1!.mealType, 'LUNCH');
+
+      // Log Lunch at 13:00
+      MockDataRepository.logMeal(
+        mealType: 'lunch',
+        mealName: rec1.title,
+        calories: rec1.calories,
+        protein: rec1.proteinGrams,
+        carbs: rec1.carbsGrams,
+        fat: rec1.fatGrams,
+      );
+
+      // Clock is still 13:00 within Lunch window, but Lunch is logged -> must advance to Snacks!
+      expect(MealRecommendationService.resolveActiveMealSlot(), MealTimeSlot.snack);
+
+      final rec2 = await MealRecommendationService.fetchRecommendation();
+      expect(rec2, isNotNull);
+      expect(rec2!.mealType, 'SNACK');
+      expect(rec2.title, 'Peanut Butter Apple Slices');
+    });
+
+    test('Scenario C — Snacks are recommended and logged -> Dinner appears', () async {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 16, 0); // 16:00 Snack window
+
+      final rec1 = await MealRecommendationService.fetchRecommendation(forceRefresh: true);
+      expect(rec1!.mealType, 'SNACK');
+
+      // Log Snack
+      MockDataRepository.logMeal(
+        mealType: 'snack',
+        mealName: rec1.title,
+        calories: rec1.calories,
+        protein: rec1.proteinGrams,
+        carbs: rec1.carbsGrams,
+        fat: rec1.fatGrams,
+      );
+
+      expect(MealRecommendationService.resolveActiveMealSlot(), MealTimeSlot.dinner);
+
+      final rec2 = await MealRecommendationService.fetchRecommendation();
+      expect(rec2, isNotNull);
+      expect(rec2!.mealType, 'DINNER');
+      expect(rec2.title, 'Hearty Vegetable Pasta');
+    });
+
+    test('Scenario D — Dinner is recommended and logged -> Tomorrow Breakfast appears', () async {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 20, 0); // 20:00 Dinner window
+
+      final rec1 = await MealRecommendationService.fetchRecommendation(forceRefresh: true);
+      expect(rec1!.mealType, 'DINNER');
+
+      // Log Dinner
+      MockDataRepository.logMeal(
+        mealType: 'dinner',
+        mealName: rec1.title,
+        calories: rec1.calories,
+        protein: rec1.proteinGrams,
+        carbs: rec1.carbsGrams,
+        fat: rec1.fatGrams,
+      );
+
+      // No remaining slots today -> advance to tomorrow's Breakfast
+      expect(MealRecommendationService.resolveActiveMealSlot(), MealTimeSlot.breakfast);
+
+      final rec2 = await MealRecommendationService.fetchRecommendation();
+      expect(rec2, isNotNull);
+      expect(rec2!.mealType, 'BREAKFAST');
+      expect(rec2.title, 'Banana Oat Smoothie');
+    });
+
+    test('Scenario E — Current Lunch recommendation is changed -> Different Lunch appears without logging or inventory changes', () async {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 12, 0);
+
+      final rec1 = await MealRecommendationService.fetchRecommendation(forceRefresh: true);
+      expect(rec1!.title, 'Paneer Rice Bowl');
+      expect(rec1.mealType, 'LUNCH');
+
+      final initialCalories = MockDataRepository.nutrition.consumedCalories;
+      final initialLoggedCount = MockDataRepository.loggedMealsHistory.length;
+      final initialCompleted = Set.from(MealRecommendationService.getCompletedMealSlotsToday());
+      final initialPaneerQty = FridgeCategoryRepository.findItemByName('Paneer')?.quantity;
+
+      // Tap Change Suggestion
+      final changed = await MealRecommendationService.changeSuggestion();
+      expect(changed, isTrue);
+
+      final rec2 = MealRecommendationService.currentRecommendation;
+      expect(rec2, isNotNull);
+      expect(rec2!.title, 'Paneer Capsicum Curry');
+      expect(rec2.mealType, 'LUNCH'); // Preserves current slot
+      expect(rec2.id, isNot(rec1.id));
+
+      // MUST NOT mutate nutrition, log meals, complete slot, or deduct inventory
+      expect(MockDataRepository.nutrition.consumedCalories, initialCalories);
+      expect(MockDataRepository.loggedMealsHistory.length, initialLoggedCount);
+      expect(MealRecommendationService.getCompletedMealSlotsToday(), initialCompleted);
+      expect(FridgeCategoryRepository.findItemByName('Paneer')?.quantity, initialPaneerQty);
+    });
+
+    test('Scenario F — Repeated Change suggestion taps -> No duplicate requests or race condition crashes', () async {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 12, 0);
+
+      await MealRecommendationService.fetchRecommendation(forceRefresh: true);
+
+      // Trigger concurrent change suggestion calls
+      final future1 = MealRecommendationService.changeSuggestion();
+      final future2 = MealRecommendationService.changeSuggestion();
+
+      final results = await Future.wait([future1, future2]);
+      // One request succeeds, duplicate rapid tap is safely ignored/handled
+      expect(results.contains(true), isTrue);
+      expect(MealRecommendationService.isChangingSuggestion, isFalse);
+      expect(MealRecommendationService.currentRecommendation, isNotNull);
+    });
+
+    test('Scenario G — Inventory is changed -> Previous recommendation becomes stale and refreshes', () async {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 12, 0);
+
+      final rec1 = await MealRecommendationService.fetchRecommendation(forceRefresh: true);
+      expect(rec1, isNotNull);
+
+      // Mutate inventory: remove Paneer completely
+      FridgeCategoryRepository.removeItemByName('Paneer');
+
+      // Next fetch refreshes because inventory fingerprint changed
+      final rec2 = await MealRecommendationService.fetchRecommendation();
+      expect(rec2, isNotNull);
+      // New recommendation does not use the removed Paneer
+      expect(rec2!.requiredIngredients.contains('Paneer'), isFalse);
+    });
+
+    test('Scenario H — Network failure -> Existing recommendation remains visible truthfully without fake content', () async {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 12, 0);
+
+      final rec1 = await MealRecommendationService.fetchRecommendation(forceRefresh: true);
+      expect(rec1, isNotNull);
+
+      // Mock network failure
+      final originalHandler = AiAssistantService.mockHandler;
+      AiAssistantService.mockHandler = (_) async => {
+        'success': false,
+        'action': 'error',
+        'error': 'Connection timed out',
+      };
+
+      String? reportedMessage;
+      try {
+        await MealRecommendationService.changeSuggestion(onMessage: (msg) {
+          reportedMessage = msg;
+        });
+
+        // Existing recommendation remains visible rather than showing fake meal
+        expect(MealRecommendationService.currentRecommendation, isNotNull);
+        expect(MealRecommendationService.alternativeMessage, isNotNull);
+        expect(reportedMessage, contains('No other suitable suggestion'));
+      } finally {
+        AiAssistantService.mockHandler = originalHandler;
+      }
+    });
+
+    testWidgets('Scenario I — Meal is logged from Meal Detail -> Dashboard recommendation advances after successful logging', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 8, 30); // Morning Breakfast
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: HomeScreen(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify Suggested for you shows Breakfast initially
+      expect(find.text('Suggested for you'), findsOneWidget);
+      expect(find.text('Banana Oat Smoothie'), findsOneWidget);
+      expect(find.text('BREAKFAST'), findsOneWidget);
+
+      // Tap on recommendation card to navigate to Meal Detail screen
+      await tester.tap(find.text('Banana Oat Smoothie'));
+      await tester.pumpAndSettle();
+
+      // Meal Detail screen is mounted
+      expect(find.text('Banana Oat Smoothie'), findsWidgets);
+      expect(find.text('Log Meal'), findsOneWidget);
+
+      // Ensure Log Meal button is scrolled into view before tapping
+      await tester.ensureVisible(find.text('Log Meal'));
+      await tester.pumpAndSettle();
+
+      // Tap Log Meal button
+      await tester.tap(find.text('Log Meal'));
+      await tester.pumpAndSettle();
+
+      // Returned to Dashboard
+      expect(find.text('Suggested for you'), findsOneWidget);
+      // Breakfast is logged, recommendation has advanced to Lunch!
+      expect(find.text('LUNCH'), findsOneWidget);
+      expect(find.text('Paneer Rice Bowl'), findsOneWidget);
+    });
+
+    test('Scenario J — App reopening / persistent data -> Interprets today completed slots accurately', () {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 13, 30); // 13:30 Lunch time
+
+      // Simulate persisted history from earlier today
+      MockDataRepository.seedSampleDataForTesting(); // Contains completed Breakfast and Lunch
+
+      final completed = MealRecommendationService.getCompletedMealSlotsToday(DateTime(2026, 11, 4, 13, 30));
+      expect(completed.contains(MealTimeSlot.breakfast), isTrue);
+      expect(completed.contains(MealTimeSlot.lunch), isTrue);
+
+      // Next unlogged slot advances to Snacks
+      expect(MealRecommendationService.resolveActiveMealSlot(DateTime(2026, 11, 4, 13, 30)), MealTimeSlot.snack);
+    });
+
+    testWidgets('Change suggestion text button renders and updates recommendation with visual stability', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 12, 0);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: HomeScreen(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Suggested for you'), findsOneWidget);
+      expect(find.text('Paneer Rice Bowl'), findsOneWidget);
+      expect(find.text('Change suggestion'), findsOneWidget);
+
+      // Tap Change suggestion
+      await tester.tap(find.text('Change suggestion'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Alternative suggestion appears
+      expect(find.text('Paneer Capsicum Curry'), findsOneWidget);
+      expect(find.text('Change suggestion'), findsOneWidget);
     });
   });
 }

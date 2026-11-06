@@ -510,16 +510,31 @@ class MockDataRepository {
 
     // 3. Update matching meal item in Today's Meals
     final cleanType = mealType.trim().toLowerCase();
-    final index = _currentMeals.indexWhere((m) => m.name.toLowerCase() == cleanType);
+    final index = _currentMeals.indexWhere((m) {
+      final itemLower = m.name.toLowerCase();
+      return itemLower == cleanType ||
+          (itemLower.startsWith('snack') && cleanType.startsWith('snack'));
+    });
     if (index != -1) {
       _currentMeals[index] = _currentMeals[index].copyWith(
         status: MealStatus.completed,
         time: timeString,
       );
     } else {
+      String formattedName = mealType;
+      if (cleanType.contains('breakfast')) {
+        formattedName = 'Breakfast';
+      } else if (cleanType.contains('lunch')) {
+        formattedName = 'Lunch';
+      } else if (cleanType.startsWith('snack')) {
+        formattedName = 'Snack';
+      } else if (cleanType.contains('dinner')) {
+        formattedName = 'Dinner';
+      }
+
       _currentMeals.add(
         MealItem(
-          name: mealType,
+          name: formattedName,
           status: MealStatus.completed,
           time: timeString,
         ),
