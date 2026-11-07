@@ -1,0 +1,306 @@
+{
+  "name": "NutriFridge AI Assistant (Gemini)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nutrifridge/ai",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef0123456789",
+      "name": "Webhook — NutriFridge AI",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        180,
+        300
+      ],
+      "webhookId": "nutrifridge-ai-webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "nutrifridge-webhook-auth",
+          "name": "NutriFridge Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Extract request payload\nconst raw = $input.first().json;\nconst headers = raw.headers || {};\nconst body = raw.body || raw;\n\nif (!body || typeof body !== 'object') {\n  return [{\n    json: {\n      isValid: false,\n      statusCode: 400,\n      errorCode: 'INVALID_REQUEST_BODY',\n      errorMessage: 'Request body must be a valid JSON object.',\n      requestId: null,\n      data: null\n    }\n  }];\n}\n\n// Note: Webhook authentication (x-webhook-secret) is enforced natively by the Webhook node\n// using n8n Cloud's managed Header Auth credential. Requests without valid secret are rejected with 401.\n\nconst requestId = body.requestId || 'req_' + Date.now();\nconst userId = body.userId || headers['x-nutrifridge-user-id'] || null;\nconst source = (body.source || 'text').toLowerCase();\nconst actionHint = (body.actionHint || 'auto').toLowerCase();\nconst message = (body.message || '').trim();\nlet imageBase64 = body.imageBase64 || null;\nlet mimeType = body.mimeType || null;\nconst conversationHistory = Array.isArray(body.conversationHistory) ? body.conversationHistory : [];\nconst inventoryContext = Array.isArray(body.inventoryContext) ? body.inventoryContext : [];\nconst userPreferences = (body.userPreferences && typeof body.userPreferences === 'object') ? body.userPreferences : {};\nconst todayNutrition = (body.todayNutrition && typeof body.todayNutrition === 'object') ? body.todayNutrition : {};\nconst recentMeals = Array.isArray(body.recentMeals) ? body.recentMeals : [];\nconst locale = body.locale || 'en-IN';\n// Gemini model defaults directly to gemini-3.8-flash for n8n Cloud\nconst targetModel = body.model || 'gemini-3.8-flash';\n\n// Validate supported source\nconst validSources = ['text', 'image', 'text_image'];\nif (!validSources.includes(source)) {\n  return [{\n    json: {\n      isValid: false,\n      statusCode: 400,\n      errorCode: 'INVALID_SOURCE',\n      errorMessage: 'Invalid source. Supported values: text, image, text_image.',\n      requestId: requestId,\n      data: null\n    }\n  }];\n}\n\n// Validate image requirements\nif ((source === 'image' || source === 'text_image') && !imageBase64) {\n  return [{\n    json: {\n      isValid: false,\n      statusCode: 400,\n      errorCode: 'MISSING_IMAGE',\n      errorMessage: 'imageBase64 is required when source is image or text_image.',\n      requestId: requestId,\n      data: null\n    }\n  }];\n}\n\n// Validate text requirements\nif (source === 'text' && !message && actionHint !== 'meal_recommendation') {\n  return [{\n    json: {\n      isValid: false,\n      statusCode: 400,\n      errorCode: 'EMPTY_TEXT_MESSAGE',\n      errorMessage: 'Text message cannot be empty when source is text.',\n      requestId: requestId,\n      data: null\n    }\n  }];\n}\n\n// Clean base64 image if present\nif (imageBase64) {\n  const dataUrlMatch = imageBase64.match(/^data:([^;]+);base64,(.+)$/);\n  if (dataUrlMatch) {\n    if (!mimeType) mimeType = dataUrlMatch[1].toLowerCase();\n    imageBase64 = dataUrlMatch[2];\n  }\n  mimeType = (mimeType || 'image/jpeg').toLowerCase().trim();\n  imageBase64 = imageBase64.replace(/\\s/g, '');\n}\n\nreturn [{\n  json: {\n    isValid: true,\n    statusCode: 200,\n    requestId: requestId,\n    userId: userId,\n    targetModel: targetModel,\n    source: source,\n    actionHint: actionHint,\n    message: message,\n    imageBase64: imageBase64,\n    mimeType: mimeType,\n    conversationHistory: conversationHistory,\n    inventoryContext: inventoryContext,\n    userPreferences: userPreferences,\n    todayNutrition: todayNutrition,\n    recentMeals: recentMeals,\n    locale: locale\n  }\n}];"
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef0123456780",
+      "name": "Validate Request & Auth Secret",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isValid }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef0123456781",
+      "name": "IF — Request & Secret Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({\n  ok: false,\n  requestId: $json.requestId,\n  action: 'error',\n  assistantMessage: $json.errorMessage,\n  error: {\n    code: $json.errorCode,\n    message: $json.errorMessage,\n    retryable: false\n  }\n}) }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode }}"
+        }
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef0123456782",
+      "name": "Respond to Webhook — Auth/Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        900,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst parts = [];\n\nif (item.imageBase64 && item.mimeType) {\n  parts.push({\n    inlineData: {\n      mimeType: item.mimeType,\n      data: item.imageBase64\n    }\n  });\n}\n\nlet promptText = 'USER MESSAGE: ' + (item.message || '(Image uploaded without text)') + '\\n\\n';\npromptText += 'OPERATION HINT: ' + item.actionHint + '\\n';\npromptText += 'LOCALE: ' + item.locale + '\\n\\n';\n\n// 1. Inventory Context\nif (item.inventoryContext && item.inventoryContext.length > 0) {\n  promptText += 'CURRENT FRIDGE INVENTORY CONTEXT (Authoritative database records):\\n';\n  for (const inv of item.inventoryContext) {\n    promptText += '- ID: ' + (inv.id || 'N/A') + ' | ' + (inv.name || 'Unknown') + ' | Quantity: ' + (inv.quantity ?? 'N/A') + ' ' + (inv.unit || '') + ' | Category: ' + (inv.category || 'Others') + (inv.expiryDate ? ' | Expiry: ' + inv.expiryDate : '') + '\\n';\n  }\n  promptText += '\\n';\n} else {\n  promptText += 'CURRENT FRIDGE INVENTORY CONTEXT: (Empty fridge — No items currently in inventory)\\n\\n';\n}\n\n// 2. User Preferences & Nutrition Goals\nif (item.userPreferences && Object.keys(item.userPreferences).length > 0) {\n  promptText += 'USER PREFERENCES & GOALS:\\n' + JSON.stringify(item.userPreferences) + '\\n\\n';\n}\n\n// 3. Today's Nutrition Progress\nif (item.todayNutrition && Object.keys(item.todayNutrition).length > 0) {\n  promptText += 'TODAY NUTRITION INTAKE (Calories & Macros):\\n' + JSON.stringify(item.todayNutrition) + '\\n\\n';\n}\n\n// 4. Recent Meals History\nif (item.recentMeals && item.recentMeals.length > 0) {\n  promptText += 'RECENT MEAL HISTORY TODAY:\\n';\n  for (const m of item.recentMeals.slice(-3)) {\n    promptText += '- ' + (m.mealType || 'Meal') + ': ' + m.name + ' (' + (m.calories ?? 0) + ' kcal, P:' + (m.proteinG ?? 0) + 'g, C:' + (m.carbsG ?? 0) + 'g, F:' + (m.fatG ?? 0) + 'g)\\n';\n  }\n  promptText += '\\n';\n}\n\n// 5. Recent Conversation Messages\nif (item.conversationHistory && item.conversationHistory.length > 0) {\n  promptText += 'RECENT CONVERSATION HISTORY:\\n';\n  for (const c of item.conversationHistory.slice(-5)) {\n    promptText += '- [' + (c.role || 'user') + ']: ' + (c.text || c.message || '') + '\\n';\n  }\n  promptText += '\\n';\n}\n\npromptText += 'Analyze the request carefully according to your system instructions and respond strictly in valid JSON.';\n\nparts.push({ text: promptText });\n\nconst systemInstructionText = `You are the NutriFridge AI Food & Nutrition Assistant for the NutriFridge mobile application.\nYour role is to assist users with fridge inventory management, recipe and meal recommendations, food queries, and meal tracking.\n\nCRITICAL CONSTRAINTS & BEHAVIORAL RULES:\n1. INVENTORY ACCURACY (NEVER INVENT INVENTORY):\n   - When answering questions about stock or recommending recipes, use ONLY the items present in \"CURRENT FRIDGE INVENTORY CONTEXT\".\n   - If an ingredient is NOT in the inventory context, treat it as MISSING (put in \"missingIngredients\"). Never claim the user has an ingredient that is not listed.\n   - If the inventory context is empty or missing, explicitly inform the user that their fridge is currently empty and suggest adding ingredients.\n\n2. MEAL RECOMMENDATIONS (action: \"meal_recommendation\"):\n   - Recommend meals using the available inventory as the primary source.\n   - Distinguish available ingredients from missing ones (put missing ones in \"missingIngredients\").\n   - For each ingredient in \"ingredients\", if it matches an item in the fridge inventory, provide its exact \"matchedInventoryItemId\" from the inventory context. Set \"matchedInventoryItemId: null\" for items not in the fridge.\n   - Tailor recommendations to user dietary preferences (vegetarian, vegan, allergies, etc.) and calorie/protein targets.\n   - If the inventory is too depleted to prepare any recommended meal, return action: \"no_match\" with an encouraging assistantMessage suggesting a few staple ingredients to buy.\n\n3. NUTRITION & CALORIE ESTIMATES:\n   - Nutrition numbers (calories, protein, carbs, fat) are approximate AI estimates (nutritionIsEstimate: true).\n   - Never provide medical or clinical nutritional advice. Add an estimate note.\n\n4. MEAL LOGGING & DEDUCTIONS:\n   - All ingredient deductions require explicit user confirmation (deductionNeedsUserConfirmation: true).\n   - Gemini does NOT mutate the database directly. Output action \"meal_recommendation\" or \"log_meal\" with structured data for the user to review and confirm.\n\n5. EXACT 11 CANONICAL CATEGORIES FOR ANY PROPOSED INVENTORY ITEMS:\n   Every item in \"inventoryItems\" MUST use exactly one of these 11 categories:\n   - \"Dairy Products\"\n   - \"Vegetables\"\n   - \"Fruits\"\n   - \"Non-Veg\"\n   - \"Meals & Leftovers\"\n   - \"Packaged Food\"\n   - \"Drinks & Juices\"\n   - \"Ice Cream\"\n   - \"Frozen Food\"\n   - \"Dry Fruits\"\n   - \"Others\"\n\nOUTPUT SCHEMA (STRICT JSON ONLY):\n{\n  \"action\": \"meal_recommendation\" | \"log_meal\" | \"add_inventory_items\" | \"remove_inventory_items\" | \"query_inventory\" | \"assistant_reply\" | \"clarification_needed\" | \"no_match\",\n  \"assistantMessage\": \"Helpful and friendly response text formatted with clear Markdown where appropriate\",\n  \"requiresConfirmation\": boolean,\n  \"needsClarification\": boolean,\n  \"clarifyingQuestion\": string | null,\n  \"inventoryItems\": [\n    {\n      \"name\": \"string\",\n      \"category\": \"Dairy Products\" | \"Vegetables\" | \"Fruits\" | \"Non-Veg\" | \"Meals & Leftovers\" | \"Packaged Food\" | \"Drinks & Juices\" | \"Ice Cream\" | \"Frozen Food\" | \"Dry Fruits\" | \"Others\",\n      \"quantity\": number | null,\n      \"unit\": \"g\" | \"kg\" | \"ml\" | \"L\" | \"pieces\" | \"pack\" | \"bottle\" | null,\n      \"expiryDate\": \"YYYY-MM-DD\" | null,\n      \"expiryDaysEstimate\": number | null,\n      \"confidence\": number\n    }\n  ],\n  \"meal\": {\n    \"name\": \"string\",\n    \"mealType\": \"breakfast\" | \"lunch\" | \"dinner\" | \"snack\",\n    \"description\": \"string\",\n    \"preparationTimeMinutes\": number,\n    \"reason\": \"string (why this meal suits their fridge & goals)\",\n    \"ingredients\": [\n      {\n        \"name\": \"string\",\n        \"quantity\": number | null,\n        \"unit\": \"g\" | \"ml\" | \"pieces\" | null,\n        \"matchedInventoryItemId\": \"string (UUID)\" | null,\n        \"suggestedDeductionQuantity\": number | null,\n        \"deductionNeedsUserConfirmation\": true\n      }\n    ],\n    \"missingIngredients\": [\"string\"],\n    \"calories\": number,\n    \"proteinG\": number,\n    \"carbsG\": number,\n    \"fatG\": number,\n    \"nutrition\": {\n      \"calories\": number,\n      \"proteinG\": number,\n      \"carbsG\": number,\n      \"fatG\": number,\n      \"isEstimate\": true,\n      \"estimateNote\": \"Approximate nutrition estimate\"\n    }\n  } | null,\n  \"warnings\": [\"string\"]\n}`;\n\nconst geminiPayload = {\n  contents: [\n    {\n      role: 'user',\n      parts: parts\n    }\n  ],\n  systemInstruction: {\n    parts: [\n      { text: systemInstructionText }\n    ]\n  },\n  generationConfig: {\n    maxOutputTokens: 2048,\n    responseMimeType: 'application/json',\n    thinkingConfig: {\n      thinkingLevel: 'low'\n    }\n  }\n};\n\nconst targetModel = item.targetModel || 'gemini-3.8-flash';\nconst apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/' + targetModel + ':generateContent';\n\nreturn [{\n  json: {\n    requestId: item.requestId,\n    apiUrl: apiUrl,\n    geminiPayload: geminiPayload,\n    promptBuildTimestamp: Date.now()\n  }\n}];"
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef0123456783",
+      "name": "Prepare Context & Gemini Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.apiUrl }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.geminiPayload) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef0123456784",
+      "name": "Call Google Gemini API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1140,
+        240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "gemini-api-key-auth",
+          "name": "Google Gemini API Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputItem = $input.first().json;\nconst originalRequestId = $('Validate Request & Auth Secret').first().json.requestId || 'req_unknown';\nconst promptBuildTimestamp = $('Prepare Context & Gemini Prompt').first().json.promptBuildTimestamp || Date.now();\nconst geminiDurationMs = Date.now() - promptBuildTimestamp;\n\n// Handle upstream network or API errors\nif (inputItem.error || inputItem.statusCode >= 400) {\n  const errObj = inputItem.error || {};\n  const errMsg = String(errObj.message || errObj.description || '').toLowerCase();\n  const errCode = String(errObj.code || '').toUpperCase();\n  const isTimeout = errCode === 'ECONNABORTED' || errCode === 'ETIMEDOUT' || errMsg.includes('timeout') || errMsg.includes('timed out');\n  const status = inputItem.statusCode || (isTimeout ? 504 : (inputItem.error ? 502 : 500));\n  let errorCode = 'GEMINI_UPSTREAM_ERROR';\n  let userMessage = 'NutriFridge could not complete AI analysis at this time. Please tap retry.';\n  let retryable = true;\n  if (isTimeout || status === 504) {\n    errorCode = 'GEMINI_REQUEST_TIMEOUT';\n    userMessage = 'Google Gemini request timed out while generating your meal plan. Please tap retry.';\n    retryable = true;\n  } else if (status === 429) {\n    errorCode = 'GEMINI_RATE_LIMIT_EXCEEDED';\n    userMessage = 'Google Gemini rate limit exceeded. Please wait a moment and tap retry.';\n    retryable = true;\n  } else if (status === 401 || status === 403) {\n    errorCode = 'GEMINI_AUTH_FAILED';\n    userMessage = 'Google Gemini authentication failed. Please verify the Gemini Header Auth credential in n8n.';\n    retryable = false;\n  } else if (status === 400) {\n    errorCode = 'GEMINI_INVALID_REQUEST';\n    userMessage = 'Google Gemini rejected the request format. Please shorten or simplify your input.';\n    retryable = false;\n  }\n  return [{\n    json: {\n      ok: false,\n      httpStatus: status === 401 || status === 403 ? 502 : (status === 504 ? 504 : status),\n      responseBody: {\n        ok: false,\n        requestId: originalRequestId,\n        action: 'error',\n        assistantMessage: userMessage,\n        error: {\n          code: errorCode,\n          message: userMessage,\n          retryable: retryable\n        },\n        timings: {\n          geminiDurationMs: geminiDurationMs\n        }\n      }\n    }\n  }];\n}\n\n// Extract text from Gemini candidates\nconst candidates = inputItem.candidates;\nif (!candidates || !Array.isArray(candidates) || candidates.length === 0) {\n  return [{\n    json: {\n      ok: false,\n      httpStatus: 502,\n      responseBody: {\n        ok: false,\n        requestId: originalRequestId,\n        action: 'error',\n        assistantMessage: 'AI returned an empty response candidate. Please tap retry.',\n        error: { code: 'EMPTY_CANDIDATE', message: 'No candidate in Gemini response' },\n        timings: { geminiDurationMs: geminiDurationMs }\n      }\n    }\n  }];\n}\n\nlet combinedText = '';\nfor (const part of candidates[0].content?.parts || []) {\n  if (part.text) combinedText += part.text;\n}\n\ncombinedText = combinedText.trim();\nif (combinedText.startsWith('```')) {\n  combinedText = combinedText.replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/, '').trim();\n}\n\nlet parsed;\ntry {\n  parsed = JSON.parse(combinedText);\n} catch (e) {\n  return [{\n    json: {\n      ok: false,\n      httpStatus: 502,\n      responseBody: {\n        ok: false,\n        requestId: originalRequestId,\n        action: 'error',\n        assistantMessage: 'AI output could not be parsed as valid JSON. Please tap retry.',\n        error: { code: 'INVALID_AI_JSON', message: e.message },\n        timings: { geminiDurationMs: geminiDurationMs }\n      }\n    }\n  }];\n}\n\nconst CANONICAL_CATEGORIES = [\n  'Dairy Products',\n  'Vegetables',\n  'Fruits',\n  'Non-Veg',\n  'Meals & Leftovers',\n  'Packaged Food',\n  'Drinks & Juices',\n  'Ice Cream',\n  'Frozen Food',\n  'Dry Fruits',\n  'Others'\n];\n\nfunction normalizeCategory(cat) {\n  if (!cat || typeof cat !== 'string') return 'Others';\n  const clean = cat.trim();\n  for (const c of CANONICAL_CATEGORIES) {\n    if (c.toLowerCase() === clean.toLowerCase()) return c;\n  }\n  const u = clean.toUpperCase();\n  if (u.includes('DAIRY')) return 'Dairy Products';\n  if (u.includes('ICE CREAM')) return 'Ice Cream';\n  if (u.includes('FROZEN')) return 'Frozen Food';\n  if (u.includes('DRY FRUIT')) return 'Dry Fruits';\n  if (u.includes('NON-VEG') || u.includes('NON VEG')) return 'Non-Veg';\n  if (u.includes('LEFTOVER') || u.includes('MEAL')) return 'Meals & Leftovers';\n  if (u.includes('PACKAGE')) return 'Packaged Food';\n  if (u.includes('DRINK') || u.includes('JUICE')) return 'Drinks & Juices';\n  if (u.includes('VEG')) return 'Vegetables';\n  if (u.includes('FRUIT')) return 'Fruits';\n  return 'Others';\n}\n\nconst action = parsed.action || 'assistant_reply';\nconst assistantMessage = parsed.assistantMessage || 'Processed your request successfully.';\nconst requiresConfirmation = Boolean(parsed.requiresConfirmation);\nconst needsClarification = Boolean(parsed.needsClarification);\nconst clarifyingQuestion = parsed.clarifyingQuestion || null;\n\nlet inventoryItems = [];\nif (Array.isArray(parsed.inventoryItems)) {\n  for (const it of parsed.inventoryItems) {\n    if (it && typeof it === 'object' && it.name) {\n      inventoryItems.push({\n        name: String(it.name).trim(),\n        category: normalizeCategory(it.category),\n        quantity: typeof it.quantity === 'number' && it.quantity > 0 ? it.quantity : null,\n        unit: it.unit ? String(it.unit).trim() : 'pieces',\n        expiryDate: it.expiryDate || null,\n        expiryDaysEstimate: typeof it.expiryDaysEstimate === 'number' ? it.expiryDaysEstimate : null,\n        confidence: typeof it.confidence === 'number' ? Math.min(1.0, Math.max(0.0, it.confidence)) : 0.95\n      });\n    }\n  }\n}\n\nlet meal = null;\nif ((action === 'meal_recommendation' || action === 'log_meal') && parsed.meal && typeof parsed.meal === 'object') {\n  const m = parsed.meal;\n  const ingredients = [];\n  for (const ing of m.ingredients || []) {\n    if (ing && typeof ing === 'object' && ing.name) {\n      ingredients.push({\n        name: String(ing.name).trim(),\n        quantity: typeof ing.quantity === 'number' ? ing.quantity : null,\n        unit: ing.unit ? String(ing.unit).trim() : null,\n        matchedInventoryItemId: ing.matchedInventoryItemId || null,\n        suggestedDeductionQuantity: typeof ing.suggestedDeductionQuantity === 'number' ? ing.suggestedDeductionQuantity : null,\n        deductionNeedsUserConfirmation: true\n      });\n    }\n  }\n  const nutr = m.nutrition || {};\n  meal = {\n    name: m.name ? String(m.name).trim() : 'Recommended Meal',\n    mealType: m.mealType ? String(m.mealType).toLowerCase().trim() : 'lunch',\n    description: m.description ? String(m.description).trim() : '',\n    preparationTimeMinutes: typeof m.preparationTimeMinutes === 'number' ? m.preparationTimeMinutes : 25,\n    reason: m.reason ? String(m.reason).trim() : 'Suits your fridge ingredients.',\n    ingredients: ingredients,\n    missingIngredients: Array.isArray(m.missingIngredients) ? m.missingIngredients.map(String) : [],\n    calories: typeof m.calories === 'number' ? Math.round(m.calories) : 450,\n    proteinG: typeof m.proteinG === 'number' ? Math.round(m.proteinG) : 20,\n    carbsG: typeof m.carbsG === 'number' ? Math.round(m.carbsG) : 50,\n    fatG: typeof m.fatG === 'number' ? Math.round(m.fatG) : 15,\n    nutritionIsEstimate: true,\n    nutrition: {\n      calories: typeof nutr.calories === 'number' ? Math.round(nutr.calories) : 450,\n      proteinG: typeof nutr.proteinG === 'number' ? Math.round(nutr.proteinG) : 20,\n      carbsG: typeof nutr.carbsG === 'number' ? Math.round(nutr.carbsG) : 50,\n      fatG: typeof nutr.fatG === 'number' ? Math.round(nutr.fatG) : 15,\n      isEstimate: true,\n      estimateNote: nutr.estimateNote || 'Nutritional values are approximate AI estimates.'\n    }\n  };\n}\n\nreturn [{\n  json: {\n    ok: true,\n    httpStatus: 200,\n    responseBody: {\n      ok: true,\n      requestId: originalRequestId,\n      action: action,\n      assistantMessage: assistantMessage,\n      requiresConfirmation: requiresConfirmation,\n      needsClarification: needsClarification,\n      clarifyingQuestion: clarifyingQuestion,\n      inventoryItems: inventoryItems,\n      meal: meal,\n      warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [],\n      timings: {\n        geminiDurationMs: geminiDurationMs\n      }\n    }\n  }\n}];"
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef0123456785",
+      "name": "Parse & Validate Gemini Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.ok }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef0123456786",
+      "name": "IF — Gemini Output Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1620,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.responseBody) }}",
+        "options": {
+          "responseCode": "={{ $json.httpStatus }}"
+        }
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef0123456787",
+      "name": "Respond to Webhook — Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1860,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.responseBody) }}",
+        "options": {
+          "responseCode": "={{ $json.httpStatus }}"
+        }
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef0123456788",
+      "name": "Respond to Webhook — Upstream Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1860,
+        360
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook — NutriFridge AI": {
+      "main": [
+        [
+          {
+            "node": "Validate Request & Auth Secret",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Request & Auth Secret": {
+      "main": [
+        [
+          {
+            "node": "IF — Request & Secret Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Request & Secret Valid?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Context & Gemini Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook — Auth/Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Context & Gemini Prompt": {
+      "main": [
+        [
+          {
+            "node": "Call Google Gemini API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Google Gemini API": {
+      "main": [
+        [
+          {
+            "node": "Parse & Validate Gemini Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse & Validate Gemini Output": {
+      "main": [
+        [
+          {
+            "node": "IF — Gemini Output Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Gemini Output Valid?": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook — Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook — Upstream Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "versionId": "c2d3e4f5-a6b7-8901-cdef-123456789abc",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "nutrifridge-ai-cloud"
+  },
+  "tags": []
+}

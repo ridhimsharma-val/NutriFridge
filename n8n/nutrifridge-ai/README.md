@@ -78,19 +78,24 @@ Gemini is constrained by system instructions to output **only** the 11 categorie
    - `Respond to Webhook — Success`
    - `Format and Respond to Upstream Error`
 
-### Step 2: Configure Gemini API Credentials (Header Auth)
-1. Obtain an API key from [Google AI Studio](https://aistudio.google.com/).
-2. In n8n, go to **Credentials** → **New Credential**.
-3. Search for **Header Auth** and click **Create**.
-4. Configure the credential:
-   - **Credential Name:** `Google AI Studio Header Auth (x-goog-api-key)`
+### Step 2: Configure n8n Cloud Credentials (Header Auth)
+
+Configure two credentials in n8n Cloud (**Credentials** → **New Credential** → **Header Auth**):
+
+1. **NutriFridge Webhook Secret (Webhook Node)**:
+   - **Credential Name:** `NutriFridge Webhook Secret`
+   - **Header Name:** `x-webhook-secret`
+   - **Header Value:** `<PASTE_YOUR_SHARED_SECRET_HERE>`
+   - Attach this in the **`Webhook — NutriFridge AI`** node under **Authentication** (`Header Auth`).
+
+2. **Google Gemini API Key (HTTP Request Node)**:
+   - **Credential Name:** `Google Gemini API Key`
    - **Header Name:** `x-goog-api-key`
    - **Header Value:** `<PASTE_YOUR_GEMINI_API_KEY_HERE>`
-5. Save the credential.
-6. Return to the imported workflow, double-click the **`HTTP Request — Gemini generateContent`** node, and select this credential under **Authentication** → **Credential for Header Auth**.
+   - Attach this in the **`HTTP Request — Gemini generateContent`** node under **Authentication** (`Generic Credential Type` → `Header Auth`).
 
 > [!CAUTION]
-> **Secret Protection:** Never commit or hardcode your Gemini API key inside `NutriFridge_AI_Backend.json` or Flutter source code. n8n safely encrypts the key in its internal credential database.
+> **Secret Protection:** Never commit or hardcode your Gemini API key or webhook secret inside workflow JSON or Flutter source code. n8n safely encrypts credentials in its internal credential vault. Server environment variables are not required on n8n Cloud.
 
 ### Step 3: Activate the Workflow
 1. Toggle the **Active** switch in the top right corner to **ON**.

@@ -53,4 +53,6 @@ app.*.map.json
 
 # Supabase local environment credentials
 supabase.dev.json
+supabase/.temp/
+
 

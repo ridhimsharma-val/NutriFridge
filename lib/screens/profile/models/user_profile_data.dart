@@ -39,7 +39,6 @@ class UserProfileData {
     'Increase protein intake',
     'Manage calorie intake',
     'Eat more fruits and vegetables',
-    'Maintain current habits',
   ];
 
   /// Standard common allergens
