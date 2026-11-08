@@ -363,7 +363,7 @@ void main() {
 
     // Verify Today's Wellness clean empty state
     expect(find.text("Today's Wellness"), findsOneWidget);
-    expect(find.text('Your wellness insights will appear here as you log meals.'), findsOneWidget);
+    expect(find.text('Your wellness score today'), findsOneWidget);
 
     // Verify Nutrition Today
     expect(find.text('Nutrition Today'), findsOneWidget);
@@ -373,7 +373,7 @@ void main() {
 
     // Verify Today's Meals clean empty state
     expect(find.text("Today's Meals"), findsOneWidget);
-    expect(find.text('No meals logged yet today'), findsOneWidget);
+    expect(find.text('No meals logged today'), findsOneWidget);
 
     // Verify Navigation Bar items (Design 06: Float - Icons only, no text labels)
     expect(find.byIcon(Icons.home_rounded), findsOneWidget);

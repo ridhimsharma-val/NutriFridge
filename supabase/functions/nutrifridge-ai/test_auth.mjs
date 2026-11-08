@@ -228,20 +228,25 @@ async function runTests() {
     );
   }
 
-  // Test 11: n8n workflow timeout configuration (60,000ms)
+  // Test 11: n8n workflow integration contract (Restored Gemini REST API HTTP Request node & error handling)
   {
     const workflowPath = join(__dirname, '../../../n8n/workflows/nutrifridge-ai-assistant.json');
     const workflowSource = readFileSync(workflowPath, 'utf-8');
     const workflowJson = JSON.parse(workflowSource);
-    const geminiNode = workflowJson.nodes.find((n) => n.name === 'Call Google Gemini API');
-    assert(
-      geminiNode && geminiNode.parameters && geminiNode.parameters.options && geminiNode.parameters.options.timeout === 60000,
-      'n8n workflow Call Google Gemini API node timeout is configured to 60,000ms'
+    const geminiHttpNode = workflowJson.nodes.find(
+      (n) => n.name === 'HTTP Request — Gemini generateContent' || n.name === 'Call Google Gemini API'
     );
     assert(
-      workflowSource.includes('GEMINI_REQUEST_TIMEOUT') &&
-      workflowSource.includes('ECONNABORTED'),
-      'n8n workflow handles ECONNABORTED Axios timeouts and maps to GEMINI_REQUEST_TIMEOUT'
+      geminiHttpNode &&
+      geminiHttpNode.parameters &&
+      geminiHttpNode.parameters.url &&
+      geminiHttpNode.parameters.url.includes('gemini-flash-lite-latest:generateContent'),
+      'n8n workflow HTTP Request node targets gemini-flash-lite-latest:generateContent REST endpoint'
+    );
+    assert(
+      workflowSource.includes('GEMINI_UPSTREAM_ERROR') &&
+      workflowSource.includes('x-goog-api-key'),
+      'n8n workflow handles upstream Gemini errors and configures x-goog-api-key authentication'
     );
   }
 

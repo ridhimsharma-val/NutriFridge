@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/transitions/hero_transition_route.dart';
 import '../../models/notification_data.dart';
@@ -24,18 +25,26 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _isWellnessExpanded = false;
   bool _isNutritionExpanded = false;
-  int _lastKnownDay = DateTime.now().day;
+  DateTime _lastKnownDate = DateTime(
+    DateTime.now().year,
+    DateTime.now().month,
+    DateTime.now().day,
+  );
+  Timer? _midnightTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initializeDataAndRecommendations();
+    _scheduleNextMidnightTimer();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _midnightTimer?.cancel();
+    _midnightTimer = null;
     super.dispose();
   }
 
@@ -46,13 +55,38 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  void _scheduleNextMidnightTimer() {
+    _midnightTimer?.cancel();
+    final now = DateTime.now();
+    final nextMidnight = DateTime(now.year, now.month, now.day + 1);
+    final durationUntilMidnight = nextMidnight.difference(now) + const Duration(milliseconds: 500);
+
+    _midnightTimer = Timer(durationUntilMidnight, () {
+      if (!mounted) return;
+      _onMidnightCrossed();
+      _scheduleNextMidnightTimer();
+    });
+  }
+
+  void _onMidnightCrossed() {
+    final now = DateTime.now();
+    final currentDate = DateTime(now.year, now.month, now.day);
+    if (currentDate != _lastKnownDate) {
+      _lastKnownDate = currentDate;
+      MockDataRepository.loadFromSupabase(force: true);
+      MealRecommendationService.fetchRecommendation(forceRefresh: true);
+    }
+  }
+
   void _checkDateChangeOrRefresh() {
     final now = DateTime.now();
-    if (now.day != _lastKnownDay) {
-      _lastKnownDay = now.day;
+    final currentDate = DateTime(now.year, now.month, now.day);
+    if (currentDate != _lastKnownDate) {
+      _lastKnownDate = currentDate;
       // Midnight crossed: reset and reload daily data
       MockDataRepository.loadFromSupabase(force: true);
       MealRecommendationService.fetchRecommendation(forceRefresh: true);
+      _scheduleNextMidnightTimer();
     } else {
       // App resumed from background: refresh daily score and meals
       MockDataRepository.loadFromSupabase();

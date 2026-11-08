@@ -487,6 +487,25 @@ serve(async (req: Request) => {
   ]);
   const contextFetchDurationMs = Math.round(performance.now() - contextFetchStart);
 
+  // If the inventory query fails with a database error, do not silently fall back
+  if (fridgeRes.error) {
+    console.error('INVENTORY_QUERY_FAILED', fridgeRes.error);
+    return new Response(
+      JSON.stringify({
+        ok: false,
+        action: 'error',
+        assistantMessage: 'Unable to retrieve your fridge inventory from the database. Please tap retry.',
+        error: {
+          code: 'INVENTORY_FETCH_FAILED',
+          message: fridgeRes.error.message ?? 'Failed to query fridge_items',
+          retryable: true,
+        },
+      }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // If query succeeded: use database items if present; if empty (0 rows), allow permitted client fallback
   const inventoryContext = (fridgeRes.data && fridgeRes.data.length > 0)
     ? fridgeRes.data.map((it: any) => ({
         id: it.id,

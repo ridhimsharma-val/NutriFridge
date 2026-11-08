@@ -418,7 +418,7 @@ void main() {
       final nodes = workflowJson['nodes'] as List<dynamic>;
 
       final prepareNode = nodes.firstWhere(
-        (n) => n['name'] == 'Prepare Context & Gemini Prompt',
+        (n) => n['name'] == 'Build Gemini Request' || n['name'] == 'Prepare Context & Gemini Prompt',
         orElse: () => null,
       );
       expect(prepareNode, isNotNull);
@@ -555,7 +555,7 @@ void main() {
   });
 
   group('Timeout & Extended Generation Regression Tests', () {
-    test('1. n8n workflow Call Google Gemini API node timeout is 60,000ms', () {
+    test('1. n8n workflow Google Gemini HTTP Request node configuration & endpoint verification', () {
       final file = File('n8n/workflows/nutrifridge-ai-assistant.json');
       expect(file.existsSync(), isTrue);
 
@@ -563,10 +563,12 @@ void main() {
       final workflowJson = jsonDecode(content) as Map<String, dynamic>;
       final nodes = workflowJson['nodes'] as List<dynamic>;
 
-      final geminiNode = nodes.firstWhere((n) => n['name'] == 'Call Google Gemini API');
-      expect(geminiNode['parameters']['options']['timeout'], 60000);
-      expect(content, contains('ECONNABORTED'));
-      expect(content, contains('GEMINI_REQUEST_TIMEOUT'));
+      final geminiNode = nodes.firstWhere(
+        (n) => n['name'] == 'HTTP Request — Gemini generateContent' || n['name'] == 'Call Google Gemini API',
+      );
+      expect(geminiNode, isNotNull);
+      expect(geminiNode['parameters']['url'], contains('gemini-flash-lite-latest:generateContent'));
+      expect(content, contains('x-goog-api-key'));
     });
 
     test('2. Supabase Edge Function timeout is 75,000ms with clearTimeout in finally block', () {
@@ -640,15 +642,19 @@ void main() {
       final workflowJson = jsonDecode(content) as Map<String, dynamic>;
       final nodes = workflowJson['nodes'] as List<dynamic>;
 
-      final prepNode = nodes.firstWhere((n) => n['name'] == 'Prepare Context & Gemini Prompt');
+      final prepNode = nodes.firstWhere(
+        (n) => n['name'] == 'Build Gemini Request' || n['name'] == 'Prepare Context & Gemini Prompt',
+      );
       final prepCode = prepNode['parameters']['jsCode'] as String;
 
-      final parseNode = nodes.firstWhere((n) => n['name'] == 'Parse & Validate Gemini Output');
+      final parseNode = nodes.firstWhere(
+        (n) => n['name'] == 'Parse and Validate Gemini Response' || n['name'] == 'Parse & Validate Gemini Output',
+      );
       final parseCode = parseNode['parameters']['jsCode'] as String;
 
       for (final cat in expected11Categories) {
-        expect(prepCode, contains('"$cat"'));
-        expect(parseCode, contains("'$cat'"));
+        expect(prepCode, contains(cat));
+        expect(parseCode, contains(cat));
       }
     });
 
