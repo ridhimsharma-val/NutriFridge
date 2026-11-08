@@ -23,9 +23,17 @@ class CookingWorkspaceScreen extends StatefulWidget {
   State<CookingWorkspaceScreen> createState() => _CookingWorkspaceScreenState();
 }
 
-class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen> {
+class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen>
+    with SingleTickerProviderStateMixin {
   late final TextEditingController _dishNameController;
   final FocusNode _dishNameFocusNode = FocusNode();
+
+  // Carousel interactive state (Workspace ONLY)
+  late final AnimationController _carouselController;
+  late final Animation<double> _carouselAnimation;
+  bool _isCarouselOpen = false;
+  int _focusedIndex = 0;
+  PageController? _pageController;
 
   @override
   void initState() {
@@ -34,6 +42,16 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen> {
       text: CookingBasketService.preferredDishName ?? '',
     );
     _dishNameController.addListener(_onDishNameChanged);
+
+    _carouselController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
+    _carouselAnimation = CurvedAnimation(
+      parent: _carouselController,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
   }
 
   void _onDishNameChanged() {
@@ -46,7 +64,53 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen> {
     _dishNameController.removeListener(_onDishNameChanged);
     _dishNameController.dispose();
     _dishNameFocusNode.dispose();
+    _carouselController.dispose();
+    _pageController?.dispose();
     super.dispose();
+  }
+
+  void _handlePanTap(int count) {
+    if (count == 0) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.info_outline_rounded, color: Colors.white, size: 18),
+              SizedBox(width: 8),
+              Text(
+                'Your pan is empty. Add ingredients to inspect them!',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.forestGreen,
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      return;
+    }
+
+    if (_isCarouselOpen) {
+      _carouselController.reverse().then((_) {
+        if (mounted) {
+          setState(() {
+            _isCarouselOpen = false;
+          });
+        }
+      });
+    } else {
+      setState(() {
+        _isCarouselOpen = true;
+        _focusedIndex = 0;
+        _pageController?.dispose();
+        _pageController = PageController(viewportFraction: 0.58, initialPage: 0);
+      });
+      _carouselController.forward(from: 0.0);
+    }
   }
 
   Future<void> _handleGenerateMeal() async {
@@ -88,9 +152,7 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final panWidth = (screenWidth - 32).clamp(320.0, 410.0);
-    final panHeight = panWidth * 0.54;
+    const double shiftRight = 18.0;
 
     return ListenableBuilder(
       listenable: Listenable.merge([
@@ -104,6 +166,18 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen> {
         final isGenerating = CookingBasketService.isGenerating;
         final error = CookingBasketService.generationError;
         final dishName = _dishNameController.text.trim();
+
+        // Keep carousel synchronized with CookingBasketService
+        if (count == 0 && _isCarouselOpen) {
+          _isCarouselOpen = false;
+          _carouselController.reset();
+        } else if (count > 0 && _focusedIndex >= count) {
+          _focusedIndex = count - 1;
+        }
+
+        final screenWidth = MediaQuery.sizeOf(context).width;
+        final panWidth = (screenWidth - 32.0 - (shiftRight * 2)).clamp(300.0, 410.0);
+        final panHeight = panWidth * 0.54;
 
         final bool canGenerate = !isGenerating && (count > 0 || dishName.isNotEmpty);
 
@@ -184,42 +258,107 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Hero Substantially Zoomed Cooking Pan (Dominates the screen)
-                        Center(
-                          child: Hero(
-                            tag: 'cooking_pan_hero',
-                            flightShuttleBuilder: (
-                              flightContext,
-                              animation,
-                              flightDirection,
-                              fromHeroContext,
-                              toHeroContext,
-                            ) {
-                              final Hero toHero = toHeroContext.widget as Hero;
-                              return Material(
-                                color: Colors.transparent,
-                                child: toHero.child,
-                              );
-                            },
-                            child: CookingPanVisual(
-                              width: panWidth,
-                              height: panHeight,
-                              isExpanded: true,
+                        // Hero Substantially Zoomed Cooking Pan (Shifted slightly right in Workspace ONLY)
+                        Transform.translate(
+                          offset: const Offset(shiftRight, 0.0),
+                          child: Center(
+                            child: Hero(
+                              tag: 'cooking_pan_hero',
+                              flightShuttleBuilder: (
+                                flightContext,
+                                animation,
+                                flightDirection,
+                                fromHeroContext,
+                                toHeroContext,
+                              ) {
+                                final Hero toHero = toHeroContext.widget as Hero;
+                                return Material(
+                                  color: Colors.transparent,
+                                  child: toHero.child,
+                                );
+                              },
+                              child: AnimatedBuilder(
+                                animation: _carouselAnimation,
+                                builder: (context, _) {
+                                  return CookingPanVisual(
+                                    width: panWidth,
+                                    height: panHeight,
+                                    isExpanded: true,
+                                    onTap: () => _handlePanTap(count),
+                                    contentOpacity: (1.0 - (_carouselAnimation.value * 0.88)).clamp(0.0, 1.0),
+                                  );
+                                },
+                              ),
                             ),
                           ),
                         ),
                         const SizedBox(height: 6),
                         Center(
-                          child: Text(
-                            count > 0
-                                ? '$count ingredient${count > 1 ? 's' : ''} in pan'
-                                : 'Your pan is ready',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.forestGreen,
+                          child: GestureDetector(
+                            onTap: () => _handlePanTap(count),
+                            behavior: HitTestBehavior.opaque,
+                            child: AnimatedBuilder(
+                              animation: _carouselAnimation,
+                              builder: (context, _) {
+                                final isCarouselVisible = _carouselAnimation.value > 0.5;
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          count > 0
+                                              ? (isCarouselVisible
+                                                  ? 'Tap pan to hide carousel'
+                                                  : '$count in pan · Tap to inspect')
+                                              : 'Your pan is ready',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.forestGreen,
+                                          ),
+                                        ),
+                                      ),
+                                      if (count > 0) ...[
+                                        const SizedBox(width: 4),
+                                        Icon(
+                                          isCarouselVisible
+                                              ? Icons.expand_less_rounded
+                                              : Icons.touch_app_rounded,
+                                          size: 15,
+                                          color: AppColors.forestGreen,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                );
+                              },
                             ),
                           ),
+                        ),
+
+                        // INTERACTIVE INGREDIENT CAROUSEL (Workspace ONLY)
+                        AnimatedBuilder(
+                          animation: _carouselAnimation,
+                          builder: (context, child) {
+                            if (_carouselAnimation.value <= 0.001) {
+                              return const SizedBox.shrink();
+                            }
+                            return ClipRect(
+                              child: Align(
+                                alignment: Alignment.topCenter,
+                                heightFactor: _carouselAnimation.value,
+                                child: Opacity(
+                                  opacity: _carouselAnimation.value.clamp(0.0, 1.0),
+                                  child: child,
+                                ),
+                              ),
+                            );
+                          },
+                          child: count > 0 ? _buildPanCarousel(selectedItems) : const SizedBox.shrink(),
                         ),
 
                         const SizedBox(height: 20),
@@ -605,6 +744,194 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  /// Interactive horizontal ingredient carousel (Workspace ONLY)
+  Widget _buildPanCarousel(List<CategoryFoodItem> items) {
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    if (_focusedIndex >= items.length) {
+      _focusedIndex = items.length - 1;
+    }
+    _pageController ??= PageController(viewportFraction: 0.58, initialPage: _focusedIndex);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8.0, bottom: 4.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 78,
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: items.length,
+              physics: const BouncingScrollPhysics(),
+              onPageChanged: (index) {
+                setState(() {
+                  _focusedIndex = index;
+                });
+              },
+              itemBuilder: (context, index) {
+                final item = items[index];
+                final bool isFocused = index == _focusedIndex;
+
+                // Staggered emergence interval
+                final double start = (index * 0.12).clamp(0.0, 0.6);
+                final double end = (start + 0.4).clamp(0.0, 1.0);
+                final double t = Interval(start, end, curve: Curves.easeOutBack)
+                    .transform(_carouselAnimation.value);
+
+                final double scale = t.clamp(0.01, 1.0);
+                final double angle = (1.0 - t) * (index.isEven ? -0.2 : 0.2);
+                final double dy = (1.0 - t) * -22.0;
+
+                final String? imgAsset = item.effectiveImageAsset ?? item.imageAsset;
+
+                return Transform.translate(
+                  offset: Offset(0, dy),
+                  child: Transform.rotate(
+                    angle: angle,
+                    child: Transform.scale(
+                      scale: scale,
+                      child: GestureDetector(
+                        onTap: () {
+                          if (_focusedIndex != index) {
+                            _pageController?.animateToPage(
+                              index,
+                              duration: const Duration(milliseconds: 260),
+                              curve: Curves.easeOutCubic,
+                            );
+                          }
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isFocused ? Colors.white : Colors.white.withValues(alpha: 0.82),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isFocused ? AppColors.forestGreen : AppColors.cardBorder,
+                              width: isFocused ? 1.8 : 1.0,
+                            ),
+                            boxShadow: [
+                              if (isFocused)
+                                BoxShadow(
+                                  color: AppColors.forestGreen.withValues(alpha: 0.16),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                )
+                              else
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  color: AppColors.paleMint.withValues(alpha: 0.5),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: AppColors.cardBorder, width: 0.8),
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: ((imgAsset != null && imgAsset.isNotEmpty) ||
+                                        (item.iconEmoji == null && item.effectiveImageAsset != null))
+                                    ? Padding(
+                                        padding: const EdgeInsets.all(4),
+                                        child: Image.asset(
+                                          item.effectiveImageAsset ?? item.imageAsset!,
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (context, error, stackTrace) => Center(
+                                            child: Text(item.iconEmoji ?? '🥘',
+                                                style: const TextStyle(fontSize: 18)),
+                                          ),
+                                        ),
+                                      )
+                                    : Center(
+                                        child: Text(item.iconEmoji ?? '🥘',
+                                            style: const TextStyle(fontSize: 18)),
+                                      ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: isFocused ? FontWeight.w800 : FontWeight.w600,
+                                        color: isFocused
+                                            ? AppColors.textPrimary
+                                            : AppColors.neutralCharcoal,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Container(
+                                      padding:
+                                          const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isFocused ? AppColors.paleMint : AppColors.sageLight,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        item.displayQuantity,
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: isFocused
+                                              ? AppColors.forestGreen
+                                              : AppColors.neutralMedium,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          if (items.length > 1) ...[
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(items.length, (idx) {
+                final bool isActive = idx == _focusedIndex;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                  width: isActive ? 14 : 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? AppColors.forestGreen
+                        : AppColors.forestGreen.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                );
+              }),
+            ),
+          ],
         ],
       ),
     );

@@ -22,6 +22,7 @@ class CookingPanVisual extends StatefulWidget {
   final bool isCompact;
   final bool isExpanded;
   final bool showEmptyGuide;
+  final double contentOpacity;
   final VoidCallback? onTap;
   final GlobalKey? panKey;
 
@@ -32,6 +33,7 @@ class CookingPanVisual extends StatefulWidget {
     this.isCompact = false,
     this.isExpanded = false,
     this.showEmptyGuide = true,
+    this.contentOpacity = 1.0,
     this.onTap,
     this.panKey,
   });
@@ -183,8 +185,11 @@ class CookingPanVisualState extends State<CookingPanVisual>
                         width: (rx * 2).clamp(10.0, widget.width),
                         height: (ry * 2).clamp(10.0, widget.height),
                         child: ClipOval(
-                          child: Center(
-                            child: _buildIngredientsCluster(allItems),
+                          child: Opacity(
+                            opacity: widget.contentOpacity.clamp(0.0, 1.0),
+                            child: Center(
+                              child: _buildIngredientsCluster(allItems),
+                            ),
                           ),
                         ),
                       ),
@@ -224,14 +229,15 @@ class CookingPanVisualState extends State<CookingPanVisual>
   Widget _buildIngredientsCluster(List<CategoryFoodItem> items) {
     final int total = items.length;
     final double tokenSize = widget.isCompact
-        ? 20.0
-        : (widget.isExpanded ? 42.0 : 32.0);
+        ? 18.0
+        : (widget.isExpanded ? 26.0 : 22.0);
 
-    // Show up to 3 items in compact, 4 in collapsed, 5 in expanded
-    final int maxVisible = widget.isCompact ? 3 : (widget.isExpanded ? 5 : 4);
+    // Limit to 3 visible elements in basin to prevent crowded stacking
+    final int maxVisible = 3;
     final int displayCount = total > maxVisible ? (maxVisible - 1) : total;
     final List<CategoryFoodItem> displayItems = items.take(displayCount).toList();
     final int overflowCount = total - displayCount;
+    final int totalElements = displayCount + (overflowCount > 0 ? 1 : 0);
 
     return FittedBox(
       fit: BoxFit.contain,
@@ -245,14 +251,14 @@ class CookingPanVisualState extends State<CookingPanVisual>
               _buildPositionedToken(
                 item: displayItems[i],
                 index: i,
-                total: displayCount + (overflowCount > 0 ? 1 : 0),
+                total: totalElements,
                 tokenSize: tokenSize,
               ),
             if (overflowCount > 0)
               _buildOverflowToken(
                 count: overflowCount,
                 index: displayCount,
-                total: displayCount + 1,
+                total: totalElements,
                 tokenSize: tokenSize,
               ),
           ],
@@ -284,17 +290,17 @@ class CookingPanVisualState extends State<CookingPanVisual>
             width: tokenSize,
             height: tokenSize,
             decoration: BoxDecoration(
-              color: const Color(0xFFF7FAF8),
+              color: Colors.white.withValues(alpha: 0.88),
               shape: BoxShape.circle,
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.95),
-                width: widget.isCompact ? 1.0 : 1.5,
+                color: Colors.white.withValues(alpha: 0.92),
+                width: 0.8,
               ),
               boxShadow: const [
                 BoxShadow(
-                  color: Color(0x44000000),
-                  blurRadius: 4.0,
-                  offset: Offset(0, 2),
+                  color: Color(0x33000000),
+                  blurRadius: 3.0,
+                  offset: Offset(0, 1.5),
                 ),
               ],
             ),
@@ -304,17 +310,17 @@ class CookingPanVisualState extends State<CookingPanVisual>
                         (item.iconEmoji == null && item.effectiveImageAsset != null))
                     ? Image.asset(
                         item.effectiveImageAsset ?? item.imageAsset!,
-                        width: tokenSize * 0.72,
-                        height: tokenSize * 0.72,
+                        width: tokenSize * 0.88,
+                        height: tokenSize * 0.88,
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) => Text(
                           item.iconEmoji ?? '🥘',
-                          style: TextStyle(fontSize: tokenSize * 0.45),
+                          style: TextStyle(fontSize: tokenSize * 0.50),
                         ),
                       )
                     : Text(
                         item.iconEmoji ?? '🥘',
-                        style: TextStyle(fontSize: tokenSize * 0.45),
+                        style: TextStyle(fontSize: tokenSize * 0.50),
                       ),
               ),
             ),
@@ -343,14 +349,14 @@ class CookingPanVisualState extends State<CookingPanVisual>
           color: AppColors.forestGreen,
           shape: BoxShape.circle,
           border: Border.all(
-            color: Colors.white,
-            width: widget.isCompact ? 1.0 : 1.5,
+            color: Colors.white.withValues(alpha: 0.95),
+            width: 1.0,
           ),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x44000000),
-              blurRadius: 4.0,
-              offset: Offset(0, 2),
+              color: Color(0x33000000),
+              blurRadius: 3.0,
+              offset: Offset(0, 1.5),
             ),
           ],
         ),
@@ -359,7 +365,7 @@ class CookingPanVisualState extends State<CookingPanVisual>
             '+$count',
             style: TextStyle(
               color: Colors.white,
-              fontSize: widget.isCompact ? 9.0 : (widget.isExpanded ? 13.0 : 11.0),
+              fontSize: widget.isCompact ? 8.5 : (widget.isExpanded ? 11.5 : 10.0),
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -372,42 +378,29 @@ class CookingPanVisualState extends State<CookingPanVisual>
   Offset _getOffsetForIndex(int index, int total) {
     if (total == 1) return const Offset(0, 0);
     if (total == 2) {
-      return index == 0 ? const Offset(-18, 0) : const Offset(18, 0);
+      return index == 0 ? const Offset(-16, 0) : const Offset(16, 0);
     }
+    // 3 elements (either 3 items, or 2 items + 1 overflow badge)
     if (total == 3) {
       switch (index) {
         case 0:
-          return const Offset(-18, -6);
+          return const Offset(-15, -6);
         case 1:
-          return const Offset(18, -6);
+          return const Offset(15, -6);
         default:
-          return const Offset(0, 10);
+          return const Offset(0, 8);
       }
     }
-    if (total == 4) {
-      switch (index) {
-        case 0:
-          return const Offset(-20, -8);
-        case 1:
-          return const Offset(20, -8);
-        case 2:
-          return const Offset(-12, 10);
-        default:
-          return const Offset(16, 10);
-      }
-    }
-    // 5 items
+    // Fallback for 4 elements if needed
     switch (index) {
       case 0:
-        return const Offset(-22, -9);
+        return const Offset(-16, -6);
       case 1:
-        return const Offset(22, -9);
+        return const Offset(16, -6);
       case 2:
-        return const Offset(0, -12);
-      case 3:
-        return const Offset(-14, 11);
+        return const Offset(-10, 8);
       default:
-        return const Offset(16, 11);
+        return const Offset(12, 8);
     }
   }
 

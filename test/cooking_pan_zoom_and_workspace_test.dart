@@ -426,4 +426,141 @@ void main() {
       expect(source, contains("preferredDishName.trim().length === 0"));
     });
   });
+
+  group('Phase 9: Interactive Cooking Pan Layout & Workspace Carousel', () {
+    testWidgets('CookingPanVisual basin renders at most 3 items with +N badge for overflow',
+        (tester) async {
+      final items = [
+        CategoryFoodItem(id: '1', name: 'Apples', category: 'Fruits', quantity: '2', expiryDays: 3),
+        CategoryFoodItem(id: '2', name: 'Bananas', category: 'Fruits', quantity: '3', expiryDays: 2),
+        CategoryFoodItem(id: '3', name: 'Milk', category: 'Dairy', quantity: '1 L', expiryDays: 4),
+        CategoryFoodItem(id: '4', name: 'Bread', category: 'Bakery', quantity: '1 pack', expiryDays: 5),
+        CategoryFoodItem(id: '5', name: 'Tomatoes', category: 'Vegetables', quantity: '400 g', expiryDays: 6),
+      ];
+
+      for (final it in items) {
+        CookingBasketService.toggleItem(it);
+      }
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: CookingPanVisual(
+                width: 340,
+                height: 184,
+                isExpanded: true,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Overflow indicator should show +3 (5 items total - 2 displayed = +3 overflow)
+      expect(find.text('+3'), findsOneWidget);
+    });
+
+    testWidgets('Tapping empty pan in CookingWorkspaceScreen shows informative snackbar without opening carousel',
+        (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: CookingWorkspaceScreen(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PageView), findsNothing);
+
+      // Tap the pan
+      await tester.tap(find.byType(CookingPanVisual));
+      await tester.pumpAndSettle();
+
+      // Carousel is not opened
+      expect(find.byType(PageView), findsNothing);
+      // Informative SnackBar appears
+      expect(find.text('Your pan is empty. Add ingredients to inspect them!'), findsOneWidget);
+    });
+
+    testWidgets('Tapping pan with ingredients in CookingWorkspaceScreen opens interactive carousel, supports swiping and tap-to-focus, and collapses on second tap',
+        (tester) async {
+      tester.view.physicalSize = const Size(400, 850);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final itemA = CategoryFoodItem(id: '1', name: 'Brown Bread', category: 'Bakery', quantity: '1 pack', expiryDays: 3);
+      final itemB = CategoryFoodItem(id: '2', name: 'Apples', category: 'Fruits', quantity: '1 kg', expiryDays: 5);
+      CookingBasketService.toggleItem(itemA);
+      CookingBasketService.toggleItem(itemB);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: CookingWorkspaceScreen(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Initial state: Carousel is closed
+      expect(find.text('2 in pan · Tap to inspect'), findsOneWidget);
+      expect(find.byType(PageView), findsNothing);
+
+      // Tap the pan to open carousel
+      await tester.tap(find.byType(CookingPanVisual));
+      await tester.pumpAndSettle();
+
+      // Carousel is now open
+      expect(find.byType(PageView), findsOneWidget);
+      expect(find.text('Tap pan to hide carousel'), findsOneWidget);
+      expect(find.text('Brown Bread'), findsWidgets);
+      expect(find.text('Apples'), findsWidgets);
+
+      // Swipe PageView to next item
+      await tester.drag(find.byType(PageView), const Offset(-200, 0));
+      await tester.pumpAndSettle();
+
+      // Tap pan again to collapse carousel
+      await tester.tap(find.byType(CookingPanVisual));
+      await tester.pumpAndSettle();
+
+      // Carousel is collapsed
+      expect(find.byType(PageView), findsNothing);
+      expect(find.text('2 in pan · Tap to inspect'), findsOneWidget);
+    });
+
+    testWidgets('Clearing all ingredients while carousel is open cleanly resets carousel state',
+        (tester) async {
+      tester.view.physicalSize = const Size(400, 850);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final item = CategoryFoodItem(id: '1', name: 'Apples', category: 'Fruits', quantity: '1 kg', expiryDays: 5);
+      CookingBasketService.toggleItem(item);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: CookingWorkspaceScreen(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Open carousel
+      await tester.tap(find.byType(CookingPanVisual));
+      await tester.pumpAndSettle();
+      expect(find.byType(PageView), findsOneWidget);
+
+      // Tap Clear all
+      await tester.tap(find.text('Clear all'));
+      await tester.pumpAndSettle();
+
+      // Carousel collapses cleanly without errors
+      expect(find.byType(PageView), findsNothing);
+      expect(find.text('Your pan is ready'), findsOneWidget);
+    });
+  });
 }
