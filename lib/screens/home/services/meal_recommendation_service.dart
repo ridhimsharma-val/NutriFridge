@@ -121,7 +121,17 @@ class MealRecommendationService {
   static void selectDiscoveryMode(MealDiscoveryMode mode, {bool fetch = true}) {
     _discoveryMode = mode;
     discoveryModeNotifier.value = mode;
-    if (mode == MealDiscoveryMode.aiSuggestion && fetch) {
+    if (mode == MealDiscoveryMode.none) {
+      _currentRecommendation = null;
+      _currentStatus = RecommendationStatus.empty;
+      _errorMessage = null;
+      _alternativeMessage = null;
+      _isFetching = false;
+      _activeFetchFuture = null;
+      recommendationNotifier.value = null;
+      statusNotifier.value = RecommendationStatus.empty;
+      MockDataRepository.setRecommendationForTesting(null);
+    } else if (mode == MealDiscoveryMode.aiSuggestion && fetch) {
       fetchRecommendation(forceRefresh: true);
     }
   }
@@ -212,6 +222,7 @@ class MealRecommendationService {
 
   static void _wireRepositories() {
     MockDataRepository.recommendationProvider = () {
+      if (_discoveryMode == MealDiscoveryMode.none) return null;
       if (_currentRecommendation != null) return _currentRecommendation;
       if (_currentStatus == RecommendationStatus.loading ||
           _currentStatus == RecommendationStatus.error ||
@@ -220,7 +231,10 @@ class MealRecommendationService {
       }
       return getRecommendation();
     };
-    MockDataRepository.recommendationStatusProvider = () => currentStatus;
+    MockDataRepository.recommendationStatusProvider = () {
+      if (_discoveryMode == MealDiscoveryMode.none) return RecommendationStatus.empty;
+      return currentStatus;
+    };
     MockDataRepository.onResetRecommendation = () => reset();
   }
 
@@ -1027,9 +1041,7 @@ class MealRecommendationService {
     _discoveryMode = MealDiscoveryMode.none;
     discoveryModeNotifier.value = MealDiscoveryMode.none;
     CookingBasketService.clear();
-    _currentStatus = FridgeCategoryRepository.totalFridgeItems == 0
-        ? RecommendationStatus.empty
-        : RecommendationStatus.loading;
+    _currentStatus = RecommendationStatus.empty;
     _errorMessage = null;
     _alternativeMessage = null;
     _isFetching = false;

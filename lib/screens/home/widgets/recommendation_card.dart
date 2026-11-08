@@ -75,25 +75,31 @@ class RecommendationCard extends StatelessWidget {
               ),
               if (!showDualMode && onSwitchMode != null) ...[
                 const SizedBox(width: 8),
-                InkWell(
-                  onTap: onSwitchMode,
-                  borderRadius: BorderRadius.circular(8),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.swap_horiz_rounded, size: 14, color: AppColors.forestGreen),
-                        SizedBox(width: 3),
-                        Text(
-                          'Change mode',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.forestGreen,
-                          ),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    key: const ValueKey('back_to_mode_selection'),
+                    onTap: onSwitchMode,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: AppColors.cardWhite,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.cardBorder,
+                          width: 1,
                         ),
-                      ],
+                        boxShadow: const [AppColors.cardShadow],
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.arrow_back_rounded,
+                          size: 16,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
                     ),
                   ),
                 ),

@@ -109,6 +109,84 @@ void main() {
       // Mode is still aiSuggestion
       expect(MealRecommendationService.discoveryMode, equals(MealDiscoveryMode.aiSuggestion));
     });
+
+    testWidgets('Tapping back arrow resets discovery mode to none, clears recommendation, and restores both choices', (tester) async {
+      const sampleRec = RecipeRecommendation(
+        title: 'Fresh Garden Salad',
+        calories: 220,
+        proteinGrams: 8,
+        fridgeItemsUsed: 3,
+        imageUrl: 'assets/images/salad.jpg',
+      );
+
+      MealRecommendationService.selectDiscoveryMode(MealDiscoveryMode.aiSuggestion, fetch: false);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: RecommendationCard(
+              discoveryMode: MealDiscoveryMode.aiSuggestion,
+              recommendation: sampleRec,
+              status: RecommendationStatus.loaded,
+              onSwitchMode: () {
+                MealRecommendationService.selectDiscoveryMode(MealDiscoveryMode.none, fetch: false);
+              },
+            ),
+          ),
+        ),
+      );
+
+      // Verify recommendation is displayed and back arrow is present
+      expect(find.text('Fresh Garden Salad'), findsOneWidget);
+      expect(find.byKey(const ValueKey('back_to_mode_selection')), findsOneWidget);
+      expect(find.text('Change mode'), findsNothing);
+
+      // Tap back arrow icon
+      await tester.tap(find.byKey(const ValueKey('back_to_mode_selection')));
+      await tester.pump();
+
+      // Mode is reset to none
+      expect(MealRecommendationService.discoveryMode, equals(MealDiscoveryMode.none));
+      expect(MealRecommendationService.currentRecommendation, isNull);
+
+      // Rebuild with new mode: both dual-mode choices are restored
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: RecommendationCard(
+              discoveryMode: MealRecommendationService.discoveryMode,
+              recommendation: MealRecommendationService.currentRecommendation,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('AI Suggestion'), findsOneWidget);
+      expect(find.text('Use My Ingredients'), findsOneWidget);
+      expect(find.byKey(const ValueKey('back_to_mode_selection')), findsNothing);
+    });
+
+    testWidgets('Navigating back to mode selector preserves selected items in cooking basket', (tester) async {
+      const item = CategoryFoodItem(
+        id: 'spinach-123',
+        name: 'Fresh Spinach',
+        quantity: '100 g',
+        category: 'Produce',
+      );
+      CookingBasketService.toggleItem(item);
+      CookingBasketService.setPreferredDishName('Spinach Omelette');
+
+      expect(CookingBasketService.itemCount, equals(1));
+      expect(CookingBasketService.preferredDishName, equals('Spinach Omelette'));
+
+      // Simulate mode reset back to none
+      MealRecommendationService.selectDiscoveryMode(MealDiscoveryMode.none, fetch: false);
+
+      expect(MealRecommendationService.discoveryMode, equals(MealDiscoveryMode.none));
+      // Cooking basket and dish name must remain preserved
+      expect(CookingBasketService.itemCount, equals(1));
+      expect(CookingBasketService.preferredDishName, equals('Spinach Omelette'));
+    });
   });
 
   group('PHASE 3 — Cooking Basket Service & State Management', () {
