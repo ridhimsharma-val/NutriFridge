@@ -20,8 +20,9 @@ class MealStatusCardSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final history = MockDataRepository.loggedMealsHistory;
-    final bool hasAnyLogged = meals.any((m) => m.isCompleted) || history.isNotEmpty;
+    final history = MockDataRepository.todayLoggedMealsHistory;
+    // Display only genuine logged meals for today. No fake upcoming placeholder cards.
+    final loggedMeals = meals.where((m) => m.isCompleted).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -36,10 +37,10 @@ class MealStatusCardSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
 
-        // Meals List or Empty State
+        // Meals List or Clean Empty State
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
-          child: !hasAnyLogged || meals.isEmpty
+          child: loggedMeals.isEmpty
               ? Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -52,17 +53,30 @@ class MealStatusCardSection extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'No meals logged yet today',
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
+                      Stack(
+                        alignment: Alignment.centerLeft,
+                        children: const [
+                          Text(
+                            'No meals logged today',
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            'No meals logged yet today',
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.transparent,
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        'Log meals via AI Assistant or camera',
+                        'Your logged meals will appear here.',
                         style: AppTypography.subtitle.copyWith(
                           fontSize: 12,
                           color: AppColors.textSecondary,
@@ -72,7 +86,7 @@ class MealStatusCardSection extends StatelessWidget {
                   ),
                 )
               : Column(
-                  children: meals.map((meal) {
+                  children: loggedMeals.map((meal) {
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 10.0),
                       child: _MealItemCard(
@@ -107,29 +121,34 @@ class _MealItemCard extends StatelessWidget {
     // Resolve specific logged details from history if available
     Map<String, dynamic>? loggedRecord;
     for (final item in history.reversed) {
-      if (item['mealType'].toString().toLowerCase() ==
-          meal.name.toLowerCase()) {
+      final t = item['mealType']?.toString().toLowerCase() ?? '';
+      final n = item['mealName']?.toString().toLowerCase() ?? '';
+      final mn = meal.name.toLowerCase();
+      final mt = meal.mealType.toLowerCase();
+      if (t == mn || t == mt || n == mn) {
         loggedRecord = item;
         break;
       }
     }
 
-    final String displayName = isCompleted && loggedRecord != null
-        ? (loggedRecord['mealName'] ?? meal.name)
-        : meal.name;
+    final String displayName = meal.name.isNotEmpty
+        ? meal.name
+        : (loggedRecord != null ? (loggedRecord['mealName'] ?? meal.name) : 'Logged Meal');
 
-    final int calories = isCompleted && loggedRecord != null
-        ? (loggedRecord['calories'] as num?)?.toInt() ?? 0
-        : 0;
+    final int calories = meal.calories > 0
+        ? meal.calories
+        : (loggedRecord != null ? (loggedRecord['calories'] as num?)?.toInt() ?? 0 : 0);
 
-    final String displayTime = isCompleted && loggedRecord != null
-        ? (loggedRecord['time'] ?? meal.time)
-        : (isCompleted ? meal.time : 'Upcoming');
+    final String displayTime = (meal.time != null && meal.time!.isNotEmpty)
+        ? meal.time!
+        : (loggedRecord != null ? (loggedRecord['time'] ?? 'Logged') : 'Logged');
+
+    final String displaySlot = meal.mealType.isNotEmpty ? meal.mealType : 'Logged';
 
     // Resolve food photography asset for the meal
     final String imageAsset = MealImageRegistry.resolveImage(
       mealName: displayName,
-      imageKey: loggedRecord?['imageKey']?.toString(),
+      imageKey: meal.imageUrl ?? loggedRecord?['imageKey']?.toString(),
     );
 
     return Material(
@@ -181,7 +200,7 @@ class _MealItemCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      meal.name,
+                      displayName,
                       style: AppTypography.cardTitle.copyWith(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -196,16 +215,14 @@ class _MealItemCard extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          isCompleted ? 'Logged' : 'Upcoming',
-                          style: TextStyle(
+                          displaySlot,
+                          style: const TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w600,
-                            color: isCompleted
-                                ? AppColors.forestGreen
-                                : AppColors.textTertiary,
+                            color: AppColors.forestGreen,
                           ),
                         ),
-                        if (isCompleted && displayTime.isNotEmpty) ...[
+                        if (displayTime.isNotEmpty) ...[
                           const SizedBox(width: 4),
                           Flexible(
                             child: Text(
@@ -227,7 +244,7 @@ class _MealItemCard extends StatelessWidget {
 
               const SizedBox(width: 10),
 
-              // Right: Actual Calories or Pending Pill
+              // Right: Actual Calories or Done Pill
               if (isCompleted && calories > 0) ...[
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,

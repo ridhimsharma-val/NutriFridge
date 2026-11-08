@@ -355,36 +355,135 @@ class DailyNutritionData {
 enum MealStatus { completed, upcoming }
 
 class MealItem {
+  final String id;
   final String name;
+  final String mealType;
   final MealStatus status;
   final String? time;
+  final int calories;
+  final int proteinG;
+  final int carbsG;
+  final int fatG;
   final String iconEmoji;
+  final String? imageUrl;
 
   const MealItem({
+    this.id = '',
     required this.name,
+    this.mealType = '',
     required this.status,
     this.time,
+    this.calories = 0,
+    this.proteinG = 0,
+    this.carbsG = 0,
+    this.fatG = 0,
     this.iconEmoji = '',
+    this.imageUrl,
   });
 
   bool get isCompleted => status == MealStatus.completed;
 
   MealItem copyWith({
+    String? id,
     String? name,
+    String? mealType,
     MealStatus? status,
     String? time,
+    int? calories,
+    int? proteinG,
+    int? carbsG,
+    int? fatG,
     String? iconEmoji,
+    String? imageUrl,
   }) {
     return MealItem(
+      id: id ?? this.id,
       name: name ?? this.name,
+      mealType: mealType ?? this.mealType,
       status: status ?? this.status,
       time: time ?? this.time,
+      calories: calories ?? this.calories,
+      proteinG: proteinG ?? this.proteinG,
+      carbsG: carbsG ?? this.carbsG,
+      fatG: fatG ?? this.fatG,
       iconEmoji: iconEmoji ?? this.iconEmoji,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 }
 
 class MockDataRepository {
+  /// Testable clock provider allowing controlled time injection in tests
+  static DateTime Function() currentTimeProvider = DateTime.now;
+
+  /// Resets clock provider to system wall clock
+  static void resetClock() {
+    currentTimeProvider = DateTime.now;
+  }
+
+  /// Start of today (00:00:00 local time)
+  static DateTime get localStartOfToday {
+    final now = currentTimeProvider();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  /// Start of tomorrow (00:00:00 local time)
+  static DateTime get localStartOfTomorrow =>
+      localStartOfToday.add(const Duration(days: 1));
+
+  /// Start of yesterday (00:00:00 local time)
+  static DateTime get localStartOfYesterday =>
+      localStartOfToday.subtract(const Duration(days: 1));
+
+  /// Returns genuine logged meal history belonging strictly to today in local timezone
+  static List<Map<String, dynamic>> get todayLoggedMealsHistory {
+    final start = localStartOfToday;
+    final end = localStartOfTomorrow;
+
+    return _loggedMealsHistory.where((m) {
+      final ts = m['timestamp'];
+      if (ts is DateTime) {
+        final local = ts.toLocal();
+        return !local.isBefore(start) && local.isBefore(end);
+      }
+      return false;
+    }).toList();
+  }
+
+  /// Returns genuine logged meal history belonging strictly to yesterday in local timezone
+  static List<Map<String, dynamic>> get yesterdayLoggedMealsHistory {
+    final start = localStartOfYesterday;
+    final end = localStartOfToday;
+
+    return _loggedMealsHistory.where((m) {
+      final ts = m['timestamp'];
+      if (ts is DateTime) {
+        final local = ts.toLocal();
+        return !local.isBefore(start) && local.isBefore(end);
+      }
+      return false;
+    }).toList();
+  }
+
+  static String _formatMealType(String raw) {
+    if (raw.isEmpty) return 'Meal';
+    final lower = raw.trim().toLowerCase();
+    if (lower == 'breakfast') return 'Breakfast';
+    if (lower == 'lunch') return 'Lunch';
+    if (lower == 'dinner') return 'Dinner';
+    if (lower == 'snack') return 'Snack';
+    return raw[0].toUpperCase() + raw.substring(1);
+  }
+
+  static String _emojiForMealType(String raw) {
+    final lower = raw.trim().toLowerCase();
+    if (lower.contains('breakfast')) return '🍳';
+    if (lower.contains('lunch')) return '🥗';
+    if (lower.contains('dinner')) return '🍲';
+    if (lower.contains('snack')) return '🍎';
+    return '🍽️';
+  }
+
   /// ValueNotifier triggering dashboard updates on meal logging
   static final ValueNotifier<int> notifier = ValueNotifier<int>(0);
 
@@ -432,13 +531,34 @@ class MockDataRepository {
   }
 
   static WellnessScoreData? _deriveDynamicWellness() {
-    if (_loggedMealsHistory.isEmpty) return null;
-    final mealsCount = _loggedMealsHistory.length;
-    final score = (72 + (mealsCount * 5)).clamp(70, 95);
-    final prev = score - 2;
+    final todayHistory = todayLoggedMealsHistory;
+    final yesterdayHistory = yesterdayLoggedMealsHistory;
+
+    final yesterdayMealsCount = yesterdayHistory.length;
+    final int prevScore = yesterdayMealsCount > 0
+        ? (72 + (yesterdayMealsCount * 5)).clamp(70, 95)
+        : 0;
+
+    // Check genuine meals logged today
+    final int todayCount = _loggedMealsHistory.isNotEmpty
+        ? todayHistory.length
+        : _currentMeals.where((m) => m.isCompleted).length;
+
+    // When a new day starts and no qualifying wellness data exists, display 0/100
+    if (todayCount == 0 && _currentNutrition.consumedCalories == 0) {
+      return WellnessScoreData(
+        currentScore: 0,
+        previousScore: prevScore,
+        statusText: 'No meals logged yet today',
+        hasSufficientData: true,
+      );
+    }
+
+    // Preserve exact existing formula: (72 + (mealsCount * 5)).clamp(70, 95)
+    final score = todayCount > 0 ? (72 + (todayCount * 5)).clamp(70, 95) : 70;
     return WellnessScoreData(
       currentScore: score,
-      previousScore: prev,
+      previousScore: prevScore,
       statusText: score >= 85 ? 'Great today' : 'Good progress',
       hasSufficientData: true,
     );
@@ -613,34 +733,32 @@ class MockDataRepository {
         );
       }
 
-      // 3. Completed meal slots from public.daily_meal_slots
-      final slots = await MealTrackingService.instance.fetchDailyMealSlots(
+      // 3. Genuine meals logged today from public.meals
+      final todayMealRecords = await MealTrackingService.instance.fetchTodayMeals(
         userId: effectiveUserId,
-        date: DateTime.now(),
+        clientTime: currentTimeProvider(),
       );
 
-      final baseSlots = [
-        const MealItem(name: 'Breakfast', status: MealStatus.upcoming, iconEmoji: '🍳'),
-        const MealItem(name: 'Lunch', status: MealStatus.upcoming, iconEmoji: '🥗'),
-        const MealItem(name: 'Snack', status: MealStatus.upcoming, iconEmoji: '🍎'),
-        const MealItem(name: 'Dinner', status: MealStatus.upcoming, iconEmoji: '🍲'),
-      ];
-
-      if (slots.isNotEmpty) {
-        _currentMeals = baseSlots.map((base) {
-          final slotLower = base.name.toLowerCase();
-          final match = slots.firstWhere(
-            (s) => s.mealSlot.toLowerCase() == slotLower || (slotLower.contains('snack') && s.mealSlot.toLowerCase().contains('snack')),
-            orElse: () => DailyMealSlotRecord.empty(slotLower),
+      if (todayMealRecords.isNotEmpty) {
+        _currentMeals = todayMealRecords.map((m) {
+          final timeStr = _formatTimeString(m.loggedAt.toLocal());
+          final formattedSlot = _formatMealType(m.mealType);
+          return MealItem(
+            id: m.id,
+            name: m.name,
+            mealType: formattedSlot,
+            status: MealStatus.completed,
+            time: timeStr,
+            calories: m.calories ?? 0,
+            proteinG: m.proteinG ?? 0,
+            carbsG: m.carbsG ?? 0,
+            fatG: m.fatG ?? 0,
+            iconEmoji: _emojiForMealType(m.mealType),
+            imageUrl: m.imageUrl,
           );
-          if (match.isCompleted) {
-            final timeStr = match.completedAt != null ? _formatTimeString(match.completedAt!) : 'Logged';
-            return base.copyWith(status: MealStatus.completed, time: timeStr);
-          }
-          return base;
         }).toList();
       } else {
-        _currentMeals = baseSlots;
+        _currentMeals = [];
       }
 
       // 4. Meal History from public.meals
@@ -723,55 +841,65 @@ class MockDataRepository {
     }
 
     // 2. In-memory fallback (used in widget tests and offline mode)
-    // 2a. Add nutrition totals
-    _currentNutrition = _currentNutrition.copyWith(
-      consumedCalories: _currentNutrition.consumedCalories + calories,
-      protein: _currentNutrition.protein.copyWith(
-        amountGrams: _currentNutrition.protein.amountGrams + protein,
-      ),
-      carbs: _currentNutrition.carbs.copyWith(
-        amountGrams: _currentNutrition.carbs.amountGrams + carbs,
-      ),
-      fat: _currentNutrition.fat.copyWith(
-        amountGrams: _currentNutrition.fat.amountGrams + fat,
-      ),
-    );
-
-    // 2b. Format current time
-    final timeNow = timestamp ?? DateTime.now();
-    final timeString = _formatTimeString(timeNow);
-
-    // 2c. Update matching meal item in Today's Meals
     final cleanType = mealType.trim().toLowerCase();
-    final index = _currentMeals.indexWhere((m) {
-      final itemLower = m.name.toLowerCase();
-      return itemLower == cleanType ||
-          (itemLower.startsWith('snack') && cleanType.startsWith('snack'));
-    });
-    if (index != -1) {
-      _currentMeals[index] = _currentMeals[index].copyWith(
-        status: MealStatus.completed,
-        time: timeString,
-      );
-    } else {
-      String formattedName = mealType;
-      if (cleanType.contains('breakfast')) {
-        formattedName = 'Breakfast';
-      } else if (cleanType.contains('lunch')) {
-        formattedName = 'Lunch';
-      } else if (cleanType.startsWith('snack')) {
-        formattedName = 'Snack';
-      } else if (cleanType.contains('dinner')) {
-        formattedName = 'Dinner';
-      }
+    final timeNow = timestamp ?? currentTimeProvider();
+    final isToday = !timeNow.isBefore(localStartOfToday) && timeNow.isBefore(localStartOfTomorrow);
 
-      _currentMeals.add(
-        MealItem(
-          name: formattedName,
-          status: MealStatus.completed,
-          time: timeString,
+    if (isToday) {
+      // 2a. Add nutrition totals
+      _currentNutrition = _currentNutrition.copyWith(
+        consumedCalories: _currentNutrition.consumedCalories + calories,
+        protein: _currentNutrition.protein.copyWith(
+          amountGrams: _currentNutrition.protein.amountGrams + protein,
+        ),
+        carbs: _currentNutrition.carbs.copyWith(
+          amountGrams: _currentNutrition.carbs.amountGrams + carbs,
+        ),
+        fat: _currentNutrition.fat.copyWith(
+          amountGrams: _currentNutrition.fat.amountGrams + fat,
         ),
       );
+
+      // 2b. Format current time
+      final timeString = _formatTimeString(timeNow);
+
+      // 2c. Update matching meal item in Today's Meals
+      final formattedSlot = _formatMealType(mealType);
+      final formattedName = mealName.isNotEmpty ? mealName : formattedSlot;
+
+      final newMealItem = MealItem(
+        id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+        name: formattedName,
+        mealType: formattedSlot,
+        status: MealStatus.completed,
+        time: timeString,
+        calories: calories,
+        proteinG: protein,
+        carbsG: carbs,
+        fatG: fat,
+        iconEmoji: _emojiForMealType(mealType),
+        imageUrl: imageUrl,
+      );
+
+      final index = _currentMeals.indexWhere((m) {
+        final itemSlot = m.mealType.isNotEmpty ? m.mealType.toLowerCase() : m.name.toLowerCase();
+        return itemSlot == cleanType || (itemSlot.startsWith('snack') && cleanType.startsWith('snack'));
+      });
+      if (index != -1) {
+        _currentMeals[index] = _currentMeals[index].copyWith(
+          id: newMealItem.id,
+          mealType: formattedSlot,
+          status: MealStatus.completed,
+          time: timeString,
+          calories: calories,
+          proteinG: protein,
+          carbsG: carbs,
+          fatG: fat,
+          imageUrl: imageUrl,
+        );
+      } else {
+        _currentMeals.add(newMealItem);
+      }
     }
 
     // 2d. Save to history
@@ -934,6 +1062,7 @@ class MockDataRepository {
     );
     _explicitRecommendation = null;
     _explicitWellness = null;
+    resetClock();
     onResetRecommendation?.call();
     NotificationRepository.reset();
     _notify();

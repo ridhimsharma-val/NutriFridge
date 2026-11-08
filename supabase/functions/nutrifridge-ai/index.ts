@@ -408,6 +408,8 @@ serve(async (req: Request) => {
   const message = typeof body.message === 'string' ? body.message.trim() : '';
   const source = typeof body.source === 'string' ? body.source.toLowerCase() : 'text';
   const actionHint = typeof body.actionHint === 'string' ? body.actionHint.toLowerCase() : 'auto';
+  const currentMealPeriod = body.currentMealPeriod ?? body.targetMealSlot ?? null;
+  const clientLocalTime = body.clientLocalTime ?? null;
   const imageBase64 = body.imageBase64 ?? null;
   const mimeType = body.mimeType ?? null;
   const clientHistory = Array.isArray(body.conversationHistory) ? body.conversationHistory : [];
@@ -485,14 +487,16 @@ serve(async (req: Request) => {
   ]);
   const contextFetchDurationMs = Math.round(performance.now() - contextFetchStart);
 
-  const inventoryContext = (fridgeRes.data ?? []).map((it: any) => ({
-    id: it.id,
-    name: it.name,
-    category: it.category,
-    quantity: it.quantity,
-    unit: it.unit,
-    expiryDate: it.expiry_date,
-  }));
+  const inventoryContext = (fridgeRes.data && fridgeRes.data.length > 0)
+    ? fridgeRes.data.map((it: any) => ({
+        id: it.id,
+        name: it.name,
+        category: it.category,
+        quantity: it.quantity,
+        unit: it.unit,
+        expiryDate: it.expiry_date,
+      }))
+    : (Array.isArray(body.inventoryContext) ? body.inventoryContext : []);
 
   const userPreferences = {
     displayName: profileRes.data?.display_name ?? 'User',
@@ -547,7 +551,7 @@ serve(async (req: Request) => {
     }
   }
 
-  if (conversationId && message) {
+  if (conversationId && message && actionHint !== 'meal_recommendation') {
     try {
       await supabaseUser.from('ai_messages').insert({
         conversation_id: conversationId,
@@ -585,6 +589,8 @@ serve(async (req: Request) => {
     source: source,
     message: message,
     actionHint: actionHint,
+    currentMealPeriod: currentMealPeriod,
+    clientLocalTime: clientLocalTime,
     conversationId: conversationId,
     conversationHistory: clientHistory,
     inventoryContext: inventoryContext,
@@ -702,7 +708,7 @@ serve(async (req: Request) => {
 
   // 10. Persist Model Reply in `ai_messages`
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (serviceRoleKey && conversationId && normalized.assistantMessage) {
+  if (serviceRoleKey && conversationId && normalized.assistantMessage && actionHint !== 'meal_recommendation') {
     try {
       const adminClient = createClient(supabaseUrl, serviceRoleKey);
       await adminClient.from('ai_messages').insert({

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/transitions/hero_transition_route.dart';
 import '../../models/notification_data.dart';
 import '../../models/nutrition_data.dart';
+import '../../services/auth/auth_service.dart';
 import '../ai_assistant/ai_assistant_screen.dart';
 import '../fridge/models/category_item.dart';
 import '../meal_detail/meal_detail_screen.dart';
@@ -20,17 +21,51 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _isWellnessExpanded = false;
   bool _isNutritionExpanded = false;
+  int _lastKnownDay = DateTime.now().day;
 
   @override
   void initState() {
     super.initState();
-    _initializeMealRecommendations();
+    WidgetsBinding.instance.addObserver(this);
+    _initializeDataAndRecommendations();
   }
 
-  void _initializeMealRecommendations() {
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkDateChangeOrRefresh();
+    }
+  }
+
+  void _checkDateChangeOrRefresh() {
+    final now = DateTime.now();
+    if (now.day != _lastKnownDay) {
+      _lastKnownDay = now.day;
+      // Midnight crossed: reset and reload daily data
+      MockDataRepository.loadFromSupabase(force: true);
+      MealRecommendationService.fetchRecommendation(forceRefresh: true);
+    } else {
+      // App resumed from background: refresh daily score and meals
+      MockDataRepository.loadFromSupabase();
+    }
+  }
+
+  void _initializeDataAndRecommendations() {
+    // 1. Refresh today's meals and wellness score when dashboard opens
+    if (AuthService.instance.isAuthenticated && AuthService.instance.currentUser != null) {
+      MockDataRepository.loadFromSupabase();
+    }
+
+    // 2. Initialize recommendations
     try {
       MealRecommendationService.ensureInitialized().then((_) {
         if (mounted) {

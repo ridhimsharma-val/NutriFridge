@@ -252,6 +252,75 @@ class MealTrackingService {
         .toList();
   }
 
+  /// Fetches only genuine meals logged during the current day (in client's local timezone).
+  /// Boundaries are calculated locally and converted to UTC:
+  /// timestamp >= startOfTodayUtc AND timestamp < startOfTomorrowUtc.
+  Future<List<LoggedMealRecord>> fetchTodayMeals({
+    String? userId,
+    DateTime? clientTime,
+  }) async {
+    final effectiveUserId = userId ?? _currentUserId;
+    if (effectiveUserId == null) return [];
+
+    final now = clientTime ?? DateTime.now();
+    final localStartOfToday = DateTime(now.year, now.month, now.day);
+    final localStartOfTomorrow = localStartOfToday.add(const Duration(days: 1));
+
+    final utcStart = localStartOfToday.toUtc();
+    final utcEnd = localStartOfTomorrow.toUtc();
+
+    try {
+      final response = await _client
+          .from('meals')
+          .select()
+          .eq('user_id', effectiveUserId)
+          .gte('logged_at', utcStart.toIso8601String())
+          .lt('logged_at', utcEnd.toIso8601String())
+          .order('logged_at', ascending: true);
+
+      final List<dynamic> rows = response as List<dynamic>;
+      return rows
+          .map((r) => LoggedMealRecord.fromJson(r as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Fetches genuine meals logged during yesterday (in client's local timezone)
+  /// for accurate +/- vs yesterday wellness score calculations.
+  Future<List<LoggedMealRecord>> fetchYesterdayMeals({
+    String? userId,
+    DateTime? clientTime,
+  }) async {
+    final effectiveUserId = userId ?? _currentUserId;
+    if (effectiveUserId == null) return [];
+
+    final now = clientTime ?? DateTime.now();
+    final localStartOfToday = DateTime(now.year, now.month, now.day);
+    final localStartOfYesterday = localStartOfToday.subtract(const Duration(days: 1));
+
+    final utcStart = localStartOfYesterday.toUtc();
+    final utcEnd = localStartOfToday.toUtc();
+
+    try {
+      final response = await _client
+          .from('meals')
+          .select()
+          .eq('user_id', effectiveUserId)
+          .gte('logged_at', utcStart.toIso8601String())
+          .lt('logged_at', utcEnd.toIso8601String())
+          .order('logged_at', ascending: true);
+
+      final List<dynamic> rows = response as List<dynamic>;
+      return rows
+          .map((r) => LoggedMealRecord.fromJson(r as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
   /// Fetches daily nutrition snapshot from `public.daily_nutrition_snapshots`.
   Future<DailyNutritionSnapshotRecord?> fetchDailyNutritionSnapshot({
     String? userId,

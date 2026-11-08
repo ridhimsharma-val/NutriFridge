@@ -76,12 +76,19 @@ class MealRecommendationService {
   static MealRecommendationService get instance => _instance;
   factory MealRecommendationService() => _instance;
 
+  static DateTime Function() _currentTimeProvider = DateTime.now;
+
   /// Testable clock provider allowing controlled time injection in tests.
-  static DateTime Function() currentTimeProvider = DateTime.now;
+  static DateTime Function() get currentTimeProvider => _currentTimeProvider;
+  static set currentTimeProvider(DateTime Function() provider) {
+    _currentTimeProvider = provider;
+    MockDataRepository.currentTimeProvider = provider;
+  }
 
   /// Resets clock provider to system wall clock.
   static void resetClock() {
-    currentTimeProvider = DateTime.now;
+    _currentTimeProvider = DateTime.now;
+    MockDataRepository.resetClock();
   }
 
   // --- Reactive State Notifiers ---
@@ -269,7 +276,7 @@ class MealRecommendationService {
     // 1. Inspect MockDataRepository.meals
     for (final meal in MockDataRepository.meals) {
       if (meal.status == MealStatus.completed || meal.isCompleted) {
-        final slot = parseMealSlot(meal.name);
+        final slot = parseMealSlot(meal.name) ?? parseMealSlot(meal.mealType);
         if (slot != null) {
           completed.add(slot);
         }
@@ -503,7 +510,18 @@ class MealRecommendationService {
         'targetMealSlot': slot.displayName,
         'nextMealSlot': nextSlot.displayName,
         'completedMealSlots': completedSlots.map((s) => s.displayName).toList(),
-        'todayLoggedMeals': MockDataRepository.loggedMealsHistory,
+        'todayLoggedMeals': MockDataRepository.todayLoggedMealsHistory.map((m) {
+          final ts = m['timestamp'];
+          return {
+            'mealType': m['mealType'],
+            'mealName': m['mealName'],
+            'calories': m['calories'],
+            'protein': m['protein'],
+            'carbs': m['carbs'],
+            'fat': m['fat'],
+            'timestamp': ts is DateTime ? ts.toIso8601String() : ts?.toString(),
+          };
+        }).toList(),
         'clientLocalTime': now.toIso8601String(),
         'inventoryContext': inventoryContext,
         'userPreferences': userPreferences,
@@ -640,8 +658,33 @@ class MealRecommendationService {
         if (!isAlternativeRequest) {
           _currentRecommendation = null;
           _currentStatus = RecommendationStatus.error;
-          _errorMessage =
-              'Unable to reach NutriFridge AI. Please check your connection and tap retry.';
+          final errorStr = e.toString().toLowerCase();
+          if (errorStr.contains('auth') ||
+              errorStr.contains('jwt') ||
+              errorStr.contains('unauthorized') ||
+              errorStr.contains('401')) {
+            _errorMessage =
+                'Session expired. Please sign in again to get AI recommendations.';
+          } else if (errorStr.contains('timeout') ||
+              errorStr.contains('timed out')) {
+            _errorMessage = 'AI request timed out. Please tap retry.';
+          } else if (errorStr.contains('rate limit') ||
+              errorStr.contains('429')) {
+            _errorMessage =
+                'Too many requests. Please wait a moment and try again.';
+          } else if (errorStr.contains('network') ||
+              errorStr.contains('socket') ||
+              errorStr.contains('clientexception') ||
+              errorStr.contains('failed host lookup') ||
+              errorStr.contains('connection refused')) {
+            _errorMessage =
+                'Unable to reach NutriFridge AI. Please check your internet connection and tap retry.';
+          } else {
+            final cleaned = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+            _errorMessage = cleaned.isNotEmpty
+                ? cleaned
+                : 'Unable to reach NutriFridge AI. Please check your connection and tap retry.';
+          }
           statusNotifier.value = RecommendationStatus.error;
           recommendationNotifier.value = null;
         }

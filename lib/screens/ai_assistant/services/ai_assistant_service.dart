@@ -272,12 +272,33 @@ class AiAssistantService {
     } catch (e) {
       stopwatch.stop();
       debugPrint('[AiAssistantService] Network error after ${stopwatch.elapsedMilliseconds}ms: $e');
+      final errStr = e.toString().toLowerCase();
+      String msg;
+      if (errStr.contains('socket') ||
+          errStr.contains('failed host lookup') ||
+          errStr.contains('network') ||
+          errStr.contains('connection refused') ||
+          errStr.contains('clientexception')) {
+        msg = 'Unable to reach NutriFridge AI. Please check your internet connection and tap retry.';
+      } else if (errStr.contains('401') ||
+          errStr.contains('auth') ||
+          errStr.contains('jwt') ||
+          errStr.contains('unauthorized')) {
+        msg = 'Your session has expired. Please sign in again to access the AI Assistant.';
+      } else if (errStr.contains('timeout')) {
+        msg = 'NutriFridge AI took longer than expected to respond. Please tap retry.';
+      } else if (errStr.contains('429') || errStr.contains('rate limit')) {
+        msg = 'Google Gemini rate limit exceeded. Please wait a moment and tap retry.';
+      } else if (errStr.contains('format') || errStr.contains('parse') || errStr.contains('json')) {
+        msg = 'Received an invalid response format from NutriFridge AI. Please tap retry.';
+      } else {
+        msg = 'Unable to reach NutriFridge AI. Please tap retry.';
+      }
       return {
         'ok': false,
         'success': false,
         'action': 'error',
-        'assistantMessage':
-            'Unable to reach NutriFridge AI. Please check your internet connection and tap retry.',
+        'assistantMessage': msg,
         'error': e.toString(),
         'requiresConfirmation': false,
       };
