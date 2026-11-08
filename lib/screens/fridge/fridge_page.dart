@@ -21,9 +21,18 @@ class FridgePage extends StatefulWidget {
 }
 
 class _FridgePageState extends State<FridgePage> {
-  // Independent door states: Top Freezer and Lower Refrigerator
-  bool _isFreezerOpen = false;
-  bool _isFridgeOpen = false;
+  // Independent door states: Top Freezer and Lower Refrigerator.
+  // In selection mode ("Use My Ingredients"), doors default to open immediately
+  // so category shelves and inventory are instantly visible and accessible.
+  late bool _isFreezerOpen;
+  late bool _isFridgeOpen;
+
+  @override
+  void initState() {
+    super.initState();
+    _isFreezerOpen = widget.isSelectionMode;
+    _isFridgeOpen = widget.isSelectionMode;
+  }
 
   void _toggleFreezer() {
     setState(() {

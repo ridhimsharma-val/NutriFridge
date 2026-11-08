@@ -7,6 +7,7 @@ import 'package:nutrifridge/screens/fridge/models/category_item.dart';
 import 'package:nutrifridge/screens/fridge/services/cooking_basket_service.dart';
 import 'package:nutrifridge/screens/fridge/widgets/category_bottom_sheet.dart';
 import 'package:nutrifridge/screens/fridge/widgets/cooking_basket_panel.dart';
+import 'package:nutrifridge/screens/fridge/widgets/top_freezer_refrigerator.dart';
 import 'package:nutrifridge/screens/home/services/meal_recommendation_service.dart';
 import 'package:nutrifridge/screens/home/widgets/recommendation_card.dart';
 
@@ -439,6 +440,59 @@ void main() {
 
       // Verify discovery mode is useMyIngredients
       expect(MealRecommendationService.discoveryMode, equals(MealDiscoveryMode.useMyIngredients));
+    });
+
+    test('generateFromSelectedIngredients on backend failure keeps basket intact and does not poison dashboard', () async {
+      MealRecommendationService.reset();
+      expect(MealRecommendationService.discoveryMode, equals(MealDiscoveryMode.none));
+
+      const item1 = CategoryFoodItem(
+        id: '11111111-2222-3333-4444-555555555555',
+        name: 'Eggs',
+        quantity: '2 pcs',
+        category: 'Dairy & Eggs',
+      );
+      CookingBasketService.toggleItem(item1);
+      CookingBasketService.setPreferredDishName('Egg Frittata');
+
+      AiAssistantService.mockHandler = (payload) async {
+        return {
+          'ok': false,
+          'action': 'error',
+          'assistantMessage': 'Google Gemini rate limit exceeded. Please wait a moment and tap retry.',
+          'error': {'code': 'GEMINI_RATE_LIMIT_EXCEEDED'},
+        };
+      };
+
+      final rec = await MealRecommendationService.generateFromSelectedIngredients(
+        selectedItems: CookingBasketService.selectedItems,
+        preferredDishName: CookingBasketService.preferredDishName,
+      );
+
+      expect(rec, isNull);
+      // Inline error set in basket
+      expect(CookingBasketService.generationError, contains('rate limit exceeded'));
+      // Selected items and dish name remain intact
+      expect(CookingBasketService.itemCount, equals(1));
+      expect(CookingBasketService.preferredDishName, equals('Egg Frittata'));
+      // Dashboard mode and status are not poisoned into error
+      expect(MealRecommendationService.currentStatus, isNot(equals(RecommendationStatus.error)));
+      expect(MealRecommendationService.discoveryMode, equals(MealDiscoveryMode.none));
+    });
+
+    testWidgets('FridgePage in selection mode opens doors immediately to reveal shelves', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: FridgePage(isSelectionMode: true),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // TopFreezerRefrigerator is present with shelves open
+      expect(find.byType(TopFreezerRefrigerator), findsOneWidget);
+      final fridgeWidget = tester.widget<TopFreezerRefrigerator>(find.byType(TopFreezerRefrigerator));
+      expect(fridgeWidget.isFridgeOpen, isTrue);
+      expect(fridgeWidget.isFreezerOpen, isTrue);
     });
   });
 }

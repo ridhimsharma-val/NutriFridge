@@ -852,15 +852,19 @@ class MealRecommendationService {
     }
 
     _isFetching = true;
-    _discoveryMode = MealDiscoveryMode.useMyIngredients;
-    discoveryModeNotifier.value = MealDiscoveryMode.useMyIngredients;
-    _currentStatus = RecommendationStatus.loading;
-    statusNotifier.value = RecommendationStatus.loading;
     CookingBasketService.isGeneratingNotifier.value = true;
     CookingBasketService.generationErrorNotifier.value = null;
 
     final now = _currentTimeProvider();
     final slot = resolveActiveMealSlot(now);
+
+    final validUuidIds = selectedItems
+        .where((i) => MealTrackingService.isValidUuid(i.id))
+        .map((i) => i.id)
+        .toList();
+    final itemIds = validUuidIds.isNotEmpty
+        ? validUuidIds
+        : selectedItems.map((i) => i.id).toList();
 
     final requestPayload = {
       'userId': MockDataRepository.profile.displayName.isNotEmpty
@@ -868,10 +872,7 @@ class MealRecommendationService {
           : 'guest_user',
       'actionHint': 'meal_recommendation',
       'recipeMode': 'selected_ingredients',
-      'selectedInventoryItemIds': selectedItems
-          .where((i) => MealTrackingService.isValidUuid(i.id))
-          .map((i) => i.id)
-          .toList(),
+      'selectedInventoryItemIds': itemIds,
       'preferredDishName': preferredDishName,
       'message': (preferredDishName != null && preferredDishName.trim().isNotEmpty)
           ? 'Create a recipe for ${preferredDishName.trim()} using these selected ingredients from my fridge: ${selectedItems.map((i) => i.name).join(", ")}.'
@@ -922,6 +923,8 @@ class MealRecommendationService {
         rec = _synthesizeRecipeFromSelected(selectedItems, preferredDishName, slot);
       }
 
+      _discoveryMode = MealDiscoveryMode.useMyIngredients;
+      discoveryModeNotifier.value = MealDiscoveryMode.useMyIngredients;
       _currentRecommendation = rec;
       _currentStatus = RecommendationStatus.loaded;
       _errorMessage = null;
@@ -933,9 +936,6 @@ class MealRecommendationService {
     } catch (e) {
       debugPrint('[MealRecommendationService] generateFromSelectedIngredients error: $e');
       final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
-      _currentStatus = RecommendationStatus.error;
-      _errorMessage = cleanMsg;
-      statusNotifier.value = RecommendationStatus.error;
       CookingBasketService.generationErrorNotifier.value = cleanMsg;
       CookingBasketService.isGeneratingNotifier.value = false;
       return null;

@@ -178,11 +178,16 @@ class AiAssistantService {
     // 4. Ensure active session is valid and refresh if expired before invoking
     if (!MockDataRepository.forceInMemoryForTesting) {
       final session = _client.auth.currentSession;
-      if (session != null && session.isExpired) {
-        try {
-          await _client.auth.refreshSession();
-        } catch (refreshErr) {
-          debugPrint('[AiAssistantService] Session auto-refresh failed: $refreshErr');
+      if (session != null) {
+        final nowSeconds = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+        final expiresAt = session.expiresAt;
+        final isNearExpiry = expiresAt != null && (expiresAt - nowSeconds) < 120;
+        if (session.isExpired || isNearExpiry) {
+          try {
+            await _client.auth.refreshSession();
+          } catch (refreshErr) {
+            debugPrint('[AiAssistantService] Session auto-refresh failed: $refreshErr');
+          }
         }
       }
     }
@@ -232,23 +237,47 @@ class AiAssistantService {
       stopwatch.stop();
       debugPrint('[AiAssistantService] FunctionException (${e.status}) after ${stopwatch.elapsedMilliseconds}ms: ${e.details}');
 
-      String friendlyMessage =
-          'Unable to reach NutriFridge AI. Please tap retry in a moment.';
-
-      dynamic errorCode;
+      Map<String, dynamic>? detailsMap;
       if (e.details is Map) {
-        final detailsMap = e.details as Map;
-        if (detailsMap['error'] is Map) {
-          errorCode = detailsMap['error']['code'];
-        } else if (detailsMap['error'] is String) {
-          errorCode = detailsMap['error'];
-        }
-        if (detailsMap['assistantMessage'] is String && (detailsMap['assistantMessage'] as String).isNotEmpty) {
-          friendlyMessage = detailsMap['assistantMessage'] as String;
+        detailsMap = Map<String, dynamic>.from(e.details as Map);
+      } else if (e.details is String) {
+        final rawDetails = (e.details as String).trim();
+        if ((rawDetails.startsWith('{') && rawDetails.endsWith('}')) ||
+            (rawDetails.startsWith('[') && rawDetails.endsWith(']'))) {
+          try {
+            final decoded = jsonDecode(rawDetails);
+            if (decoded is Map) {
+              detailsMap = Map<String, dynamic>.from(decoded);
+            }
+          } catch (_) {}
         }
       }
 
-      if (e.status == 401 || errorCode == 'MISSING_AUTHORIZATION' || errorCode == 'USER_AUTHENTICATION_FAILED') {
+      String? backendMessage;
+      dynamic errorCode;
+      if (detailsMap != null) {
+        if (detailsMap['error'] is Map) {
+          errorCode = detailsMap['error']['code'];
+          if (detailsMap['error']['message'] is String) {
+            backendMessage = detailsMap['error']['message'] as String;
+          }
+        } else if (detailsMap['error'] is String) {
+          errorCode = detailsMap['error'];
+        }
+        if (detailsMap['assistantMessage'] is String && (detailsMap['assistantMessage'] as String).trim().isNotEmpty) {
+          backendMessage = (detailsMap['assistantMessage'] as String).trim();
+        }
+      }
+
+      String friendlyMessage;
+      if (backendMessage != null &&
+          backendMessage.isNotEmpty &&
+          !backendMessage.toLowerCase().contains('internal server error')) {
+        friendlyMessage = backendMessage;
+      } else if (e.status == 401 ||
+          errorCode == 'MISSING_AUTHORIZATION' ||
+          errorCode == 'USER_AUTHENTICATION_FAILED' ||
+          errorCode == 'INVALID_AUTHORIZATION_FORMAT') {
         friendlyMessage =
             'Your session has expired. Please sign in again to access the AI Assistant.';
       } else if (e.status == 429 || errorCode == 'GEMINI_RATE_LIMIT_EXCEEDED') {
@@ -257,12 +286,25 @@ class AiAssistantService {
       } else if (e.status == 504 || errorCode == 'GEMINI_REQUEST_TIMEOUT') {
         friendlyMessage =
             'NutriFridge AI took longer than expected to respond. Please tap retry.';
-      } else if (e.status == 400 || errorCode == 'GEMINI_INVALID_REQUEST') {
+      } else if (errorCode == 'GEMINI_INVALID_REQUEST') {
         friendlyMessage =
             'Google Gemini rejected the request format. Please shorten or simplify your input.';
+      } else if (errorCode == 'EMPTY_SELECTION') {
+        friendlyMessage = 'Please select at least one ingredient from your fridge.';
+      } else if (errorCode == 'INVALID_UUID_SYNTAX') {
+        friendlyMessage = 'One or more selected ingredient IDs are invalid.';
+      } else if (errorCode == 'ITEM_NOT_FOUND_OR_UNAUTHORIZED') {
+        friendlyMessage = 'One or more selected items could not be found in your inventory.';
+      } else if (errorCode == 'DATABASE_QUERY_ERROR' || errorCode == 'INVENTORY_FETCH_FAILED') {
+        friendlyMessage = 'Unable to verify selected ingredients from database. Please tap retry.';
+      } else if (errorCode == 'N8N_NOT_CONFIGURED') {
+        friendlyMessage = 'NutriFridge AI service is currently not configured.';
       } else if (e.status == 503 || e.status == 502) {
         friendlyMessage =
             'NutriFridge AI is temporarily experiencing high load. Please tap retry.';
+      } else {
+        friendlyMessage =
+            'Unable to reach NutriFridge AI. Please tap retry in a moment.';
       }
 
       return {

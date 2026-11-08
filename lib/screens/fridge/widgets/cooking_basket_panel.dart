@@ -63,25 +63,10 @@ class _CookingBasketPanelState extends State<CookingBasketPanel> {
           page: MealDetailScreen(recommendation: rec),
         ),
       );
-    } else {
-      final error = CookingBasketService.generationError ??
-          MealRecommendationService.errorMessage ??
-          'Could not generate a recipe. Please tap retry.';
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 4),
-          action: SnackBarAction(
-            label: 'Retry',
-            textColor: Colors.white,
-            onPressed: _handleGenerateMeal,
-          ),
-        ),
-      );
     }
+    // Note: If rec is null, the specific failure message is already populated in
+    // CookingBasketService.generationErrorNotifier and rendered cleanly inline in the
+    // CookingBasketPanel below. We deliberately avoid a redundant global SnackBar.
   }
 
   @override
@@ -371,18 +356,36 @@ class _CookingBasketPanelState extends State<CookingBasketPanel> {
                 if (error != null) ...[
                   const SizedBox(height: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFEE2E2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      error,
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        color: Color(0xFFB91C1C),
-                        fontWeight: FontWeight.w600,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: const Color(0xFFFCA5A5),
+                        width: 1,
                       ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.info_outline_rounded,
+                          size: 15,
+                          color: Color(0xFFB91C1C),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            error,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFFB91C1C),
+                              fontWeight: FontWeight.w600,
+                              height: 1.25,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
