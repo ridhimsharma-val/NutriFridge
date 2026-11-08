@@ -4,6 +4,8 @@ import '../models/category_item.dart';
 import '../services/cooking_basket_service.dart';
 import 'animated_quantity_text.dart';
 import 'food_details_sheet.dart';
+import 'cooking_pan_widget.dart';
+import 'flying_ingredient_overlay.dart';
 
 /// Large reusable mobile bottom sheet for a food category
 /// Features:
@@ -54,21 +56,36 @@ class CategoryBottomSheet extends StatefulWidget {
 }
 
 class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
+  final GlobalKey _bottomSheetPanKey = GlobalKey();
+  final Map<String, GlobalKey> _itemThumbnailKeys = {};
   late CategoryData _category;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+
+  GlobalKey _getItemKey(String id) =>
+      _itemThumbnailKeys.putIfAbsent(id, () => GlobalKey());
 
   @override
   void initState() {
     super.initState();
     _category = widget.category;
     FridgeCategoryRepository.notifier.addListener(_onRepositoryChanged);
+    if (widget.isSelectionMode) {
+      CookingPanCoordinator.bottomSheetPanKey = _bottomSheetPanKey;
+      CookingPanCoordinator.activeTargetKey = _bottomSheetPanKey;
+    }
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     FridgeCategoryRepository.notifier.removeListener(_onRepositoryChanged);
+    if (CookingPanCoordinator.activeTargetKey == _bottomSheetPanKey) {
+      CookingPanCoordinator.activeTargetKey = CookingPanCoordinator.mainPanKey;
+    }
+    if (CookingPanCoordinator.bottomSheetPanKey == _bottomSheetPanKey) {
+      CookingPanCoordinator.bottomSheetPanKey = null;
+    }
     super.dispose();
   }
 
@@ -95,8 +112,31 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
     }
 
     if (widget.isSelectionMode) {
-      CookingBasketService.toggleItem(item);
-      setState(() {});
+      final wasSelected = CookingBasketService.isSelected(item);
+      if (wasSelected) {
+        // Deselect immediately
+        CookingBasketService.toggleItem(item);
+        setState(() {});
+      } else {
+        // Select & animate flying thumbnail into pan
+        final sourceKey = _itemThumbnailKeys[item.id];
+        final targetKey =
+            CookingPanCoordinator.activeTargetKey ?? _bottomSheetPanKey;
+
+        if (sourceKey != null) {
+          FlyingIngredientHelper.flyIngredient(
+            context: context,
+            sourceKey: sourceKey,
+            targetKey: targetKey,
+            item: item,
+            onLanded: () {
+              if (mounted) setState(() {});
+            },
+          );
+        }
+        CookingBasketService.toggleItem(item);
+        setState(() {});
+      }
       return;
     }
 
@@ -307,20 +347,51 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
                 // 5. Selection mode footer
                 if (widget.isSelectionMode)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       border: Border(top: BorderSide(color: Color(0xFFEBE5DC))),
                     ),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          '${CookingBasketService.count} selected in basket',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.forestGreen,
+                        // Compact physical cooking pan landing target
+                        CookingPanWidget(
+                          key: _bottomSheetPanKey,
+                          panKey: _bottomSheetPanKey,
+                          width: 104,
+                          height: 56,
+                          isCompact: true,
+                          showEmptyGuide: false,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                CookingBasketService.count == 0
+                                    ? 'Your pan is ready'
+                                    : '${CookingBasketService.count} selected in pan',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.forestGreen,
+                                ),
+                              ),
+                              Text(
+                                CookingBasketService.count == 0
+                                    ? 'Tap items to add'
+                                    : 'In pan: ${CookingBasketService.selectedItems.map((e) => e.name).take(2).join(', ')}${CookingBasketService.count > 2 ? '...' : ''}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.neutralMedium,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
                           ),
                         ),
                         ElevatedButton(
@@ -373,6 +444,7 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
               children: [
                 // Small realistic food visual container (~50px)
                 Container(
+                  key: widget.isSelectionMode ? _getItemKey(item.id) : null,
                   width: 50,
                   height: 50,
                   decoration: BoxDecoration(

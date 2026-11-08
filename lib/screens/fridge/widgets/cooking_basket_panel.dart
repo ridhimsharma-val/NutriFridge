@@ -6,6 +6,7 @@ import '../../meal_detail/meal_detail_screen.dart';
 import '../models/category_item.dart';
 import '../services/cooking_basket_service.dart';
 import '../../home/services/meal_recommendation_service.dart';
+import 'cooking_pan_widget.dart';
 
 /// Persistent cooking basket bottom panel for "Use My Ingredients" mode.
 /// Allows viewing selected ingredients, removing items, typing an optional dish name,
@@ -23,8 +24,12 @@ class CookingBasketPanel extends StatefulWidget {
 }
 
 class _CookingBasketPanelState extends State<CookingBasketPanel> {
+  final GlobalKey _collapsedPanKey = GlobalKey();
+  final GlobalKey _expandedPanKey = GlobalKey();
   late final TextEditingController _dishNameController;
   bool _isExpanded = true;
+
+  GlobalKey get _currentPanKey => _isExpanded ? _expandedPanKey : _collapsedPanKey;
 
   Timer? _stageTimer;
   int _currentStageIndex = 0;
@@ -37,6 +42,7 @@ class _CookingBasketPanelState extends State<CookingBasketPanel> {
   @override
   void initState() {
     super.initState();
+    _updatePanCoordinator();
     _dishNameController = TextEditingController(
       text: CookingBasketService.preferredDishName ?? '',
     );
@@ -45,10 +51,23 @@ class _CookingBasketPanelState extends State<CookingBasketPanel> {
     });
   }
 
+  void _updatePanCoordinator() {
+    CookingPanCoordinator.mainPanKey = _currentPanKey;
+    if (CookingPanCoordinator.bottomSheetPanKey == null) {
+      CookingPanCoordinator.activeTargetKey = _currentPanKey;
+    }
+  }
+
   @override
   void dispose() {
     _stageTimer?.cancel();
     _dishNameController.dispose();
+    if (CookingPanCoordinator.mainPanKey == _currentPanKey) {
+      CookingPanCoordinator.mainPanKey = null;
+    }
+    if (CookingPanCoordinator.activeTargetKey == _currentPanKey) {
+      CookingPanCoordinator.activeTargetKey = null;
+    }
     super.dispose();
   }
 
@@ -154,7 +173,7 @@ class _CookingBasketPanelState extends State<CookingBasketPanel> {
                 ? _buildGeneratingState(count)
                 : _isExpanded
                     ? _buildExpandedContent(items, count, isGenerating, error)
-                    : _buildCollapsedContent(count, isGenerating),
+                    : _buildCollapsedContent(items, count, isGenerating),
           ),
         );
       },
@@ -164,25 +183,32 @@ class _CookingBasketPanelState extends State<CookingBasketPanel> {
   // ==========================================
   // COLLAPSED STATE
   // ==========================================
-  Widget _buildCollapsedContent(int count, bool isGenerating) {
+  Widget _buildCollapsedContent(
+    List<CategoryFoodItem> items,
+    int count,
+    bool isGenerating,
+  ) {
     return InkWell(
-      onTap: () => setState(() => _isExpanded = true),
+      onTap: () {
+        setState(() => _isExpanded = true);
+        _updatePanCoordinator();
+      },
       borderRadius: BorderRadius.circular(16),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(
-                color: AppColors.paleMint,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.shopping_basket_rounded,
-                size: 18,
-                color: AppColors.forestGreen,
-              ),
+            // Physical Cooking Pan
+            CookingPanWidget(
+              key: _collapsedPanKey,
+              width: 112.0,
+              height: 60.0,
+              isCompact: false,
+              showEmptyGuide: false,
+              onTap: () {
+                setState(() => _isExpanded = true);
+                _updatePanCoordinator();
+              },
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -199,18 +225,44 @@ class _CookingBasketPanelState extends State<CookingBasketPanel> {
                       letterSpacing: -0.2,
                     ),
                   ),
-                  Text(
-                    count == 0
-                        ? 'Tap ingredients to select'
-                        : '$count ingredient${count == 1 ? '' : 's'} selected',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: count == 0
-                          ? AppColors.neutralMedium
-                          : AppColors.forestGreen,
+                  if (count == 0) ...[
+                    const Text(
+                      'Your pan is ready',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.forestGreen,
+                      ),
                     ),
-                  ),
+                    const Text(
+                      'Select ingredients from fridge',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: AppColors.neutralMedium,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ] else ...[
+                    Text(
+                      items.map((e) => e.name).take(3).join(' · '),
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.neutralCharcoal,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      '$count ingredient${count == 1 ? '' : 's'} selected',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.forestGreen,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -249,7 +301,10 @@ class _CookingBasketPanelState extends State<CookingBasketPanel> {
                 Icons.keyboard_arrow_up_rounded,
                 color: AppColors.neutralMedium,
               ),
-              onPressed: () => setState(() => _isExpanded = true),
+              onPressed: () {
+                setState(() => _isExpanded = true);
+                _updatePanCoordinator();
+              },
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
@@ -273,6 +328,24 @@ class _CookingBasketPanelState extends State<CookingBasketPanel> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // 0. Physical Cooking Pan Hero Visual
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 2.0, bottom: 8.0),
+            child: CookingPanWidget(
+              key: _expandedPanKey,
+              width: 175.0,
+              height: 96.0,
+              isCompact: false,
+              showEmptyGuide: true,
+              onTap: () {
+                setState(() => _isExpanded = false);
+                _updatePanCoordinator();
+              },
+            ),
+          ),
+        ),
+
         // 1. Drag header / Collapsible summary
         Row(
           children: [
@@ -283,7 +356,7 @@ class _CookingBasketPanelState extends State<CookingBasketPanel> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
-                Icons.shopping_basket_rounded,
+                Icons.soup_kitchen_rounded,
                 size: 18,
                 color: AppColors.forestGreen,
               ),
@@ -339,7 +412,10 @@ class _CookingBasketPanelState extends State<CookingBasketPanel> {
                 Icons.keyboard_arrow_down_rounded,
                 color: AppColors.neutralMedium,
               ),
-              onPressed: () => setState(() => _isExpanded = false),
+              onPressed: () {
+                setState(() => _isExpanded = false);
+                _updatePanCoordinator();
+              },
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
