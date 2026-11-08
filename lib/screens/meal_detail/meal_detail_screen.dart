@@ -179,10 +179,21 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
   /// Opens the AI Assistant passing a complete structured meal context
   void _handleCookWithAi(BuildContext context, MealDetailInfo meal) {
     final availableFridgeMap = <String, String>{};
+    final detailedIngredients = <Map<String, dynamic>>[];
     for (final ing in meal.ingredients) {
-      if (ing.availability == IngredientAvailability.available && ing.availableQuantityInFridge != null) {
+      final isAvail = ing.availability == IngredientAvailability.available;
+      if (isAvail && ing.availableQuantityInFridge != null) {
         availableFridgeMap[ing.name] = ing.availableQuantityInFridge!;
       }
+      detailedIngredients.add({
+        'name': ing.name,
+        'requiredQuantity': ing.requiredQuantity,
+        'requiredUnit': ing.requiredUnit,
+        'recipeQuantityText': ing.recipeQuantityText,
+        'availableQuantityInFridge': ing.availableQuantityInFridge,
+        'availability': isAvail ? 'available' : 'missing',
+        'statusLabel': ing.statusLabel,
+      });
     }
 
     final missingIngList = meal.ingredients
@@ -193,6 +204,14 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
     final nutritionSummary = (meal.calories != null)
         ? '${meal.calories} kcal, ${meal.proteinGrams ?? "--"}g protein, ${meal.carbsGrams ?? "--"}g carbs, ${meal.fatGrams ?? "--"}g fat'
         : 'Nutrition unavailable';
+
+    // Source of truth for steps: use generated steps if available, else meal's preparationSteps
+    final effectiveSteps = (_generatedSteps != null && _generatedSteps!.isNotEmpty)
+        ? _generatedSteps!
+        : meal.preparationSteps;
+
+    final detailedSteps = effectiveSteps.map((s) => s.toJson()).toList();
+    final stepInstructions = effectiveSteps.map((s) => s.instruction).toList();
 
     final mealContext = MealAiContext(
       mealId: widget.recommendation.id.isNotEmpty
@@ -205,10 +224,16 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
       servingSize: meal.servingSize,
       prepTimeMinutes: meal.prepTimeMinutes,
       cookingTimeMinutes: meal.cookingTimeMinutes,
+      calories: meal.calories,
+      proteinGrams: meal.proteinGrams,
+      carbsGrams: meal.carbsGrams,
+      fatGrams: meal.fatGrams,
       requiredIngredients: meal.ingredients.map((i) => '${i.name} (${i.recipeQuantityText})').toList(),
       availableFridgeQuantities: availableFridgeMap,
       missingIngredients: missingIngList,
-      preparationSteps: meal.preparationSteps.map((s) => s.instruction).toList(),
+      preparationSteps: stepInstructions,
+      detailedSteps: detailedSteps,
+      detailedIngredients: detailedIngredients,
       cookingTips: meal.cookingTips,
       substitutions: meal.substitutions,
       recommendationReasons: meal.whyReasons,

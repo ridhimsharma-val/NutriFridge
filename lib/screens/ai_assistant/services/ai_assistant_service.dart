@@ -7,6 +7,7 @@ import '../../../../core/supabase/supabase_client.dart';
 import '../../../../services/auth/auth_service.dart';
 import '../../fridge/models/category_item.dart';
 import '../../../models/nutrition_data.dart';
+import '../../meal_detail/models/meal_ai_context.dart';
 import '../models/ai_message.dart';
 
 /// Service connecting the Flutter client to the NutriFridge AI pipeline:
@@ -21,9 +22,17 @@ class AiAssistantService {
   /// Current pending quick-action intent (e.g. 'log_meal', 'add_groceries', 'recipe_ideas')
   static String? activeQuickActionIntent;
 
+  /// Active meal context ID currently being discussed in the session
+  static String? activeMealContextId;
+
+  /// Active structured meal context currently being discussed
+  static MealAiContext? activeMealContext;
+
   /// Resets the conversation session back to the clean introductory welcome message
   static void resetSession() {
     activeQuickActionIntent = null;
+    activeMealContextId = null;
+    activeMealContext = null;
     sessionMessages = [
       AiChatMessage(
         id: 'msg_welcome_${DateTime.now().millisecondsSinceEpoch}',

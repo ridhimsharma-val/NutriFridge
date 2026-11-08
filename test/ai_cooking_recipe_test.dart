@@ -407,6 +407,211 @@ A delicious, high-protein breakfast made with ingredients from your fridge.
       expect(payloads[1]['mealContext'], isNotNull);
       expect(payloads[1]['mealContext']['mealTitle'], 'Scrambled Eggs on Toast with Milk');
     });
+
+    testWidgets('First assistant response immediately provides complete recipe with all 5 steps when Gemini returns 1-sentence acknowledgment', (WidgetTester tester) async {
+      AiAssistantService.mockHandler = (payload) async {
+        return {
+          'ok': true,
+          'action': 'assistant_reply',
+          'assistantMessage': 'Here is a recipe for Pan-seared Chicken with Tomatoes & Peas using ingredients from your fridge!',
+        };
+      };
+
+      const mealContext = MealAiContext(
+        mealId: 'rec_chicken_peas_123',
+        mealTitle: 'Pan-seared Chicken with Tomatoes & Peas',
+        mealDescription: 'A protein-packed skillet dish using fresh ingredients from your fridge.',
+        mealType: 'Dinner',
+        nutritionSummary: '420 kcal, 38g protein, 12g carbs, 14g fat',
+        servingSize: '1 serving',
+        prepTimeMinutes: 10,
+        cookingTimeMinutes: 15,
+        calories: 420,
+        proteinGrams: 38,
+        carbsGrams: 12,
+        fatGrams: 14,
+        requiredIngredients: [
+          'Chicken Breast (200 g)',
+          'Tomatoes (2 pieces)',
+          'Green Peas (50 g)',
+          'Olive Oil (1 tbsp)',
+        ],
+        availableFridgeQuantities: {
+          'Chicken Breast': '500 g',
+          'Tomatoes': '4 pieces',
+          'Green Peas': '150 g',
+          'Olive Oil': '250 ml',
+        },
+        missingIngredients: [],
+        detailedSteps: [
+          {
+            'stepNumber': 1,
+            'instruction': 'Pat the chicken breast dry with a paper towel and season both sides with salt and black pepper.',
+            'time': '2 mins',
+          },
+          {
+            'stepNumber': 2,
+            'instruction': 'Heat 1 tbsp olive oil in a skillet over medium-high heat until shimmering.',
+            'time': '2 mins',
+            'temperature': 'medium-high',
+          },
+          {
+            'stepNumber': 3,
+            'instruction': 'Place chicken in skillet and sear undisturbed for 5-6 minutes until golden brown, then flip.',
+            'time': '6 mins',
+            'temperature': 'medium-high',
+            'tip': 'Do not move chicken too early to get a crisp crust.',
+          },
+          {
+            'stepNumber': 4,
+            'instruction': 'Add sliced tomatoes and green peas around the chicken; sauté for 3-4 minutes until softened.',
+            'time': '4 mins',
+            'temperature': 'medium',
+          },
+          {
+            'stepNumber': 5,
+            'instruction': 'Remove from heat, rest for 2 minutes, slice chicken, and serve warm with the pan vegetables.',
+            'time': '2 mins',
+          },
+        ],
+        cookingTips: ['Rest chicken before slicing to keep it juicy.'],
+        substitutions: ['Cherry tomatoes can substitute regular tomatoes.'],
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: AiAssistantScreen(
+            initialPrompt: 'I want to cook Pan-seared Chicken with Tomatoes & Peas. Please give me the complete recipe with ingredients from my fridge and step-by-step cooking instructions.',
+            mealContext: mealContext,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify the response is NOT just the 1-sentence acknowledgment
+      // It must immediately show title, ingredients with available fridge quantities, all 5 steps, tips, and nutrition
+      expect(find.textContaining('Pan-seared Chicken with Tomatoes & Peas'), findsWidgets);
+      expect(find.textContaining('Here is a recipe for Pan-seared Chicken with Tomatoes & Peas'), findsOneWidget);
+      expect(find.textContaining('Step-by-Step Instructions'), findsOneWidget);
+      expect(find.textContaining('1. Pat the chicken breast dry'), findsOneWidget);
+      expect(find.textContaining('2. Heat 1 tbsp olive oil'), findsOneWidget);
+      expect(find.textContaining('3. Place chicken in skillet'), findsOneWidget);
+      expect(find.textContaining('4. Add sliced tomatoes and green peas'), findsOneWidget);
+      expect(find.textContaining('5. Remove from heat, rest for 2 minutes'), findsOneWidget);
+      expect(find.textContaining('Available in fridge: 500 g'), findsOneWidget);
+      expect(find.textContaining('420 kcal'), findsOneWidget);
+      expect(find.textContaining("Chef's Cooking Tips"), findsOneWidget);
+    });
+
+    testWidgets('Follow-up questions do NOT repeat the entire recipe', (WidgetTester tester) async {
+      int requestCount = 0;
+      AiAssistantService.mockHandler = (payload) async {
+        requestCount++;
+        if (requestCount == 1) {
+          return {
+            'ok': true,
+            'action': 'assistant_reply',
+            'assistantMessage': 'Here is a recipe for Pan-seared Chicken with Tomatoes & Peas using ingredients from your fridge!',
+          };
+        } else {
+          return {
+            'ok': true,
+            'action': 'assistant_reply',
+            'assistantMessage': 'Yes, you can cook it without oil by using a splash of water or vegetable broth in a non-stick skillet.',
+          };
+        }
+      };
+
+      const mealContext = MealAiContext(
+        mealId: 'rec_chicken_peas_123',
+        mealTitle: 'Pan-seared Chicken with Tomatoes & Peas',
+        mealType: 'Dinner',
+        nutritionSummary: '420 kcal, 38g protein',
+        requiredIngredients: ['Chicken Breast (200 g)', 'Tomatoes (2 pieces)'],
+        availableFridgeQuantities: {'Chicken Breast': '500 g', 'Tomatoes': '4 pieces'},
+        missingIngredients: [],
+        detailedSteps: [
+          {
+            'stepNumber': 1,
+            'instruction': 'Season chicken breast with salt and pepper.',
+          },
+          {
+            'stepNumber': 2,
+            'instruction': 'Sear chicken in skillet for 6 minutes per side.',
+          },
+        ],
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: AiAssistantScreen(
+            initialPrompt: 'I want to cook Pan-seared Chicken with Tomatoes & Peas.',
+            mealContext: mealContext,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // First response has the recipe
+      expect(find.textContaining('Step-by-Step Instructions'), findsOneWidget);
+
+      // Now ask follow-up question
+      final inputFinder = find.byType(TextField);
+      await tester.enterText(inputFinder, 'Can I make this without oil?');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      // The follow-up response should answer the question without duplicating the whole recipe
+      expect(find.textContaining('Yes, you can cook it without oil by using a splash of water'), findsOneWidget);
+      // 'Step-by-Step Instructions' should still only appear once in total (from message 1)
+      expect(find.textContaining('Step-by-Step Instructions'), findsOneWidget);
+    });
+
+    testWidgets('Duplicate request prevention prevents re-sending initial prompt on re-entry', (WidgetTester tester) async {
+      int requestCount = 0;
+      AiAssistantService.mockHandler = (payload) async {
+        requestCount++;
+        return {
+          'ok': true,
+          'action': 'assistant_reply',
+          'assistantMessage': 'Here is the recipe!',
+        };
+      };
+
+      const mealContext = MealAiContext(
+        mealId: 'rec_dedup_test',
+        mealTitle: 'Pan-seared Chicken with Tomatoes & Peas',
+        mealType: 'Dinner',
+        nutritionSummary: '420 kcal',
+        requiredIngredients: ['Chicken Breast'],
+        availableFridgeQuantities: {'Chicken Breast': '500 g'},
+        missingIngredients: [],
+      );
+
+      // First launch
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: AiAssistantScreen(
+            mealContext: mealContext,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(requestCount, 1);
+
+      // Re-enter / rebuild same screen with same meal context
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: AiAssistantScreen(
+            mealContext: mealContext,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // requestCount must remain 1 — no duplicate prompt sent
+      expect(requestCount, 1);
+    });
   });
 
   group('DATA INTEGRITY & SAFETY', () {

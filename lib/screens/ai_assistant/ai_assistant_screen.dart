@@ -58,20 +58,31 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       _scrollToBottom();
     });
 
-    _activeMealContext = widget.mealContext;
+    _activeMealContext = widget.mealContext ?? AiAssistantService.activeMealContext;
+    if (widget.mealContext != null) {
+      AiAssistantService.activeMealContext = widget.mealContext;
+    }
+
     final promptToRun = widget.initialPrompt ??
-        (widget.mealContext != null
-            ? "I want to cook ${widget.mealContext!.mealTitle}. Please give me the complete recipe with ingredients from my fridge and step-by-step cooking instructions."
+        (_activeMealContext != null
+            ? "I want to cook ${_activeMealContext!.mealTitle}. Please give me the complete recipe with ingredients from my fridge and step-by-step cooking instructions."
             : null);
 
-    if (promptToRun != null && promptToRun.isNotEmpty && !_initialPromptDispatched) {
+    final isSameMealAlreadyInSession = _activeMealContext != null &&
+        AiAssistantService.activeMealContextId == _activeMealContext!.mealId &&
+        _messages.any((m) => m.isUser && m.text.contains(_activeMealContext!.mealTitle));
+
+    if (promptToRun != null && promptToRun.isNotEmpty && !_initialPromptDispatched && !isSameMealAlreadyInSession) {
       _initialPromptDispatched = true;
+      if (_activeMealContext != null) {
+        AiAssistantService.activeMealContextId = _activeMealContext!.mealId;
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _handleSend(
           promptOverride: promptToRun,
-          extraPayload: widget.mealContext != null
+          extraPayload: _activeMealContext != null
               ? {
-                  'mealContext': widget.mealContext!.toJson(),
+                  'mealContext': _activeMealContext!.toJson(),
                   'actionHint': 'assistant',
                 }
               : null,
@@ -253,7 +264,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
       if (!mounted) return;
 
-      final String assistantText =
+      String assistantText =
           (response['assistantMessage'] as String?) ?? 'Processed your request.';
       final String action = (response['action'] as String?) ?? 'assistant_reply';
       final bool requiresConfirmation = (response['requiresConfirmation'] as bool?) ?? false;
@@ -345,6 +356,50 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         }
       }
 
+      // If the user requested recipe instructions / cooking flow, ensure the response contains complete steps
+      if (_activeMealContext != null && _isFullRecipeRequest(text)) {
+        final hasSteps = assistantText.contains('1.') ||
+            assistantText.contains('Step 1') ||
+            (assistantText.contains('Preparation') && assistantText.length > 250);
+
+        if (!hasSteps) {
+          String recipeMarkdown = _activeMealContext!.formattedRecipeMarkdown;
+
+          // If the meal context didn't have steps, but Gemini returned structured meal steps:
+          if ((_activeMealContext!.preparationSteps.isEmpty && _activeMealContext!.detailedSteps.isEmpty) &&
+              meal != null &&
+              meal['preparationSteps'] is List &&
+              (meal['preparationSteps'] as List).isNotEmpty) {
+            recipeMarkdown = MealAiContext.buildRecipeMarkdownFromMealMap(
+              mealMap: meal,
+              fallbackContext: _activeMealContext,
+            );
+          }
+
+          final intro = assistantText.trim().isNotEmpty
+              ? assistantText.trim()
+              : 'Here is the complete recipe for ${_activeMealContext!.mealTitle} using ingredients from your fridge:';
+          assistantText = '$intro\n\n$recipeMarkdown';
+        }
+      } else if (meal != null &&
+          meal['preparationSteps'] is List &&
+          (meal['preparationSteps'] as List).isNotEmpty &&
+          _isFullRecipeRequest(text)) {
+        final hasSteps = assistantText.contains('1.') ||
+            assistantText.contains('Step 1') ||
+            (assistantText.contains('Preparation') && assistantText.length > 250);
+
+        if (!hasSteps) {
+          final recipeMarkdown = MealAiContext.buildRecipeMarkdownFromMealMap(
+            mealMap: meal,
+          );
+          final intro = assistantText.trim().isNotEmpty
+              ? assistantText.trim()
+              : 'Here is the complete recipe using ingredients from your fridge:';
+          assistantText = '$intro\n\n$recipeMarkdown';
+        }
+      }
+
       final assistantMessage = AiChatMessage(
         id: 'msg_ai_${DateTime.now().millisecondsSinceEpoch}',
         text: assistantText,
@@ -385,6 +440,33 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         _scrollToBottom();
       }
     }
+  }
+
+  bool _isFullRecipeRequest(String prompt) {
+    final lower = prompt.toLowerCase();
+    // Specific follow-up questions about ingredients or timings should NOT re-trigger full recipe
+    final isSpecificQuestion = lower.startsWith('can i') ||
+        lower.startsWith('could i') ||
+        lower.startsWith('should i') ||
+        lower.startsWith('what if') ||
+        lower.startsWith('how long') ||
+        lower.startsWith('what temperature') ||
+        lower.startsWith('is it okay');
+
+    if (isSpecificQuestion) return false;
+
+    return lower.contains('complete recipe') ||
+        lower.contains('give me the recipe') ||
+        lower.contains('show me the recipe') ||
+        lower.contains('full recipe') ||
+        lower.contains('step-by-step') ||
+        lower.contains('step by step') ||
+        lower.contains('show steps') ||
+        lower.contains('all steps') ||
+        lower.contains('instructions') ||
+        lower.contains('i want to cook') ||
+        lower.contains('how to cook') ||
+        lower.contains('how do i make');
   }
 
   static num _parseQuantity(dynamic q) {
@@ -1451,8 +1533,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Contextual meal indicator when opened from Meal Detail
-            if (widget.mealContext != null)
+            // Contextual meal indicator when opened from Meal Detail or active in session
+            if (_activeMealContext != null)
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -1471,7 +1553,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            'Discussing: ${widget.mealContext!.mealTitle}',
+                            'Discussing: ${_activeMealContext!.mealTitle}',
                             style: const TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w700,
@@ -1480,7 +1562,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
-                            'Recipe context active · ${widget.mealContext!.servingSize}',
+                            'Recipe context active · ${_activeMealContext!.servingSize}',
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
@@ -1495,7 +1577,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               ),
 
             // Active Quick Action Context Banner (when quick-action clarification flow is active)
-            if (_pendingQuickActionIntent != null && widget.mealContext == null)
+            if (_pendingQuickActionIntent != null && _activeMealContext == null)
               Container(
                 margin: const EdgeInsets.fromLTRB(16, 6, 16, 2),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
