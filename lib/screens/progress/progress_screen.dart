@@ -10,7 +10,7 @@ import 'widgets/weekly_calories_chart.dart';
 import 'widgets/wellness_score_hero.dart';
 
 /// Cinematic Nutrition Progress Screen
-/// Mobile-first editorial analytics narrative replacing the placeholder Progress tab.
+/// Mobile-first editorial analytics narrative displaying real Supabase nutrition data.
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key});
 
@@ -18,8 +18,31 @@ class ProgressScreen extends StatefulWidget {
   State<ProgressScreen> createState() => _ProgressScreenState();
 }
 
-class _ProgressScreenState extends State<ProgressScreen> {
+class _ProgressScreenState extends State<ProgressScreen>
+    with WidgetsBindingObserver {
   String _selectedPeriod = 'Week'; // 'Week' or 'Month'
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    if (!MockDataRepository.forceInMemoryForTesting) {
+      MockDataRepository.loadFromSupabase();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && !MockDataRepository.forceInMemoryForTesting) {
+      MockDataRepository.loadFromSupabase();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,24 +77,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     // 2. Cinematic Wellness Hero
                     WellnessScoreHero(
                       score: analytics.wellnessScore,
-                      previousScore: analytics.previousWellnessScore,
-                      interpretation: analytics.wellnessInterpretation,
                     ),
 
                     const SizedBox(height: 20),
 
                     // 3. Macronutrient Donut Chart
                     MacroDonutChart(
-                      proteinGrams: analytics.daySummaries.isNotEmpty
-                          ? analytics.totalProteinGrams ~/ analytics.daySummaries.length
-                          : 0,
-                      carbsGrams: analytics.daySummaries.isNotEmpty
-                          ? analytics.totalCarbsGrams ~/ analytics.daySummaries.length
-                          : 0,
-                      fatGrams: analytics.daySummaries.isNotEmpty
-                          ? analytics.totalFatGrams ~/ analytics.daySummaries.length
-                          : 0,
-                      centerCalories: analytics.averageDailyCalories,
+                      proteinGrams: analytics.macroChartProteinGrams,
+                      carbsGrams: analytics.macroChartCarbsGrams,
+                      fatGrams: analytics.macroChartFatGrams,
+                      centerCalories: analytics.macroChartCalories,
                       centerLabel: _selectedPeriod == 'Week' ? 'Daily avg' : 'Monthly avg',
                     ),
 
@@ -81,6 +96,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     WeeklyCaloriesChart(
                       summaries: analytics.daySummaries,
                       period: _selectedPeriod,
+                      targetCalories: analytics.targetCalories,
                     ),
 
                     const SizedBox(height: 20),
@@ -88,7 +104,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     // 5. Minimal LeetCode-style Consistency Heatmap
                     ConsistencyHeatmap(
                       cells: analytics.heatmapCells,
-                      factualSummary: analytics.factualConsistencySummary,
                       period: _selectedPeriod,
                     ),
                   ],
@@ -117,7 +132,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-
           const Text(
             'Your nutrition journey starts with your first meal.',
             textAlign: TextAlign.center,

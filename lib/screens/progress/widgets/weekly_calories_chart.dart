@@ -1,19 +1,22 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../models/progress_data.dart';
 
 /// Cinematic Weekly Calorie Bar Chart
-/// Displays 7-day or 4-week rounded calorie bars with a target reference line,
+/// Displays 7-day or monthly week segment rounded calorie bars with a dynamic target reference line,
 /// smooth animated entrance, and interactive day selection revealing macronutrient breakdown.
 class WeeklyCaloriesChart extends StatefulWidget {
   final List<DayNutritionSummary> summaries;
   final String period; // 'Week' or 'Month'
+  final int? targetCalories;
 
   const WeeklyCaloriesChart({
     super.key,
     required this.summaries,
     required this.period,
+    this.targetCalories,
   });
 
   @override
@@ -24,7 +27,7 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
     with SingleTickerProviderStateMixin {
   late AnimationController _animController;
   late Animation<double> _barAnimation;
-  int _selectedIndex = 1; // Default to today (Tuesday / current week)
+  int _selectedIndex = 0;
 
   @override
   void initState() {
@@ -39,11 +42,12 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
     );
     _animController.forward();
 
-    // Default selected index to today if available
+    _updateDefaultSelection();
+  }
+
+  void _updateDefaultSelection() {
     final todayIdx = widget.summaries.indexWhere((s) => s.isToday);
-    if (todayIdx != -1) {
-      _selectedIndex = todayIdx;
-    }
+    _selectedIndex = todayIdx != -1 ? todayIdx : (widget.summaries.isNotEmpty ? 0 : 0);
   }
 
   @override
@@ -52,9 +56,8 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
     if (oldWidget.period != widget.period ||
         oldWidget.summaries != widget.summaries) {
       _animController.forward(from: 0.0);
-      final todayIdx = widget.summaries.indexWhere((s) => s.isToday);
       setState(() {
-        _selectedIndex = todayIdx != -1 ? todayIdx : 0;
+        _updateDefaultSelection();
       });
     }
   }
@@ -65,10 +68,21 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
     super.dispose();
   }
 
+  String _formatNumber(int number) {
+    final str = number.toString();
+    final reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    return str.replaceAllMapped(reg, (m) => '${m[1]},');
+  }
+
   @override
   Widget build(BuildContext context) {
-    const int maxCalorieScale = 2600;
-    const int targetCalories = 2200;
+    if (widget.summaries.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final int targetCalories = widget.targetCalories ??
+        (widget.summaries.isNotEmpty ? widget.summaries.first.targetCalories : 2200);
+    final int maxCalorieScale = math.max(2600, ((targetCalories * 1.22) / 100).ceil() * 100);
     const double chartHeight = 170.0;
 
     final selectedDay = (_selectedIndex >= 0 && _selectedIndex < widget.summaries.length)
@@ -115,7 +129,9 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
           ),
           const SizedBox(height: 4),
           Text(
-            'Tap any day to inspect that day’s macronutrients',
+            widget.period == 'Week'
+                ? 'Tap any day to inspect that day’s macronutrients'
+                : 'Tap any week to inspect that week’s macronutrients',
             style: AppTypography.subtitle.copyWith(
               fontSize: 12,
               color: AppColors.textTertiary,
@@ -123,14 +139,14 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
           ),
           const SizedBox(height: 22),
 
-          // Main Bar Chart Area with Target Guideline
+          // Main Bar Chart Area with Dynamic Target Guideline
           SizedBox(
             height: chartHeight,
             child: Stack(
               children: [
-                // 1. Target Reference Line (Dashed / Subtle hairline)
+                // 1. Target Reference Line (Subtle hairline at exact proportion)
                 Positioned(
-                  top: chartHeight * (1.0 - (targetCalories / maxCalorieScale)),
+                  top: (chartHeight * (1.0 - (targetCalories / maxCalorieScale))).clamp(8.0, chartHeight - 20.0),
                   left: 0,
                   right: 0,
                   child: Row(
@@ -143,7 +159,7 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        '2,200',
+                        _formatNumber(targetCalories),
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
@@ -164,10 +180,10 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
                         final summary = widget.summaries[index];
                         final bool isSelected = index == _selectedIndex;
                         final double barMaxHeight = chartHeight - 44.0;
-                        final double barHeightFactor =
-                            ((summary.calories / maxCalorieScale) * _barAnimation.value)
-                                .clamp(0.08, 1.0);
-                        final double barHeight = (barMaxHeight * barHeightFactor).clamp(6.0, barMaxHeight);
+                        final double barHeightFactor = summary.calories > 0
+                            ? ((summary.calories / maxCalorieScale) * _barAnimation.value).clamp(0.06, 1.0)
+                            : 0.035;
+                        final double barHeight = (barMaxHeight * barHeightFactor).clamp(5.0, barMaxHeight);
 
                         return Expanded(
                           child: InkWell(
@@ -216,14 +232,23 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
                                                 AppColors.sageAccent,
                                               ],
                                             )
-                                          : LinearGradient(
-                                              begin: Alignment.topCenter,
-                                              end: Alignment.bottomCenter,
-                                              colors: [
-                                                const Color(0xFFC7E2D8).withValues(alpha: 0.8),
-                                                const Color(0xFFE4F0EB).withValues(alpha: 0.6),
-                                              ],
-                                            ),
+                                          : (summary.calories > 0
+                                              ? LinearGradient(
+                                                  begin: Alignment.topCenter,
+                                                  end: Alignment.bottomCenter,
+                                                  colors: [
+                                                    const Color(0xFFC7E2D8).withValues(alpha: 0.8),
+                                                    const Color(0xFFE4F0EB).withValues(alpha: 0.6),
+                                                  ],
+                                                )
+                                              : LinearGradient(
+                                                  begin: Alignment.topCenter,
+                                                  end: Alignment.bottomCenter,
+                                                  colors: [
+                                                    const Color(0xFFE8EFEA).withValues(alpha: 0.4),
+                                                    const Color(0xFFEFF5F1).withValues(alpha: 0.3),
+                                                  ],
+                                                )),
                                       boxShadow: isSelected
                                           ? [
                                               BoxShadow(
@@ -238,7 +263,7 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
                                   ),
                                   const SizedBox(height: 8),
 
-                                  // Day Label
+                                  // Day / Week Label (Mon..Sun or W1..W5)
                                   Text(
                                     summary.dayName,
                                     style: TextStyle(
@@ -268,7 +293,7 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
           const Divider(height: 1, color: Color(0xFFF1F5F2)),
           const SizedBox(height: 14),
 
-          // Selected Day Macronutrient Summary Pill Card
+          // Selected Day / Week Macronutrient Summary Pill Card
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 250),
             child: Container(
@@ -309,9 +334,9 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
                             color: AppColors.paleMint,
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: const Text(
-                            'Today (Live)',
-                            style: TextStyle(
+                          child: Text(
+                            widget.period == 'Week' ? 'Today (Live)' : 'Current Week',
+                            style: const TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                               color: AppColors.forestGreen,
@@ -323,7 +348,9 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${selectedDay.calories} kcal • ${selectedDay.loggedMealsCount} meals logged',
+                    widget.period == 'Week'
+                        ? '${selectedDay.calories} kcal • ${selectedDay.loggedMealsCount} meal${selectedDay.loggedMealsCount == 1 ? '' : 's'} logged'
+                        : '${selectedDay.calories} kcal/day avg • ${selectedDay.loggedMealsCount} meal${selectedDay.loggedMealsCount == 1 ? '' : 's'} logged',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,

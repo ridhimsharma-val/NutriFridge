@@ -1408,7 +1408,8 @@ void main() {
     // 4. Verify Cinematic Wellness Hero
     expect(find.text('WELLNESS SCORE'), findsOneWidget);
     expect(find.text('out of 100'), findsOneWidget);
-    expect(find.text('NutriFridge wellness indicator • Not a medical assessment'), findsOneWidget);
+    expect(find.text('NutriFridge wellness indicator • Not a medical assessment'), findsNothing);
+    expect(find.textContaining('demo baseline'), findsNothing);
 
     // 5. Verify Macronutrient Donut Chart
     expect(find.text('Calorie distribution by macro'), findsOneWidget);
@@ -1438,7 +1439,7 @@ void main() {
     expect(find.text('1'), findsWidgets);
     expect(find.text('2'), findsWidgets);
     expect(find.text('3+'), findsWidgets);
-    expect(find.textContaining('Meals logged on'), findsOneWidget);
+    expect(find.textContaining('Meals logged on'), findsNothing);
 
     // 8. Verify Removed Sections are NOT present
     expect(find.text('Nutrition trends'), findsNothing);

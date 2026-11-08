@@ -5,16 +5,16 @@ import '../models/progress_data.dart';
 
 /// Minimal LeetCode-style Meal Logging Consistency Heatmap
 /// Visualizes meal logging activity with compact rounded-square cells,
-/// 4 green intensity levels, day selection tooltip, factual summary, and clean legend.
+/// 4 green intensity levels, day selection tooltip, and clean legend.
 class ConsistencyHeatmap extends StatefulWidget {
   final List<HeatmapCellData> cells;
-  final String factualSummary;
+  final String? factualSummary;
   final String period;
 
   const ConsistencyHeatmap({
     super.key,
     required this.cells,
-    required this.factualSummary,
+    this.factualSummary,
     this.period = 'Week',
   });
 
@@ -163,6 +163,7 @@ class _ConsistencyHeatmapState extends State<ConsistencyHeatmap> {
 
                   final cell = widget.cells[index];
                   final isSelected = selected != null &&
+                      !cell.isPadding &&
                       selected.date.year == cell.date.year &&
                       selected.date.month == cell.date.month &&
                       selected.date.day == cell.date.day;
@@ -192,7 +193,7 @@ class _ConsistencyHeatmapState extends State<ConsistencyHeatmap> {
                                       color: AppColors.forestGreen,
                                       width: 2.0,
                                     )
-                                  : cell.isCurrentDay
+                                  : (cell.isCurrentDay && !cell.isPadding)
                                       ? Border.all(
                                           color: AppColors.forestGreenDark,
                                           width: 1.8,
@@ -236,36 +237,17 @@ class _ConsistencyHeatmapState extends State<ConsistencyHeatmap> {
 
           const SizedBox(height: 12),
 
-          // 5. Factual Summary Line & Simple 4-Level Legend
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 12,
-            runSpacing: 8,
+          // 5. Clean 4-Level Legend (Redundant summary line removed per requirements)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              // Factual summary line
-              Text(
-                widget.factualSummary,
-                style: AppTypography.subtitle.copyWith(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.forestGreen,
-                ),
-              ),
-
-              // Simple 0, 1, 2, 3+ legend
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildLegendBlock(const Color(0xFFEFF3F0), '0'),
-                  const SizedBox(width: 8),
-                  _buildLegendBlock(const Color(0xFFCBE5D7), '1'),
-                  const SizedBox(width: 8),
-                  _buildLegendBlock(AppColors.sageAccent, '2'),
-                  const SizedBox(width: 8),
-                  _buildLegendBlock(AppColors.forestGreen, '3+'),
-                ],
-              ),
+              _buildLegendBlock(const Color(0xFFEFF3F0), '0'),
+              const SizedBox(width: 8),
+              _buildLegendBlock(const Color(0xFFCBE5D7), '1'),
+              const SizedBox(width: 8),
+              _buildLegendBlock(AppColors.sageAccent, '2'),
+              const SizedBox(width: 8),
+              _buildLegendBlock(AppColors.forestGreen, '3+'),
             ],
           ),
         ],

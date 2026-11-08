@@ -321,6 +321,37 @@ class MealTrackingService {
     }
   }
 
+  /// Fetches genuine meals logged within a local date range [localStart, localEndExclusive).
+  /// Automatically converts boundaries to UTC for database comparison.
+  Future<List<LoggedMealRecord>> fetchMealsForDateRange({
+    String? userId,
+    required DateTime localStart,
+    required DateTime localEndExclusive,
+  }) async {
+    final effectiveUserId = userId ?? _currentUserId;
+    if (effectiveUserId == null) return [];
+
+    final utcStart = localStart.toUtc();
+    final utcEnd = localEndExclusive.toUtc();
+
+    try {
+      final response = await _client
+          .from('meals')
+          .select()
+          .eq('user_id', effectiveUserId)
+          .gte('logged_at', utcStart.toIso8601String())
+          .lt('logged_at', utcEnd.toIso8601String())
+          .order('logged_at', ascending: true);
+
+      final List<dynamic> rows = response as List<dynamic>;
+      return rows
+          .map((r) => LoggedMealRecord.fromJson(r as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
   /// Fetches daily nutrition snapshot from `public.daily_nutrition_snapshots`.
   Future<DailyNutritionSnapshotRecord?> fetchDailyNutritionSnapshot({
     String? userId,

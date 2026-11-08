@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_typography.dart';
 
 /// Cinematic Wellness Score Hero Section
-/// Features deep navy/forest-green gradient, elegant typography, and animated circular score ring.
+/// Mobile-first card featuring deep midnight/pine gradient, elegant typography,
+/// and smooth circular animated score ring.
 class WellnessScoreHero extends StatefulWidget {
   final int score;
   final int? previousScore;
@@ -13,7 +14,7 @@ class WellnessScoreHero extends StatefulWidget {
     super.key,
     required this.score,
     this.previousScore,
-    required this.interpretation,
+    this.interpretation = '',
   });
 
   @override
@@ -57,11 +58,6 @@ class _WellnessScoreHeroState extends State<WellnessScoreHero>
 
   @override
   Widget build(BuildContext context) {
-    final int scoreDiff = widget.previousScore != null
-        ? widget.score - widget.previousScore!
-        : 0;
-    final bool hasDiff = widget.previousScore != null;
-
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -83,11 +79,11 @@ class _WellnessScoreHeroState extends State<WellnessScoreHero>
           ),
         ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Section Sub-tag
+          // Section Heading
           Text(
             'WELLNESS SCORE',
             style: AppTypography.subtitle.copyWith(
@@ -97,7 +93,7 @@ class _WellnessScoreHeroState extends State<WellnessScoreHero>
               letterSpacing: 2.0,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
 
           // Cinematic Animated Circular Score Ring
           AnimatedBuilder(
@@ -129,7 +125,7 @@ class _WellnessScoreHeroState extends State<WellnessScoreHero>
                             height: 1.0,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 3),
                         Text(
                           'out of 100',
                           style: AppTypography.subtitle.copyWith(
@@ -144,57 +140,6 @@ class _WellnessScoreHeroState extends State<WellnessScoreHero>
                 ),
               );
             },
-          ),
-
-          const SizedBox(height: 12),
-
-          // Short human-readable interpretation
-          Text(
-            widget.interpretation,
-            textAlign: TextAlign.center,
-            style: AppTypography.greeting.copyWith(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              letterSpacing: -0.2,
-            ),
-          ),
-
-          const SizedBox(height: 6),
-
-          // Comparison with previous period (only if historical baseline exists)
-          if (hasDiff)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  width: 0.8,
-                ),
-              ),
-              child: Text(
-                '${scoreDiff >= 0 ? "+" : ""}$scoreDiff vs previous period (demo baseline)',
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFFA5D6C5),
-                ),
-              ),
-            ),
-
-          const SizedBox(height: 8),
-
-          // Honest editorial indicator disclaimer
-          Text(
-            'NutriFridge wellness indicator • Not a medical assessment',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w400,
-              color: Colors.white.withValues(alpha: 0.45),
-            ),
           ),
         ],
       ),
