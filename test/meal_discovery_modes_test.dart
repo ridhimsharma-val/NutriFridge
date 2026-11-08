@@ -7,6 +7,7 @@ import 'package:nutrifridge/screens/fridge/models/category_item.dart';
 import 'package:nutrifridge/screens/fridge/services/cooking_basket_service.dart';
 import 'package:nutrifridge/screens/fridge/widgets/category_bottom_sheet.dart';
 import 'package:nutrifridge/screens/fridge/widgets/cooking_basket_panel.dart';
+import 'package:nutrifridge/screens/fridge/widgets/cooking_pan_visual.dart';
 import 'package:nutrifridge/screens/fridge/widgets/top_freezer_refrigerator.dart';
 import 'package:nutrifridge/screens/home/services/meal_recommendation_service.dart';
 import 'package:nutrifridge/screens/home/widgets/recommendation_card.dart';
@@ -434,7 +435,7 @@ void main() {
       );
 
       expect(find.text('Select Ingredients'), findsOneWidget);
-      expect(find.byType(CookingBasketPanel), findsOneWidget);
+      expect(find.byType(CookingPanVisual), findsOneWidget);
       expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
     });
   });

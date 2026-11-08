@@ -208,32 +208,33 @@ class FridgeHeader extends StatelessWidget {
           ),
           const SizedBox(width: 8),
 
-          // Right circular action button (Settings / Overflow)
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onActionTap,
-              borderRadius: BorderRadius.circular(22),
-              child: Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppColors.cardWhite,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.cardBorder,
-                    width: 1,
+          // Right circular action button (Settings / Overflow) - Hidden in selection mode
+          if (!isSelectionMode)
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onActionTap,
+                borderRadius: BorderRadius.circular(22),
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: AppColors.cardWhite,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.cardBorder,
+                      width: 1,
+                    ),
+                    boxShadow: const [AppColors.cardShadow],
                   ),
-                  boxShadow: const [AppColors.cardShadow],
-                ),
-                child: const Icon(
-                  Icons.tune_rounded,
-                  size: 19,
-                  color: AppColors.textPrimary,
+                  child: const Icon(
+                    Icons.tune_rounded,
+                    size: 19,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

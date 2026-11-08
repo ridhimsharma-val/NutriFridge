@@ -672,6 +672,22 @@ serve(async (req: Request) => {
 
     // 7. Only validated selected inventory items become the primary ingredient context
     inventoryContext = validatedSelectedContext;
+  } else if (recipeMode === 'named_dish_from_inventory') {
+    // Server-side validation for named_dish_from_inventory mode
+    if (!preferredDishName || preferredDishName.trim().length === 0) {
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          action: 'error',
+          assistantMessage: 'Please enter a dish name to generate a recipe.',
+          error: {
+            code: 'EMPTY_DISH_NAME',
+            message: 'preferredDishName is required when recipeMode is named_dish_from_inventory.',
+          },
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
   }
 
   const userPreferences = {
@@ -772,7 +788,11 @@ serve(async (req: Request) => {
         : (preferredDishName
             ? `Create a recipe for ${preferredDishName} using these selected ingredients: ${inventoryContext.map((i: any) => i.name).join(', ')}.`
             : `Create a recipe using primarily these selected ingredients: ${inventoryContext.map((i: any) => i.name).join(', ')}.`))
-    : message;
+    : (recipeMode === 'named_dish_from_inventory')
+        ? (message.length > 0
+            ? message
+            : `Create a recipe for ${preferredDishName}. Check what ingredients are available in my fridge inventory (${inventoryContext.map((i: any) => i.name).join(', ')}), identify which required ingredients are present and which are missing, and suggest reasonable substitutions for any missing ingredients.`)
+        : message;
 
   const n8nPayload = {
     requestId: `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,

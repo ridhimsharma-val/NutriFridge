@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import 'models/category_item.dart';
 import 'models/fridge_preferences.dart';
+import 'screens/cooking_workspace_screen.dart';
 import 'services/cooking_basket_service.dart';
 import 'widgets/category_bottom_sheet.dart';
-import 'widgets/cooking_basket_panel.dart';
+import 'widgets/cooking_pan_visual.dart';
+import 'widgets/cooking_pan_widget.dart';
 import 'widgets/expiring_soon_bottom_sheet.dart';
 import 'widgets/fridge_header.dart';
 import 'widgets/fridge_preferences_sheet.dart';
@@ -23,6 +25,8 @@ class FridgePage extends StatefulWidget {
 }
 
 class _FridgePageState extends State<FridgePage> {
+  final GlobalKey _mainPanKey = GlobalKey();
+
   // Independent door states: Top Freezer and Lower Refrigerator.
   // In selection mode ("Use My Ingredients"), doors default to open immediately
   // so category shelves and inventory are instantly visible and accessible.
@@ -34,10 +38,45 @@ class _FridgePageState extends State<FridgePage> {
     super.initState();
     _isFreezerOpen = widget.isSelectionMode;
     _isFridgeOpen = widget.isSelectionMode;
+    if (widget.isSelectionMode) {
+      CookingPanCoordinator.mainPanKey = _mainPanKey;
+      CookingPanCoordinator.activeTargetKey = _mainPanKey;
+    }
     if (!FridgeCategoryRepository.isLoadedFromSupabase &&
         !FridgeCategoryRepository.isLoading) {
       FridgeCategoryRepository.loadFromSupabase();
     }
+  }
+
+  @override
+  void dispose() {
+    if (CookingPanCoordinator.mainPanKey == _mainPanKey) {
+      CookingPanCoordinator.mainPanKey = null;
+    }
+    if (CookingPanCoordinator.activeTargetKey == _mainPanKey) {
+      CookingPanCoordinator.activeTargetKey = null;
+    }
+    super.dispose();
+  }
+
+  void _openCookingWorkspace(BuildContext context) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            const CookingWorkspaceScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeInOut,
+            ),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 380),
+        reverseTransitionDuration: const Duration(milliseconds: 320),
+      ),
+    );
   }
 
   void _toggleFreezer() {
@@ -112,9 +151,6 @@ class _FridgePageState extends State<FridgePage> {
           primary: false,
           resizeToAvoidBottomInset: widget.isSelectionMode,
           backgroundColor: Colors.transparent,
-          bottomNavigationBar: widget.isSelectionMode
-              ? const CookingBasketPanel()
-              : null,
           body: SafeArea(
             child: Column(
               children: [
@@ -240,6 +276,27 @@ class _FridgePageState extends State<FridgePage> {
                     ),
                   ),
                 ),
+
+                // 3. Selection Mode Cooking Pan (Clickable surface that zooms into Cooking Workspace)
+                if (widget.isSelectionMode) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 12.0),
+                    child: Center(
+                      child: Hero(
+                        tag: 'cooking_pan_hero',
+                        child: CookingPanVisual(
+                          key: _mainPanKey,
+                          panKey: _mainPanKey,
+                          width: 275.0,
+                          height: 142.0,
+                          isCompact: false,
+                          showEmptyGuide: true,
+                          onTap: () => _openCookingWorkspace(context),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

@@ -5,6 +5,7 @@ import '../services/cooking_basket_service.dart';
 import 'animated_quantity_text.dart';
 import 'food_details_sheet.dart';
 import 'cooking_pan_widget.dart';
+import 'cooking_pan_visual.dart';
 import 'flying_ingredient_overlay.dart';
 
 /// Large reusable mobile bottom sheet for a food category
@@ -355,11 +356,11 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
                     child: Row(
                       children: [
                         // Compact physical cooking pan landing target
-                        CookingPanWidget(
+                        CookingPanVisual(
                           key: _bottomSheetPanKey,
                           panKey: _bottomSheetPanKey,
-                          width: 104,
-                          height: 56,
+                          width: 108,
+                          height: 58,
                           isCompact: true,
                           showEmptyGuide: false,
                         ),
