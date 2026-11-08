@@ -61,9 +61,15 @@ void main() {
       final panWidget = tester.widget<CookingPanVisual>(find.byType(CookingPanVisual));
       expect(panWidget.width, greaterThanOrEqualTo(320.0));
       expect(panWidget.height, greaterThanOrEqualTo(170.0));
+
+      // Verify pan is shifted slightly right for optimal visual balance with refrigerator
+      final transformFinder = find.byWidgetPredicate(
+        (widget) => widget is Transform && widget.transform.getTranslation().x > 0,
+      );
+      expect(transformFinder, findsWidgets);
     });
 
-    testWidgets('CategoryBottomSheet footer renders enlarged mini-pan and Add button, retaining selections on pop',
+    testWidgets('CategoryBottomSheet footer renders enlarged standalone pan and Add action card, retaining selections on pop',
         (tester) async {
       tester.view.physicalSize = const Size(400, 850);
       tester.view.devicePixelRatio = 1.0;
@@ -97,11 +103,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Mini pan is rendered and enlarged
+      // Standalone pan is rendered outside card and enlarged substantially
       expect(find.byType(CookingPanVisual), findsOneWidget);
       final miniPan = tester.widget<CookingPanVisual>(find.byType(CookingPanVisual));
-      expect(miniPan.width, greaterThanOrEqualTo(150.0));
-      expect(miniPan.height, greaterThanOrEqualTo(80.0));
+      expect(miniPan.width, greaterThanOrEqualTo(240.0));
+      expect(miniPan.height, greaterThanOrEqualTo(120.0));
 
       // Button is labeled "Add" (not "Done")
       expect(find.widgetWithText(ElevatedButton, 'Add'), findsOneWidget);

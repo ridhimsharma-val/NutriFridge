@@ -288,7 +288,8 @@ class _FridgePageState extends State<FridgePage> {
                       // Prominent cooking pan sized to approximately 3x the original visual size (~400px x 216px vs 240px x 130px),
                       // maintaining aspect ratio, full handle visibility, and comfortable vertical margins.
                       final double maxAllowedHeight = (screenHeight * 0.28).clamp(160.0, 228.0);
-                      final double panWidth = (screenWidth - 24.0).clamp(300.0, 420.0).clamp(0.0, maxAllowedHeight / 0.54);
+                      const double shiftRight = 18.0;
+                      final double panWidth = (screenWidth - 24.0 - (shiftRight * 2)).clamp(280.0, 400.0).clamp(0.0, maxAllowedHeight / 0.54);
                       final double panHeight = panWidth * 0.54;
 
                       return Padding(
@@ -296,30 +297,33 @@ class _FridgePageState extends State<FridgePage> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Center(
-                              child: Hero(
-                                tag: 'cooking_pan_hero',
-                                flightShuttleBuilder: (
-                                  flightContext,
-                                  animation,
-                                  flightDirection,
-                                  fromHeroContext,
-                                  toHeroContext,
-                                ) {
-                                  final Hero toHero = toHeroContext.widget as Hero;
-                                  return Material(
-                                    color: Colors.transparent,
-                                    child: toHero.child,
-                                  );
-                                },
-                                child: CookingPanVisual(
-                                  key: _mainPanKey,
-                                  panKey: _mainPanKey,
-                                  width: panWidth,
-                                  height: panHeight,
-                                  isCompact: false,
-                                  showEmptyGuide: false,
-                                  onTap: () => _openCookingWorkspace(context),
+                            Transform.translate(
+                              offset: const Offset(shiftRight, 0.0),
+                              child: Center(
+                                child: Hero(
+                                  tag: 'cooking_pan_hero',
+                                  flightShuttleBuilder: (
+                                    flightContext,
+                                    animation,
+                                    flightDirection,
+                                    fromHeroContext,
+                                    toHeroContext,
+                                  ) {
+                                    final Hero toHero = toHeroContext.widget as Hero;
+                                    return Material(
+                                      color: Colors.transparent,
+                                      child: toHero.child,
+                                    );
+                                  },
+                                  child: CookingPanVisual(
+                                    key: _mainPanKey,
+                                    panKey: _mainPanKey,
+                                    width: panWidth,
+                                    height: panHeight,
+                                    isCompact: false,
+                                    showEmptyGuide: false,
+                                    onTap: () => _openCookingWorkspace(context),
+                                  ),
                                 ),
                               ),
                             ),

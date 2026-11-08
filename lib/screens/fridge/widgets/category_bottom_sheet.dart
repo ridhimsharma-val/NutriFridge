@@ -170,8 +170,10 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final double screenHeight = MediaQuery.sizeOf(context).height;
-    // Mobile bottom sheet taking ~72% of screen height
-    final double sheetHeight = (screenHeight * 0.72).clamp(500.0, 750.0);
+    // Mobile bottom sheet taking ~82% in selection mode (for standalone pan + Add card) or ~72% normally
+    final double sheetHeight = widget.isSelectionMode
+        ? (screenHeight * 0.82).clamp(560.0, 800.0)
+        : (screenHeight * 0.72).clamp(500.0, 750.0);
 
     final filteredItems = _category.items.where((it) {
       if (_searchQuery.isEmpty) return true;
@@ -345,84 +347,101 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
                         ),
                 ),
 
-                // 5. Selection mode footer
-                if (widget.isSelectionMode)
+                // 5. Standalone Large Cooking Pan (Prominent visual element, outside any card container)
+                if (widget.isSelectionMode) ...[
+                  Builder(
+                    builder: (context) {
+                      final screenWidth = MediaQuery.sizeOf(context).width;
+                      // Substantially enlarged standalone pan (~250-290px wide x 135-156px high), centered horizontally
+                      final double standalonePanWidth = (screenWidth - 48.0).clamp(240.0, 290.0);
+                      final double standalonePanHeight = standalonePanWidth * 0.54;
+
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                        child: Center(
+                          child: CookingPanVisual(
+                            key: _bottomSheetPanKey,
+                            panKey: _bottomSheetPanKey,
+                            width: standalonePanWidth,
+                            height: standalonePanHeight,
+                            isCompact: false,
+                            showEmptyGuide: false,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  // 6. Separate Full-Width Add Action Card directly below the standalone pan
                   Container(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 14, 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       border: Border(top: BorderSide(color: Color(0xFFEBE5DC))),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(0x0A000000),
+                          blurRadius: 8,
+                          offset: Offset(0, -3),
+                        ),
+                      ],
                     ),
-                    child: Builder(
-                      builder: (context) {
-                        final screenWidth = MediaQuery.sizeOf(context).width;
-                        // Substantially larger mini-pan (~3x visual area, ~180px vs 108px), preserving aspect ratio & handle
-                        final double sheetPanWidth = (screenWidth * 0.44).clamp(150.0, 185.0);
-                        final double sheetPanHeight = sheetPanWidth * 0.54;
-
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            // Enlarged physical cooking pan landing target
-                            CookingPanVisual(
-                              key: _bottomSheetPanKey,
-                              panKey: _bottomSheetPanKey,
-                              width: sheetPanWidth,
-                              height: sheetPanHeight,
-                              isCompact: true,
-                              showEmptyGuide: false,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    CookingBasketService.count == 0
-                                        ? 'Your pan is ready'
-                                        : '${CookingBasketService.count} selected in pan',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.forestGreen,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    CookingBasketService.count == 0
-                                        ? 'Tap items to add'
-                                        : '${CookingBasketService.count} item${CookingBasketService.count > 1 ? 's' : ''} added',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w500,
-                                      color: AppColors.neutralMedium,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                CookingBasketService.count == 0
+                                    ? '0 items in pan'
+                                    : '${CookingBasketService.count} item${CookingBasketService.count > 1 ? 's' : ''} in pan',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.neutralCharcoal,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            ElevatedButton(
-                              onPressed: () => Navigator.of(context).pop(),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.forestGreen,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                elevation: 0,
+                              const SizedBox(height: 2),
+                              Text(
+                                CookingBasketService.count == 0
+                                    ? 'Tap items above to add'
+                                    : 'In pan: ${CookingBasketService.selectedItems.map((e) => e.name).take(2).join(', ')}${CookingBasketService.count > 2 ? '...' : ''}',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.neutralMedium,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              child: const Text('Add', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        ElevatedButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.forestGreen,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Add',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
                             ),
-                          ],
-                        );
-                      },
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                ],
               ],
             ),
           ),
