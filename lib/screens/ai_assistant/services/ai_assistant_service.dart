@@ -2,12 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../../core/config/supabase_config.dart';
 import '../../../../core/supabase/supabase_client.dart';
 import '../../../../services/auth/auth_service.dart';
 import '../../fridge/models/category_item.dart';
 import '../../../models/nutrition_data.dart';
 import '../../meal_detail/models/meal_ai_context.dart';
+import '../../../../services/ai/supabase_ai_function_client.dart';
 import '../models/ai_message.dart';
 
 /// Service connecting the Flutter client to the NutriFridge AI pipeline:
@@ -15,6 +15,9 @@ import '../models/ai_message.dart';
 class AiAssistantService {
   /// Name of the authenticated Supabase Edge Function
   static const String edgeFunctionName = 'nutrifridge-ai';
+
+  /// Client timeout limit of 90 seconds (Duration(seconds: 90)) before returning 'GEMINI_REQUEST_TIMEOUT'.
+  static const Duration invocationTimeout = Duration(seconds: 90);
 
   /// In-memory conversation session history to prevent resetting across screen navigations
   static List<AiChatMessage> sessionMessages = [];
@@ -149,273 +152,26 @@ class AiAssistantService {
       payload['actionHint'] = 'assistant';
     }
 
-    // 1. Mock handler bypass (for unit tests and deterministic offline test suites)
-    if (mockHandler != null) {
-      final mockResult = await mockHandler!(payload);
-      return _normalizeResponse(mockResult);
-    }
-
-    // 2. Reject unauthenticated requests in live mode
-    if (!MockDataRepository.forceInMemoryForTesting &&
-        (!AuthService.instance.isAuthenticated || AuthService.instance.currentUser == null)) {
-      return {
-        'ok': false,
-        'success': false,
-        'action': 'error',
-        'assistantMessage':
-            'Please sign in to your NutriFridge account to use the AI Assistant.',
-        'error': 'User not authenticated',
-        'requiresConfirmation': false,
-      };
-    }
-
-    // 3. Fallback for offline widget test environments
+    // Fallback for offline widget test environments without mock handler
     if (MockDataRepository.forceInMemoryForTesting &&
-        (!AuthService.instance.isAuthenticated || AuthService.instance.currentUser == null)) {
+        (!AuthService.instance.isAuthenticated || AuthService.instance.currentUser == null) &&
+        mockHandler == null &&
+        SupabaseAiFunctionClient.mockHandler == null) {
       return _generateTestModeFallback(message, actionHint);
     }
 
-    // 4. Ensure active session is valid and refresh if expired before invoking
-    if (!MockDataRepository.forceInMemoryForTesting) {
-      final session = _client.auth.currentSession;
-      if (session != null) {
-        final nowSeconds = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-        final expiresAt = session.expiresAt;
-        final isNearExpiry = expiresAt != null && (expiresAt - nowSeconds) < 120;
-        if (session.isExpired || isNearExpiry) {
-          try {
-            await _client.auth.refreshSession();
-          } catch (refreshErr) {
-            debugPrint('[AiAssistantService] Session auto-refresh failed: $refreshErr');
-            if (session.isExpired) {
-              return {
-                'ok': false,
-                'success': false,
-                'action': 'error',
-                'assistantMessage':
-                    'Your session has expired. Please sign in again to access NutriFridge AI.',
-                'error': 'Session expired and refresh failed: $refreshErr',
-                'requiresConfirmation': false,
-              };
+    // Delegate execution to the centralized SupabaseAiFunctionClient
+    return await SupabaseAiFunctionClient.invokeAiFunction(
+      body: payload,
+      functionName: edgeFunctionName,
+      customClient: SupabaseManager.isInitialized ? _client : null,
+      handlerOverride: mockHandler != null
+          ? (b) async {
+              final res = await mockHandler!(b);
+              return _normalizeResponse(res);
             }
-          }
-        }
-      }
-    }
-
-    final activeSession = _client.auth.currentSession;
-    final String? accessToken = activeSession?.accessToken;
-    final Map<String, String> invocationHeaders = {};
-    if (accessToken != null && accessToken.isNotEmpty) {
-      invocationHeaders['Authorization'] = 'Bearer $accessToken';
-    }
-    if (SupabaseConfig.isConfigured && SupabaseConfig.supabasePublishableKey.isNotEmpty) {
-      invocationHeaders['apikey'] = SupabaseConfig.supabasePublishableKey;
-    }
-
-    final stopwatch = Stopwatch()..start();
-
-    try {
-      // 5. Dispatch request to Supabase Edge Function `nutrifridge-ai`
-      // Configured with a 90-second client-side timeout so backend (75s) and n8n (60s)
-      // have adequate time to generate meal recommendations without premature termination.
-      final FunctionResponse response = await _client.functions
-          .invoke(
-            edgeFunctionName,
-            body: payload,
-            headers: invocationHeaders.isNotEmpty ? invocationHeaders : null,
-          )
-          .timeout(const Duration(seconds: 90));
-
-      stopwatch.stop();
-      debugPrint('[AiAssistantService] Edge function returned status ${response.status} in ${stopwatch.elapsedMilliseconds}ms');
-
-      final dynamic data = response.data;
-      if (data == null) {
-        return {
-          'ok': false,
-          'success': false,
-          'action': 'error',
-          'assistantMessage':
-              'Received an empty response from NutriFridge AI. Please tap retry.',
-          'error': 'Response data was null',
-          'requiresConfirmation': false,
-        };
-      }
-
-      return _normalizeResponse(data);
-    } on FunctionException catch (e) {
-      stopwatch.stop();
-      debugPrint('[AiAssistantService] FunctionException (${e.status}) after ${stopwatch.elapsedMilliseconds}ms: ${e.details}');
-
-      Map<String, dynamic>? detailsMap;
-      if (e.details is Map) {
-        detailsMap = Map<String, dynamic>.from(e.details as Map);
-      } else if (e.details is String) {
-        final rawDetails = (e.details as String).trim();
-        if ((rawDetails.startsWith('{') && rawDetails.endsWith('}')) ||
-            (rawDetails.startsWith('[') && rawDetails.endsWith(']'))) {
-          try {
-            final decoded = jsonDecode(rawDetails);
-            if (decoded is Map) {
-              detailsMap = Map<String, dynamic>.from(decoded);
-            }
-          } catch (_) {}
-        }
-      }
-
-      String? backendMessage;
-      dynamic errorCode;
-      if (detailsMap != null) {
-        if (detailsMap['error'] is Map) {
-          errorCode = detailsMap['error']['code'];
-          if (detailsMap['error']['message'] is String) {
-            backendMessage = detailsMap['error']['message'] as String;
-          }
-        } else if (detailsMap['error'] is String) {
-          errorCode = detailsMap['error'];
-        }
-        if (detailsMap['assistantMessage'] is String && (detailsMap['assistantMessage'] as String).trim().isNotEmpty) {
-          backendMessage = (detailsMap['assistantMessage'] as String).trim();
-        }
-      }
-
-      final detailsString = (e.details?.toString() ?? e.reasonPhrase ?? '').trim();
-      final detailsLower = detailsString.toLowerCase();
-
-      // Check for code inside detailsString if errorCode was not extracted from JSON
-      if (errorCode == null) {
-        if (detailsLower.contains('gemini_rate_limit_exceeded') || detailsLower.contains('rate limit') || e.status == 429) {
-          errorCode = 'GEMINI_RATE_LIMIT_EXCEEDED';
-        } else if (detailsLower.contains('gemini_request_timeout') || detailsLower.contains('timeout') || e.status == 504) {
-          errorCode = 'GEMINI_REQUEST_TIMEOUT';
-        } else if (detailsLower.contains('invalid_uuid_syntax') || detailsLower.contains('invalid uuid') || detailsLower.contains('22p02')) {
-          errorCode = 'INVALID_UUID_SYNTAX';
-        } else if (detailsLower.contains('item_not_found') || detailsLower.contains('unauthorized item')) {
-          errorCode = 'ITEM_NOT_FOUND_OR_UNAUTHORIZED';
-        } else if (detailsLower.contains('user_authentication_failed') || detailsLower.contains('missing_authorization') || detailsLower.contains('jwt') || detailsLower.contains('expired') || e.status == 401) {
-          errorCode = 'USER_AUTHENTICATION_FAILED';
-        } else if (detailsLower.contains('database_query_error') || detailsLower.contains('inventory_fetch_failed')) {
-          errorCode = 'DATABASE_QUERY_ERROR';
-        } else if (detailsLower.contains('empty_selection')) {
-          errorCode = 'EMPTY_SELECTION';
-        } else if (detailsLower.contains('invalid_ai_response')) {
-          errorCode = 'INVALID_AI_RESPONSE';
-        }
-      }
-
-      String friendlyMessage;
-      if (e.status == 401 ||
-          errorCode == 'MISSING_AUTHORIZATION' ||
-          errorCode == 'USER_AUTHENTICATION_FAILED' ||
-          errorCode == 'INVALID_AUTHORIZATION_FORMAT') {
-        friendlyMessage =
-            'Your session has expired. Please sign in again to access NutriFridge AI.';
-      } else if (errorCode == 'EMPTY_SELECTION') {
-        friendlyMessage = 'Please select at least one ingredient from your fridge.';
-      } else if (errorCode == 'INVALID_UUID_SYNTAX') {
-        friendlyMessage = 'One or more selected ingredient IDs are invalid. Please refresh your inventory.';
-      } else if (errorCode == 'ITEM_NOT_FOUND_OR_UNAUTHORIZED') {
-        friendlyMessage = 'One or more selected items could not be found in your inventory. Please refresh and try again.';
-      } else if (errorCode == 'DATABASE_QUERY_ERROR' || errorCode == 'INVENTORY_FETCH_FAILED') {
-        friendlyMessage = 'Unable to verify selected ingredients from database. Please tap retry.';
-      } else if (e.status == 429 || errorCode == 'GEMINI_RATE_LIMIT_EXCEEDED') {
-        friendlyMessage =
-            'Google Gemini rate limit exceeded. Please wait a moment and tap retry.';
-      } else if (e.status == 504 || errorCode == 'GEMINI_REQUEST_TIMEOUT') {
-        friendlyMessage =
-            'NutriFridge AI took longer than expected to respond. Please tap retry.';
-      } else if (errorCode == 'GEMINI_INVALID_REQUEST') {
-        friendlyMessage =
-            'Google Gemini rejected the request format. Please shorten or simplify your input.';
-      } else if (errorCode == 'GEMINI_AUTH_FAILED') {
-        friendlyMessage =
-            'Google Gemini authentication failed. Please verify API key configuration.';
-      } else if (errorCode == 'INVALID_AI_RESPONSE') {
-        friendlyMessage =
-            'Received an invalid response format from NutriFridge AI. Please tap retry.';
-      } else if (errorCode == 'N8N_NOT_CONFIGURED') {
-        friendlyMessage = 'NutriFridge AI service is currently not configured.';
-      } else if (e.status == 503 || e.status == 502 || errorCode == 'CONNECTION_FAILED' || (errorCode is String && errorCode.startsWith('N8N_UPSTREAM_'))) {
-        friendlyMessage =
-            'NutriFridge AI is temporarily experiencing high load. Please tap retry.';
-      } else if (backendMessage != null &&
-          backendMessage.isNotEmpty &&
-          !backendMessage.toLowerCase().contains('internal server error')) {
-        friendlyMessage = backendMessage;
-      } else if (e.status >= 500) {
-        friendlyMessage =
-            'NutriFridge AI is temporarily unavailable. Please tap retry.';
-      } else if (e.status == 400) {
-        friendlyMessage =
-            'Request could not be processed. Please check your selected ingredients.';
-      } else {
-        friendlyMessage =
-            'Unable to reach NutriFridge AI. Please tap retry in a moment.';
-      }
-
-      return {
-        'ok': false,
-        'success': false,
-        'action': 'error',
-        'assistantMessage': friendlyMessage,
-        'error': 'FunctionException (${e.status}): ${e.details ?? e.reasonPhrase}',
-        'requiresConfirmation': false,
-      };
-    } on TimeoutException catch (e) {
-      stopwatch.stop();
-      debugPrint('[AiAssistantService] Request timed out after ${stopwatch.elapsedMilliseconds}ms: $e');
-      return {
-        'ok': false,
-        'success': false,
-        'action': 'error',
-        'assistantMessage':
-            'NutriFridge AI took longer than expected to respond. Please tap retry.',
-        'error': {
-          'code': 'GEMINI_REQUEST_TIMEOUT',
-          'message': 'Client timeout limit of 90 seconds exceeded.',
-          'retryable': true,
-        },
-        'requiresConfirmation': false,
-      };
-    } catch (e) {
-      stopwatch.stop();
-      debugPrint('[AiAssistantService] Network error after ${stopwatch.elapsedMilliseconds}ms: $e');
-      final errStr = e.toString().toLowerCase();
-      String msg;
-      if (errStr.contains('socket') ||
-          errStr.contains('failed host lookup') ||
-          errStr.contains('network') ||
-          errStr.contains('connection refused') ||
-          errStr.contains('clientexception')) {
-        msg = 'Unable to reach NutriFridge AI. Please check your internet connection and tap retry.';
-      } else if (errStr.contains('401') ||
-          errStr.contains('auth') ||
-          errStr.contains('jwt') ||
-          errStr.contains('unauthorized')) {
-        msg = 'Your session has expired. Please sign in again to access NutriFridge AI.';
-      } else if (errStr.contains('timeout')) {
-        msg = 'NutriFridge AI took longer than expected to respond. Please tap retry.';
-      } else if (errStr.contains('429') || errStr.contains('rate limit')) {
-        msg = 'Google Gemini rate limit exceeded. Please wait a moment and tap retry.';
-      } else if (errStr.contains('format') || errStr.contains('parse') || errStr.contains('json')) {
-        msg = 'Received an invalid response format from NutriFridge AI. Please tap retry.';
-      } else if (errStr.contains('invalid uuid') || errStr.contains('uuid')) {
-        msg = 'One or more selected ingredient IDs are invalid. Please refresh your inventory.';
-      } else if (errStr.contains('item not found') || errStr.contains('not found')) {
-        msg = 'One or more selected items could not be found in your inventory. Please refresh and try again.';
-      } else {
-        msg = 'Unable to reach NutriFridge AI. Please tap retry.';
-      }
-      return {
-        'ok': false,
-        'success': false,
-        'action': 'error',
-        'assistantMessage': msg,
-        'error': e.toString(),
-        'requiresConfirmation': false,
-      };
-    }
+          : null,
+    );
   }
 
   /// Generates a structured response for widget tests when in forced in-memory test mode
