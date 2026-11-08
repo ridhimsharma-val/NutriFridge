@@ -113,6 +113,13 @@ class AiAssistantService {
             })
         .toList();
 
+    // Normalize actionHint: n8n workflow strictly supports:
+    // ['auto', 'add_food_single', 'add_food_multiple', 'receipt_scan', 'log_meal', 'assistant', 'meal_recommendation'].
+    // Cooking instructions map to 'assistant' while passing mealContext.
+    final String normalizedActionHint = (actionHint == 'cook_recipe' || actionHint == 'recipe_instructions')
+        ? 'assistant'
+        : actionHint;
+
     final Map<String, dynamic> payload = {
       'requestId': 'req_${DateTime.now().millisecondsSinceEpoch}',
       'source': source,
@@ -124,10 +131,14 @@ class AiAssistantService {
       'userPreferences': getProfilePreferences(),
       'todayNutrition': getNutritionContext(),
       'locale': 'en-IN',
-      'actionHint': actionHint,
+      'actionHint': normalizedActionHint,
       'conversationId': ?conversationId,
       ...?extraPayload,
     };
+
+    if (payload['actionHint'] == 'cook_recipe' || payload['actionHint'] == 'recipe_instructions') {
+      payload['actionHint'] = 'assistant';
+    }
 
     // 1. Mock handler bypass (for unit tests and deterministic offline test suites)
     if (mockHandler != null) {

@@ -72,7 +72,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           extraPayload: widget.mealContext != null
               ? {
                   'mealContext': widget.mealContext!.toJson(),
-                  'actionHint': 'cook_recipe',
+                  'actionHint': 'assistant',
                 }
               : null,
         );
@@ -222,7 +222,12 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     } else if (currentIntent == 'recipe_ideas') {
       resolvedActionHint = 'meal_recommendation';
     } else if (_activeMealContext != null) {
-      resolvedActionHint = 'cook_recipe';
+      resolvedActionHint = 'assistant';
+    }
+
+    // Ensure cook_recipe is normalized to 'assistant' for n8n compatibility
+    if (resolvedActionHint == 'cook_recipe' || resolvedActionHint == 'recipe_instructions') {
+      resolvedActionHint = 'assistant';
     }
 
     final Map<String, dynamic> combinedPayload = {

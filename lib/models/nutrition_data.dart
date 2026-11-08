@@ -887,7 +887,7 @@ class MockDataRepository {
         fiberG: fiber,
         isEstimate: isEstimate,
         nutritionSource: nutritionSource,
-        recipeId: recipeId,
+        recipeId: MealTrackingService.isValidUuid(recipeId) ? recipeId : null,
         imageUrl: imageUrl,
         ingredients: deductions,
       );

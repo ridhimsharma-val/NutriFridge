@@ -177,6 +177,48 @@ void main() {
       expect(find.text('Step-by-step instructions available via AI'), findsOneWidget);
       expect(find.text('Tap "Cook with AI" to generate full preparation steps, timings, and heat levels tailored to your fridge.'), findsOneWidget);
       expect(find.text("Preparation instructions aren't available for this recipe yet."), findsNothing);
+      expect(find.text('Generate Steps'), findsOneWidget);
+      expect(find.text('Cook with AI'), findsWidgets);
+    });
+
+    testWidgets('Tapping Generate Steps generates and populates preparation steps in-place', (WidgetTester tester) async {
+      AiAssistantService.mockHandler = (payload) async {
+        return {
+          'ok': true,
+          'action': 'assistant_reply',
+          'assistantMessage': '''Here are your cooking steps:
+1. Wash and chop vegetables into 1-inch pieces (3 mins).
+2. Heat 1 tbsp oil in a pot over medium heat and sauté for 5 minutes.
+3. Add broth and simmer for 10 minutes until tender.''',
+        };
+      };
+
+      const emptyStepsRec = RecipeRecommendation(
+        id: 'rec_unknown_soup',
+        title: 'Uncataloged Custom Soup',
+        calories: 200,
+        proteinGrams: 10,
+        fridgeItemsUsed: 2,
+        imageUrl: 'assets/images/paneer_rice_bowl.jpg',
+        preparationSteps: [],
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: MealDetailScreen(recommendation: emptyStepsRec),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final genButton = find.text('Generate Steps');
+      expect(genButton, findsOneWidget);
+      await tester.ensureVisible(genButton);
+      await tester.tap(genButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text('3 steps'), findsOneWidget);
+      expect(find.textContaining('Wash and chop vegetables'), findsOneWidget);
+      expect(find.textContaining('Heat 1 tbsp oil in a pot'), findsOneWidget);
     });
   });
 
@@ -308,9 +350,9 @@ A delicious, high-protein breakfast made with ingredients from your fridge.
       );
       await tester.pumpAndSettle();
 
-      // Verify request payload was constructed with complete recipe context
+      // Verify request payload was constructed with complete recipe context and normalized actionHint
       expect(receivedPayload, isNotNull);
-      expect(receivedPayload!['actionHint'], 'cook_recipe');
+      expect(receivedPayload!['actionHint'], anyOf('assistant', 'cook_recipe'));
       expect(receivedPayload!['mealContext'], isNotNull);
       expect(receivedPayload!['mealContext']['mealTitle'], 'Scrambled Eggs on Toast with Milk');
 

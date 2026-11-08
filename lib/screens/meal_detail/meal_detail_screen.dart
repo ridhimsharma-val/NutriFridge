@@ -8,6 +8,7 @@ import '../../services/auth/auth_service.dart';
 import '../../services/meals/meal_tracking_service.dart';
 import '../../services/meals/models/meal_models.dart';
 import '../ai_assistant/ai_assistant_screen.dart';
+import '../ai_assistant/services/ai_assistant_service.dart';
 import '../fridge/models/category_item.dart';
 import '../home/services/meal_recommendation_service.dart';
 import 'models/meal_ai_context.dart';
@@ -35,6 +36,9 @@ class MealDetailScreen extends StatefulWidget {
 
 class _MealDetailScreenState extends State<MealDetailScreen> {
   bool _isLogging = false;
+  List<RecipePreparationStep>? _generatedSteps;
+  bool _isLoadingSteps = false;
+  String? _stepsError;
 
   String get _heroTag =>
       widget.heroTag ??
@@ -63,11 +67,7 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
       for (final ing in meal.ingredients) {
         final matched = FridgeCategoryRepository.findItemByName(ing.name);
         final isAvail = ing.availability == IngredientAvailability.available && matched != null;
-        final isRealUuid = matched != null &&
-            matched.id.isNotEmpty &&
-            !matched.id.startsWith('item_') &&
-            !matched.id.startsWith('food_') &&
-            !matched.id.startsWith('dairy_');
+        final isRealUuid = matched != null && MealTrackingService.isValidUuid(matched.id);
         final isUnitCompatible = matched != null &&
             FridgeCategoryRepository.areUnitsCompatible(matched.unit, ing.requiredUnit);
         final doDeduct = isAvail && isRealUuid && ing.requiredQuantity > 0 && isUnitCompatible;
@@ -84,6 +84,11 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
       }
 
       // 3. Record meal via MockDataRepository (invoking Supabase RPC when authenticated)
+      // Never pass synthetic recommendation IDs (e.g. 'rec_1794205815811') into PostgreSQL UUID column.
+      final validRecipeId = MealTrackingService.isValidUuid(widget.recommendation.id)
+          ? widget.recommendation.id
+          : null;
+
       final result = await MockDataRepository.logMeal(
         mealType: meal.tag.isNotEmpty ? meal.tag.toLowerCase() : 'lunch',
         mealName: meal.name,
@@ -94,9 +99,7 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
         ingredients: availableIngredients,
         idempotencyKey: _idempotencyKey,
         ingredientDeductions: deductions,
-        recipeId: widget.recommendation.id.isNotEmpty && !widget.recommendation.id.startsWith('recipe_')
-            ? widget.recommendation.id
-            : null,
+        recipeId: validRecipeId,
         imageUrl: meal.imageUrl,
       );
 
@@ -897,8 +900,130 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
   // ==========================================
   // 4. RECIPE-SPECIFIC PREPARATION SECTION
   // ==========================================
+  Future<void> _fetchPreparationSteps(MealDetailInfo meal) async {
+    if (_isLoadingSteps) return;
+    setState(() {
+      _isLoadingSteps = true;
+      _stepsError = null;
+    });
+
+    try {
+      final availableFridgeMap = <String, String>{};
+      for (final ing in meal.ingredients) {
+        if (ing.availability == IngredientAvailability.available && ing.availableQuantityInFridge != null) {
+          availableFridgeMap[ing.name] = ing.availableQuantityInFridge!;
+        }
+      }
+
+      final missingIngList = meal.ingredients
+          .where((i) => i.availability == IngredientAvailability.missing)
+          .map((i) => i.name)
+          .toList();
+
+      final nutritionSummary = (meal.calories != null)
+          ? '${meal.calories} kcal, ${meal.proteinGrams ?? "--"}g protein, ${meal.carbsGrams ?? "--"}g carbs, ${meal.fatGrams ?? "--"}g fat'
+          : 'Nutrition unavailable';
+
+      final mealContext = MealAiContext(
+        mealId: widget.recommendation.id.isNotEmpty
+            ? widget.recommendation.id
+            : 'meal_${meal.name.toLowerCase().replaceAll(RegExp(r'\s+'), '_')}',
+        mealTitle: meal.name,
+        mealDescription: widget.recommendation.explanation ?? 'Recipe recommendation based on available ingredients.',
+        mealType: meal.tag,
+        nutritionSummary: nutritionSummary,
+        servingSize: meal.servingSize,
+        prepTimeMinutes: meal.prepTimeMinutes,
+        cookingTimeMinutes: meal.cookingTimeMinutes,
+        requiredIngredients: meal.ingredients.map((i) => '${i.name} (${i.recipeQuantityText})').toList(),
+        availableFridgeQuantities: availableFridgeMap,
+        missingIngredients: missingIngList,
+        preparationSteps: const [],
+        cookingTips: meal.cookingTips,
+        substitutions: meal.substitutions,
+        recommendationReasons: meal.whyReasons,
+      );
+
+      final response = await AiAssistantService.sendRequest(
+        message: 'Give me the complete step-by-step recipe instructions and cooking steps for ${meal.name}.',
+        actionHint: 'assistant',
+        extraPayload: {
+          'mealContext': mealContext.toJson(),
+        },
+      );
+
+      final steps = <RecipePreparationStep>[];
+      if (response['meal'] is Map && response['meal']['preparationSteps'] is List) {
+        final raw = response['meal']['preparationSteps'] as List;
+        for (int i = 0; i < raw.length; i++) {
+          final s = raw[i];
+          if (s is Map) {
+            steps.add(RecipePreparationStep.fromJson(Map<String, dynamic>.from(s), i + 1));
+          } else if (s != null && s.toString().trim().isNotEmpty) {
+            steps.add(RecipePreparationStep(stepNumber: i + 1, instruction: s.toString().trim()));
+          }
+        }
+      }
+
+      if (steps.isEmpty) {
+        final text = (response['assistantMessage'] as String?) ?? '';
+        final parsed = _parseStepsFromAiText(text);
+        if (parsed.isNotEmpty) {
+          steps.addAll(parsed);
+        }
+      }
+
+      if (steps.isEmpty) {
+        throw Exception('Could not extract preparation steps from AI response.');
+      }
+
+      if (mounted) {
+        setState(() {
+          _generatedSteps = steps;
+          _isLoadingSteps = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingSteps = false;
+          _stepsError = 'Unable to generate preparation steps. Tap retry to try again.';
+        });
+      }
+    }
+  }
+
+  static List<RecipePreparationStep> _parseStepsFromAiText(String text) {
+    final List<RecipePreparationStep> result = [];
+    final lines = text.split('\n');
+    final stepRegex = RegExp(r'^\s*(?:\d+[\.\)]|\*\s*\*\*Step\s*\d+:?\*\*|\*\*Step\s*\d+:?\*\*)\s*(.+)$', caseSensitive: false);
+
+    int currentStep = 1;
+    for (final line in lines) {
+      final match = stepRegex.firstMatch(line);
+      if (match != null) {
+        final instruction = match.group(1)!.trim().replaceAll(RegExp(r'^\*+|\*+$'), '').trim();
+        if (instruction.isNotEmpty) {
+          String? time;
+          final timeMatch = RegExp(r'\(?(\d+(?:-\d+)?\s*(?:min|mins|minutes|sec|secs|seconds|hours?))\)?', caseSensitive: false).firstMatch(instruction);
+          if (timeMatch != null) {
+            time = timeMatch.group(1);
+          }
+          result.add(RecipePreparationStep(
+            stepNumber: currentStep++,
+            instruction: instruction,
+            time: time,
+          ));
+        }
+      }
+    }
+    return result;
+  }
+
   Widget _buildPreparationSection(MealDetailInfo meal) {
-    final steps = meal.preparationSteps;
+    final steps = (_generatedSteps != null && _generatedSteps!.isNotEmpty)
+        ? _generatedSteps!
+        : meal.preparationSteps;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -935,7 +1060,66 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
         ),
         const SizedBox(height: 8),
 
-        if (steps.isEmpty)
+        if (_isLoadingSteps)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            decoration: BoxDecoration(
+              color: AppColors.pureWhite,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE2EBE5), width: 1.0),
+              boxShadow: const [AppColors.softShadow],
+            ),
+            child: const Column(
+              children: [
+                SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: AppColors.primaryForest,
+                  ),
+                ),
+                SizedBox(height: 14),
+                Text(
+                  'Generating recipe steps from your fridge ingredients...',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.darkText,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (_stepsError != null)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFFCA5A5), width: 1.0),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _stepsError!,
+                    style: const TextStyle(fontSize: 12.5, color: Color(0xFF991B1B)),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _fetchPreparationSteps(meal),
+                  child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+          )
+        else if (steps.isEmpty)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -993,16 +1177,34 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
                 const SizedBox(height: 12),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: () => _handleCookWithAi(context, meal),
-                    icon: const Icon(Icons.restaurant_menu_rounded, size: 16),
-                    label: const Text('Cook with AI'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primaryForest,
-                      backgroundColor: AppColors.paleMint,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _fetchPreparationSteps(meal),
+                        icon: const Icon(Icons.auto_awesome_rounded, size: 15),
+                        label: const Text('Generate Steps'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primaryForest,
+                          side: const BorderSide(color: Color(0xFFD4E7D9)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => _handleCookWithAi(context, meal),
+                        icon: const Icon(Icons.restaurant_menu_rounded, size: 16),
+                        label: const Text('Cook with AI'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primaryForest,
+                          backgroundColor: AppColors.paleMint,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

@@ -648,12 +648,19 @@ serve(async (req: Request) => {
     );
   }
 
+  // Upstream n8n workflow strictly supports:
+  // ['auto', 'add_food_single', 'add_food_multiple', 'receipt_scan', 'log_meal', 'assistant', 'meal_recommendation'].
+  // Normalize 'cook_recipe' / 'recipe_instructions' to 'assistant' with mealContext.
+  const n8nActionHint = (actionHint === 'cook_recipe' || actionHint === 'recipe_instructions')
+    ? 'assistant'
+    : actionHint;
+
   const n8nPayload = {
     requestId: `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     userId: userId,
     source: source,
     message: message,
-    actionHint: actionHint,
+    actionHint: n8nActionHint,
     currentMealPeriod: currentMealPeriod,
     clientLocalTime: clientLocalTime,
     mealContext: body.mealContext ?? null,
@@ -717,10 +724,10 @@ serve(async (req: Request) => {
     } catch (_) {}
 
     const upstreamError = errorDetail?.error;
-    const errorCode = upstreamError?.code ?? (status === 504 ? 'GEMINI_REQUEST_TIMEOUT' : `N8N_UPSTREAM_${status}`);
+    const errorCode = upstreamError?.code ?? errorDetail?.code ?? (status === 504 ? 'GEMINI_REQUEST_TIMEOUT' : `N8N_UPSTREAM_${status}`);
     const isRetryable = upstreamError?.retryable ?? (status >= 500 || status === 429);
 
-    let assistantMessage = errorDetail?.assistantMessage;
+    let assistantMessage = errorDetail?.assistantMessage ?? upstreamError?.message;
     if (!assistantMessage) {
       if (errorCode === 'GEMINI_REQUEST_TIMEOUT' || status === 504) {
         assistantMessage = 'NutriFridge AI took longer than expected to respond. Please tap retry.';
@@ -728,6 +735,8 @@ serve(async (req: Request) => {
         assistantMessage = 'Google Gemini rate limit exceeded. Please wait a moment and tap retry.';
       } else if (errorCode === 'GEMINI_AUTH_FAILED' || status === 401 || status === 403) {
         assistantMessage = 'Google Gemini authentication failed. Please verify API key configuration in n8n.';
+      } else if (errorDetail?.message && typeof errorDetail.message === 'string') {
+        assistantMessage = `AI Assistant service error: ${errorDetail.message}`;
       } else if (errorCode === 'GEMINI_INVALID_REQUEST' || status === 400) {
         assistantMessage = 'Google Gemini rejected the request format. Please shorten or simplify your input.';
       } else {

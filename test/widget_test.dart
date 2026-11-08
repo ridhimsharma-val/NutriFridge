@@ -4530,8 +4530,11 @@ void main() {
         tester.view.resetDevicePixelRatio();
       });
 
+      MockDataRepository.reset();
+      MealRecommendationService.reset();
       FridgeCategoryRepository.seedSampleDataForTesting();
       MealRecommendationService.currentTimeProvider = () => DateTime(2026, 11, 4, 8, 30); // Morning Breakfast
+      await MealRecommendationService.fetchRecommendation(forceRefresh: true);
 
       await tester.pumpWidget(
         const MaterialApp(

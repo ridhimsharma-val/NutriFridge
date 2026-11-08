@@ -39,6 +39,19 @@ class MealTrackingService {
     return 'meal_${now}_$rand';
   }
 
+  static final RegExp _uuidRegex = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+
+  /// Validates whether [value] matches standard UUID v4/canonical formatting.
+  /// Prevents PostgreSQL 22P02 errors ('invalid input syntax for type uuid')
+  /// when synthetic recommendation or item IDs (such as 'rec_1794205815811'
+  /// or 'dairy_1') are passed into fields expecting genuine UUIDs.
+  static bool isValidUuid(String? value) {
+    if (value == null) return false;
+    return _uuidRegex.hasMatch(value.trim());
+  }
+
   static const Set<String> _knownUnits = {
     'g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms',
     'ml', 'milliliter', 'milliliters', 'l', 'liter', 'liters', 'litre', 'litres',
@@ -146,6 +159,16 @@ class MealTrackingService {
 
     final cleanSlot = normalizeMealSlot(mealType);
 
+    // Sanitize recipeId: PostgreSQL p_recipe_id column requires a valid UUID.
+    // Synthetic recommendation IDs (e.g., 'rec_1794205815811') must NEVER be
+    // passed to UUID fields, avoiding error 22P02.
+    final validRecipeId = isValidUuid(recipeId) ? recipeId!.trim() : null;
+
+    final sanitizedIngredients = ingredients.map((i) {
+      final validMatchedId = isValidUuid(i.matchedFridgeItemId) ? i.matchedFridgeItemId!.trim() : null;
+      return i.copyWith(matchedFridgeItemId: validMatchedId).toJson();
+    }).toList();
+
     return <String, dynamic>{
       'p_idempotency_key': trimmedKey,
       'p_meal_name': trimmedName,
@@ -158,9 +181,9 @@ class MealTrackingService {
       'p_fiber_g': fiberG,
       'p_is_estimate': isEstimate,
       'p_nutrition_source': nutritionSource,
-      'p_recipe_id': recipeId,
+      'p_recipe_id': validRecipeId,
       'p_image_url': imageUrl,
-      'p_ingredients': ingredients.map((i) => i.toJson()).toList(),
+      'p_ingredients': sanitizedIngredients,
     };
   }
 

@@ -47,7 +47,7 @@ void main() {
         fiberG: 5,
         isEstimate: true,
         nutritionSource: 'ai_estimate',
-        recipeId: 'rec-uuid-999',
+        recipeId: '11111111-2222-3333-4444-555555555555',
         imageUrl: 'https://example.com/paneer.jpg',
         ingredients: deductions,
       );
@@ -63,7 +63,7 @@ void main() {
       expect(params['p_fiber_g'], 5);
       expect(params['p_is_estimate'], true);
       expect(params['p_nutrition_source'], 'ai_estimate');
-      expect(params['p_recipe_id'], 'rec-uuid-999');
+      expect(params['p_recipe_id'], '11111111-2222-3333-4444-555555555555');
       expect(params['p_image_url'], 'https://example.com/paneer.jpg');
 
       final ingList = params['p_ingredients'] as List<dynamic>;
@@ -106,6 +106,54 @@ void main() {
         () => MealTrackingService.normalizeMealSlot('Midnight Brunch'),
         throwsA(isA<ArgumentError>()),
       );
+    });
+
+    test('isValidUuid accurately identifies genuine UUIDs vs synthetic identifiers', () {
+      expect(MealTrackingService.isValidUuid('c3d4e5f6-a7b8-4c9d-8e1f-2a3b4c5d6e7f'), isTrue);
+      expect(MealTrackingService.isValidUuid('11111111-2222-3333-4444-555555555555'), isTrue);
+      expect(MealTrackingService.isValidUuid('00000000-0000-0000-0000-000000000000'), isTrue);
+
+      // Synthetic IDs should be rejected
+      expect(MealTrackingService.isValidUuid('rec_1794205815811'), isFalse);
+      expect(MealTrackingService.isValidUuid('rec_eggs_toast_123'), isFalse);
+      expect(MealTrackingService.isValidUuid('item_milk_1'), isFalse);
+      expect(MealTrackingService.isValidUuid('dairy_1'), isFalse);
+      expect(MealTrackingService.isValidUuid(''), isFalse);
+      expect(MealTrackingService.isValidUuid(null), isFalse);
+    });
+
+    test('buildRpcParams sanitizes synthetic recipeId to null to prevent Postgres 22P02 error', () {
+      final params = MealTrackingService.buildRpcParams(
+        idempotencyKey: 'idemp-uuid-sanitize',
+        mealName: 'Paneer Rice Bowl',
+        mealType: 'lunch',
+        recipeId: 'rec_1794205815811', // Synthetic ID from recommendation
+      );
+
+      // Must be null so PostgreSQL UUID column receives NULL instead of invalid string
+      expect(params['p_recipe_id'], isNull);
+    });
+
+    test('buildRpcParams sanitizes non-UUID matched_fridge_item_id to null in ingredient deductions', () {
+      final deductions = [
+        const MealIngredientDeduction(
+          name: 'Paneer',
+          requiredQuantity: 200,
+          requiredUnit: 'g',
+          matchedFridgeItemId: 'dairy_item_paneer_123', // Non-UUID synthetic ID
+          doDeduct: true,
+        ),
+      ];
+
+      final params = MealTrackingService.buildRpcParams(
+        idempotencyKey: 'idemp-ing-sanitize',
+        mealName: 'Paneer Bowl',
+        mealType: 'lunch',
+        ingredients: deductions,
+      );
+
+      final ingList = params['p_ingredients'] as List<dynamic>;
+      expect(ingList[0]['matched_fridge_item_id'], isNull);
     });
   });
 

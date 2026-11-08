@@ -38,12 +38,40 @@ class MealIngredientDeduction {
     this.doDeduct = false,
   });
 
+  MealIngredientDeduction copyWith({
+    String? name,
+    num? requiredQuantity,
+    String? requiredUnit,
+    String? matchedFridgeItemId,
+    num? deductQuantity,
+    String? deductUnit,
+    bool? doDeduct,
+  }) {
+    return MealIngredientDeduction(
+      name: name ?? this.name,
+      requiredQuantity: requiredQuantity ?? this.requiredQuantity,
+      requiredUnit: requiredUnit ?? this.requiredUnit,
+      matchedFridgeItemId: matchedFridgeItemId ?? this.matchedFridgeItemId,
+      deductQuantity: deductQuantity ?? this.deductQuantity,
+      deductUnit: deductUnit ?? this.deductUnit,
+      doDeduct: doDeduct ?? this.doDeduct,
+    );
+  }
+
+  static final RegExp _uuidRegex = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+
   Map<String, dynamic> toJson() {
+    final validMatchedId = (matchedFridgeItemId != null && _uuidRegex.hasMatch(matchedFridgeItemId!.trim()))
+        ? matchedFridgeItemId!.trim()
+        : null;
+
     return {
       'name': name.trim(),
       'required_quantity': requiredQuantity,
       'required_unit': requiredUnit?.trim().isNotEmpty == true ? requiredUnit!.trim() : 'pieces',
-      'matched_fridge_item_id': matchedFridgeItemId,
+      'matched_fridge_item_id': validMatchedId,
       'deduct_quantity': deductQuantity,
       'deduct_unit': deductUnit?.trim().isNotEmpty == true ? deductUnit!.trim() : 'pieces',
       'do_deduct': doDeduct,
