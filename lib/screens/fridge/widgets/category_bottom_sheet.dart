@@ -348,65 +348,79 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
                 // 5. Selection mode footer
                 if (widget.isSelectionMode)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.fromLTRB(12, 8, 14, 10),
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       border: Border(top: BorderSide(color: Color(0xFFEBE5DC))),
                     ),
-                    child: Row(
-                      children: [
-                        // Compact physical cooking pan landing target
-                        CookingPanVisual(
-                          key: _bottomSheetPanKey,
-                          panKey: _bottomSheetPanKey,
-                          width: 108,
-                          height: 58,
-                          isCompact: true,
-                          showEmptyGuide: false,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                CookingBasketService.count == 0
-                                    ? 'Your pan is ready'
-                                    : '${CookingBasketService.count} selected in pan',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.forestGreen,
-                                ),
+                    child: Builder(
+                      builder: (context) {
+                        final screenWidth = MediaQuery.sizeOf(context).width;
+                        // Substantially larger mini-pan (~3x visual area, ~180px vs 108px), preserving aspect ratio & handle
+                        final double sheetPanWidth = (screenWidth * 0.44).clamp(150.0, 185.0);
+                        final double sheetPanHeight = sheetPanWidth * 0.54;
+
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Enlarged physical cooking pan landing target
+                            CookingPanVisual(
+                              key: _bottomSheetPanKey,
+                              panKey: _bottomSheetPanKey,
+                              width: sheetPanWidth,
+                              height: sheetPanHeight,
+                              isCompact: true,
+                              showEmptyGuide: false,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    CookingBasketService.count == 0
+                                        ? 'Your pan is ready'
+                                        : '${CookingBasketService.count} selected in pan',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.forestGreen,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    CookingBasketService.count == 0
+                                        ? 'Tap items to add'
+                                        : '${CookingBasketService.count} item${CookingBasketService.count > 1 ? 's' : ''} added',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.neutralMedium,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
                               ),
-                              Text(
-                                CookingBasketService.count == 0
-                                    ? 'Tap items to add'
-                                    : 'In pan: ${CookingBasketService.selectedItems.map((e) => e.name).take(2).join(', ')}${CookingBasketService.count > 2 ? '...' : ''}',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.neutralMedium,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.forestGreen,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                elevation: 0,
                               ),
-                            ],
-                          ),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.forestGreen,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            elevation: 0,
-                          ),
-                          child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w700)),
-                        ),
-                      ],
+                              child: const Text('Add', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
               ],

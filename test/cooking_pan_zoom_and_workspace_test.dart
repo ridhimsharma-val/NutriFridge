@@ -7,6 +7,7 @@ import 'package:nutrifridge/screens/fridge/fridge_page.dart';
 import 'package:nutrifridge/screens/fridge/models/category_item.dart';
 import 'package:nutrifridge/screens/fridge/screens/cooking_workspace_screen.dart';
 import 'package:nutrifridge/screens/fridge/services/cooking_basket_service.dart';
+import 'package:nutrifridge/screens/fridge/widgets/category_bottom_sheet.dart';
 import 'package:nutrifridge/screens/fridge/widgets/cooking_pan_visual.dart';
 import 'package:nutrifridge/screens/home/services/meal_recommendation_service.dart';
 import 'package:nutrifridge/services/ai/supabase_ai_function_client.dart';
@@ -55,6 +56,70 @@ void main() {
         (widget) => widget is Hero && widget.tag == 'cooking_pan_hero',
       );
       expect(heroFinder, findsOneWidget);
+
+      // Verify enlarged dimensions: ~3x area compared to original 240x130
+      final panWidget = tester.widget<CookingPanVisual>(find.byType(CookingPanVisual));
+      expect(panWidget.width, greaterThanOrEqualTo(320.0));
+      expect(panWidget.height, greaterThanOrEqualTo(170.0));
+    });
+
+    testWidgets('CategoryBottomSheet footer renders enlarged mini-pan and Add button, retaining selections on pop',
+        (tester) async {
+      tester.view.physicalSize = const Size(400, 850);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final item = CategoryFoodItem(
+        id: 'dairy-1',
+        name: 'Whole Milk',
+        category: 'Dairy Products',
+        quantity: '1 L',
+        expiryDays: 5,
+      );
+      final category = CategoryData(
+        id: 'dairy',
+        name: 'Dairy Products',
+        iconEmoji: '🥛',
+        items: [item],
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: CategoryBottomSheet(
+              category: category,
+              isSelectionMode: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Mini pan is rendered and enlarged
+      expect(find.byType(CookingPanVisual), findsOneWidget);
+      final miniPan = tester.widget<CookingPanVisual>(find.byType(CookingPanVisual));
+      expect(miniPan.width, greaterThanOrEqualTo(150.0));
+      expect(miniPan.height, greaterThanOrEqualTo(80.0));
+
+      // Button is labeled "Add" (not "Done")
+      expect(find.widgetWithText(ElevatedButton, 'Add'), findsOneWidget);
+      expect(find.widgetWithText(ElevatedButton, 'Done'), findsNothing);
+
+      // Select an item
+      final firstItem = category.items.first;
+      await tester.tap(find.text(firstItem.name));
+      await tester.pump();
+      expect(CookingBasketService.isSelected(firstItem), isTrue);
+
+      // Tap Add button to confirm and close
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      // Selection remains retained in service
+      expect(CookingBasketService.isSelected(firstItem), isTrue);
+      expect(CookingBasketService.count, 1);
     });
 
     testWidgets('FridgePage in normal mode displays settings icon and does not render CookingPanVisual',
