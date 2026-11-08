@@ -2,13 +2,19 @@ import 'package:flutter/material.dart';
 import 'models/category_item.dart';
 import 'models/fridge_preferences.dart';
 import 'widgets/category_bottom_sheet.dart';
+import 'widgets/cooking_basket_panel.dart';
 import 'widgets/expiring_soon_bottom_sheet.dart';
 import 'widgets/fridge_header.dart';
 import 'widgets/fridge_preferences_sheet.dart';
 import 'widgets/top_freezer_refrigerator.dart';
 
 class FridgePage extends StatefulWidget {
-  const FridgePage({super.key});
+  final bool isSelectionMode;
+
+  const FridgePage({
+    super.key,
+    this.isSelectionMode = false,
+  });
 
   @override
   State<FridgePage> createState() => _FridgePageState();
@@ -55,6 +61,7 @@ class _FridgePageState extends State<FridgePage> {
     await CategoryBottomSheet.show(
       context: context,
       category: categoryData,
+      isSelectionMode: widget.isSelectionMode,
     );
     if (mounted) {
       setState(() {
@@ -86,16 +93,22 @@ class _FridgePageState extends State<FridgePage> {
 
         return Scaffold(
           primary: false,
-          resizeToAvoidBottomInset: false,
+          resizeToAvoidBottomInset: widget.isSelectionMode,
           backgroundColor: Colors.transparent,
+          bottomNavigationBar: widget.isSelectionMode
+              ? const CookingBasketPanel()
+              : null,
           body: SafeArea(
             child: Column(
               children: [
-                // 1. Top Header: My Fridge | dynamic items | dynamic expiring soon | preferences control
+                // 1. Top Header: My Fridge / Select Ingredients | dynamic items | dynamic expiring soon | preferences control
                 FridgeHeader(
-                  title: 'My Fridge',
+                  title: widget.isSelectionMode ? 'Select Ingredients' : 'My Fridge',
                   itemCount: totalItems,
                   expiringCount: expiringCount,
+                  onBackTap: widget.isSelectionMode
+                      ? () => Navigator.of(context).maybePop()
+                      : null,
                   onExpiringTap: _openExpiringSoon,
                   onActionTap: () async {
                     await FridgePreferencesSheet.show(context);

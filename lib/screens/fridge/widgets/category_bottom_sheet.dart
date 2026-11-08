@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/category_item.dart';
+import '../services/cooking_basket_service.dart';
 import 'animated_quantity_text.dart';
 import 'food_details_sheet.dart';
 
@@ -10,17 +11,20 @@ import 'food_details_sheet.dart';
 /// - Subtle top drag handle and header with category emoji, title, item count, and close button.
 /// - Compact, clean vertical inventory rows with realistic food thumbnail, name, quantity,
 ///   and calm pastel expiry badges (soft coral, soft peach, muted green).
-/// - Tapping an item opens the FoodDetailsSheet layered above this category sheet.
+/// - In normal mode: Tapping an item opens the FoodDetailsSheet layered above this category sheet.
+/// - In selection mode: Tapping an item toggles selection into the Cooking Basket.
 /// - Real-time local state updates when items are used or removed.
 /// - Keeps the open refrigerator visible in the background via a subtle translucent backdrop.
 class CategoryBottomSheet extends StatefulWidget {
   final CategoryData category;
   final ValueChanged<CategoryFoodItem>? onItemTap;
+  final bool isSelectionMode;
 
   const CategoryBottomSheet({
     super.key,
     required this.category,
     this.onItemTap,
+    this.isSelectionMode = false,
   });
 
   /// Opens the reusable category bottom sheet
@@ -28,6 +32,7 @@ class CategoryBottomSheet extends StatefulWidget {
     required BuildContext context,
     required CategoryData category,
     ValueChanged<CategoryFoodItem>? onItemTap,
+    bool isSelectionMode = false,
   }) {
     return showModalBottomSheet<T>(
       context: context,
@@ -39,6 +44,7 @@ class CategoryBottomSheet extends StatefulWidget {
       builder: (sheetContext) => CategoryBottomSheet(
         category: category,
         onItemTap: onItemTap,
+        isSelectionMode: isSelectionMode,
       ),
     );
   }
@@ -49,6 +55,8 @@ class CategoryBottomSheet extends StatefulWidget {
 
 class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
   late CategoryData _category;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -59,6 +67,7 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
 
   @override
   void dispose() {
+    _searchController.dispose();
     FridgeCategoryRepository.notifier.removeListener(_onRepositoryChanged);
     super.dispose();
   }
@@ -82,6 +91,12 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
   void _handleItemTap(CategoryFoodItem item) {
     if (widget.onItemTap != null) {
       widget.onItemTap!(item);
+      return;
+    }
+
+    if (widget.isSelectionMode) {
+      CookingBasketService.toggleItem(item);
+      setState(() {});
       return;
     }
 
@@ -114,132 +129,234 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final double screenHeight = MediaQuery.sizeOf(context).height;
-    // Mobile bottom sheet taking ~68% of screen height
-    final double sheetHeight = (screenHeight * 0.68).clamp(500.0, 720.0);
+    // Mobile bottom sheet taking ~72% of screen height
+    final double sheetHeight = (screenHeight * 0.72).clamp(500.0, 750.0);
 
-    return Container(
-      height: sheetHeight,
-      decoration: const BoxDecoration(
-        // Creamy white background
-        color: Color(0xFFFAF7F2),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x280B1522),
-            blurRadius: 28,
-            spreadRadius: 2,
-            offset: Offset(0, -6),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 1. Subtle drag handle
-            const SizedBox(height: 10),
-            Center(
-              child: Container(
-                width: 38,
-                height: 4.5,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFD6DDD8),
-                  borderRadius: BorderRadius.circular(3),
-                ),
+    final filteredItems = _category.items.where((it) {
+      if (_searchQuery.isEmpty) return true;
+      return it.name.toLowerCase().contains(_searchQuery);
+    }).toList();
+
+    return ListenableBuilder(
+      listenable: CookingBasketService.selectedItemsNotifier,
+      builder: (context, _) {
+        return Container(
+          height: sheetHeight,
+          decoration: const BoxDecoration(
+            color: Color(0xFFFAF7F2),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x280B1522),
+                blurRadius: 28,
+                spreadRadius: 2,
+                offset: Offset(0, -6),
               ),
-            ),
-            const SizedBox(height: 10),
+            ],
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 1. Subtle drag handle
+                const SizedBox(height: 10),
+                Center(
+                  child: Container(
+                    width: 38,
+                    height: 4.5,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD6DDD8),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
 
-            // 2. Header: Category emoji + title, item count, and Close button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${_category.iconEmoji} ${_category.name}',
-                          style: const TextStyle(
-                            fontSize: 19.5,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.neutralCharcoal,
-                            letterSpacing: -0.3,
+                // 2. Header: Category emoji + title, item count, and Close button
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Text(
+                              _category.iconEmoji,
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                _category.name,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.neutralCharcoal,
+                                  letterSpacing: -0.3,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppColors.paleMint,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFC8E6C9), width: 1),
+                              ),
+                              child: Text(
+                                '${_category.items.length} items',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.forestGreen,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => Navigator.of(context).pop(),
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEDE9E3),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: const Color(0xFFDDD7CE), width: 1),
+                            ),
+                            child: const Icon(
+                              Icons.close_rounded,
+                              size: 19,
+                              color: AppColors.neutralCharcoal,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 2),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                // 3. Search Bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (text) => setState(() => _searchQuery = text.trim().toLowerCase()),
+                    decoration: InputDecoration(
+                      hintText: 'Search ${_category.name}...',
+                      hintStyle: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.neutralCharcoal.withValues(alpha: 0.4),
+                      ),
+                      prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppColors.neutralMedium),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, size: 16),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            )
+                          : null,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.forestGreen, width: 1.5),
+                      ),
+                    ),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+                const Divider(height: 1, thickness: 1, color: Color(0xFFEBE5DC)),
+
+                // 4. Vertical item list
+                Expanded(
+                  child: filteredItems.isEmpty
+                      ? _buildEmptyState()
+                      : ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                          physics: const BouncingScrollPhysics(),
+                          itemCount: filteredItems.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 8),
+                          itemBuilder: (context, i) => _buildItemRow(context, filteredItems[i]),
+                        ),
+                ),
+
+                // 5. Selection mode footer
+                if (widget.isSelectionMode)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      border: Border(top: BorderSide(color: Color(0xFFEBE5DC))),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
                         Text(
-                          '${_category.itemCount} items',
+                          '${CookingBasketService.count} selected in basket',
                           style: const TextStyle(
                             fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
                             color: AppColors.forestGreen,
                           ),
                         ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.forestGreen,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            elevation: 0,
+                          ),
+                          child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w700)),
+                        ),
                       ],
                     ),
                   ),
-
-                  // Close Button
-                  Material(
-                    color: Colors.white,
-                    shape: const CircleBorder(),
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Container(
-                        padding: const EdgeInsets.all(7.0),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.cardBorder, width: 1.0),
-                          boxShadow: const [AppColors.softShadow],
-                        ),
-                        child: const Icon(
-                          Icons.close_rounded,
-                          size: 19,
-                          color: AppColors.neutralCharcoal,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              ],
             ),
-
-            const SizedBox(height: 12),
-            const Divider(height: 1, thickness: 1, color: Color(0xFFEBE5DC)),
-
-            // 3. Clean vertical item list
-            Expanded(
-              child: _category.items.isEmpty
-                  ? _buildEmptyState()
-                  : ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-                      physics: const BouncingScrollPhysics(),
-                      children: [
-                        for (int i = 0; i < _category.items.length; i++) ...[
-                          if (i > 0) const SizedBox(height: 8),
-                          _buildItemRow(context, _category.items[i]),
-                        ],
-                      ],
-                    ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
   /// Single Item Row
   Widget _buildItemRow(BuildContext context, CategoryFoodItem item) {
+    final isSelected = widget.isSelectionMode && CookingBasketService.isSelected(item);
+
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.cardWhite,
+        color: isSelected ? const Color(0xFFF1F8F1) : AppColors.cardWhite,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.cardBorder, width: 1.0),
+        border: Border.all(
+          color: isSelected ? AppColors.forestGreen : AppColors.cardBorder,
+          width: isSelected ? 1.5 : 1.0,
+        ),
         boxShadow: const [AppColors.softShadow],
       ),
       child: Material(
@@ -334,14 +451,21 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
                   ),
                 ),
 
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
 
-                // Subtle chevron arrow affordance
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  size: 19,
-                  color: AppColors.textTertiary,
-                ),
+                // Trailing Action: In Selection mode, show Checkbox / checkmark icon; otherwise Chevron
+                if (widget.isSelectionMode)
+                  Icon(
+                    isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                    size: 22,
+                    color: isSelected ? AppColors.forestGreen : const Color(0xFF9CA3AF),
+                  )
+                else
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 19,
+                    color: AppColors.textTertiary,
+                  ),
               ],
             ),
           ),
@@ -362,19 +486,22 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
               style: const TextStyle(fontSize: 42),
             ),
             const SizedBox(height: 12),
-            const Text(
-              'Nothing here yet',
-              style: TextStyle(
+            Text(
+              _searchQuery.isNotEmpty ? 'No items match "$_searchQuery"' : 'Nothing here yet',
+              style: const TextStyle(
                 fontSize: 16.5,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF1E293B),
               ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Add food using NutriFridge AI.',
+            Text(
+              _searchQuery.isNotEmpty
+                  ? 'Try searching for another ingredient name.'
+                  : 'Add food using NutriFridge AI.',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w500,
                 color: Color(0xFF64748B),

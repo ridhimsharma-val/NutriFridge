@@ -16,6 +16,10 @@ class RecommendationCard extends StatelessWidget {
   final VoidCallback? onChangeSuggestion;
   final bool? isChangingSuggestion;
   final String? alternativeMessage;
+  final MealDiscoveryMode? discoveryMode;
+  final VoidCallback? onSelectAiSuggestion;
+  final VoidCallback? onSelectUseMyIngredients;
+  final VoidCallback? onSwitchMode;
 
   const RecommendationCard({
     super.key,
@@ -29,6 +33,10 @@ class RecommendationCard extends StatelessWidget {
     this.onChangeSuggestion,
     this.isChangingSuggestion,
     this.alternativeMessage,
+    this.discoveryMode,
+    this.onSelectAiSuggestion,
+    this.onSelectUseMyIngredients,
+    this.onSwitchMode,
   });
 
   String get _heroTag =>
@@ -38,6 +46,7 @@ class RecommendationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rec = recommendation;
+    final mode = discoveryMode ?? MealRecommendationService.discoveryMode;
     final effectiveStatus = status ??
         (rec != null
             ? RecommendationStatus.loaded
@@ -45,22 +54,203 @@ class RecommendationCard extends StatelessWidget {
                 ? RecommendationStatus.empty
                 : RecommendationStatus.loading));
 
+    final bool showDualMode = mode == MealDiscoveryMode.none && rec == null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
-          child: Text(
-            'Suggested for you',
-            style: AppTypography.sectionTitle,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  'Suggested for you',
+                  style: AppTypography.sectionTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (!showDualMode && onSwitchMode != null) ...[
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: onSwitchMode,
+                  borderRadius: BorderRadius.circular(8),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.swap_horiz_rounded, size: 14, color: AppColors.forestGreen),
+                        SizedBox(width: 3),
+                        Text(
+                          'Change mode',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.forestGreen,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
         const SizedBox(height: 10),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
-          child: _buildStateBody(context, effectiveStatus, rec),
+          child: showDualMode
+              ? _buildDualModeChoices(context)
+              : _buildStateBody(context, effectiveStatus, rec),
         ),
       ],
+    );
+  }
+
+  Widget _buildDualModeChoices(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Option A: AI Suggestion
+        _buildChoiceCard(
+          context: context,
+          key: const ValueKey('choice_ai_suggestion'),
+          title: 'AI Suggestion',
+          description:
+              'Let NutriFridge find the perfect meal using your fridge ingredients.',
+          icon: Icons.auto_awesome_rounded,
+          iconColor: AppColors.forestGreen,
+          iconBgColor: AppColors.paleMint,
+          buttonText: 'Suggest Meal',
+          onTap: onSelectAiSuggestion,
+        ),
+        const SizedBox(height: 12),
+
+        // Option B: Use My Ingredients
+        _buildChoiceCard(
+          context: context,
+          key: const ValueKey('choice_use_my_ingredients'),
+          title: 'Use My Ingredients',
+          description:
+              'Choose your ingredients and let AI create a meal for you.',
+          icon: Icons.inventory_2_rounded,
+          iconColor: const Color(0xFFC85A32),
+          iconBgColor: const Color(0xFFFFF2EB),
+          buttonText: 'Select Items',
+          onTap: onSelectUseMyIngredients,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChoiceCard({
+    required BuildContext context,
+    Key? key,
+    required String title,
+    required String description,
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBgColor,
+    required String buttonText,
+    required VoidCallback? onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: key,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: AppColors.pureWhite,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppColors.cardBorder,
+              width: 1.2,
+            ),
+            boxShadow: const [AppColors.softShadow],
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: iconBgColor,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  icon,
+                  size: 22,
+                  color: iconColor,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: AppTypography.cardTitle.copyWith(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.neutralCharcoal,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      description,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.neutralMedium,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: iconBgColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      buttonText,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: iconColor,
+                      ),
+                    ),
+                    const SizedBox(width: 3),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 13,
+                      color: iconColor,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

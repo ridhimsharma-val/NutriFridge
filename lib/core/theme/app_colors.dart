@@ -55,6 +55,7 @@ class AppColors {
   static const Color charcoalLight = mutedText;
   static const Color textPrimary = darkText;
   static const Color textSecondary = mutedText;
+  static const Color neutralMedium = mutedText;
   static const Color textTertiary = Color(0xFF8FA499);
   static const Color textOnDark = pureWhite;
 

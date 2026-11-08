@@ -28,6 +28,34 @@ class FridgeHeader extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          if (onBackTap != null) ...[
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onBackTap,
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.cardWhite,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.cardBorder,
+                      width: 1,
+                    ),
+                    boxShadow: const [AppColors.cardShadow],
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back_rounded,
+                    size: 20,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ),
+          ],
           // Title & items count pill (scaled down cleanly if space is tight)
           Expanded(
             child: FittedBox(

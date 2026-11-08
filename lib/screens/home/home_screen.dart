@@ -5,6 +5,7 @@ import '../../models/notification_data.dart';
 import '../../models/nutrition_data.dart';
 import '../../services/auth/auth_service.dart';
 import '../ai_assistant/ai_assistant_screen.dart';
+import '../fridge/fridge_page.dart';
 import '../fridge/models/category_item.dart';
 import '../meal_detail/meal_detail_screen.dart';
 import 'services/meal_recommendation_service.dart';
@@ -102,7 +103,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // 2. Initialize recommendations
     try {
       MealRecommendationService.ensureInitialized().then((_) {
-        if (mounted) {
+        // Only fetch automatically if AI Suggestion mode is already active and recommendation is null.
+        // On a fresh dashboard session with mode == none, do NOT auto-generate before user selects a mode.
+        if (mounted &&
+            MealRecommendationService.discoveryMode == MealDiscoveryMode.aiSuggestion &&
+            MealRecommendationService.currentRecommendation == null) {
           MealRecommendationService.fetchRecommendation();
         }
       }).catchError((e) {
@@ -111,6 +116,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('MealRecommendationService synchronous initialization error: $e');
     }
+  }
+
+  void _handleOpenUseMyIngredients() async {
+    MealRecommendationService.selectDiscoveryMode(
+      MealDiscoveryMode.useMyIngredients,
+      fetch: false,
+    );
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const FridgePage(isSelectionMode: true),
+      ),
+    );
   }
 
   @override
@@ -123,6 +140,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         MealRecommendationService.statusNotifier,
         MealRecommendationService.recommendationNotifier,
         MealRecommendationService.isChangingSuggestionNotifier,
+        MealRecommendationService.discoveryModeNotifier,
       ]),
       builder: (context, _) {
         final recommendation = MockDataRepository.recommendation;
@@ -163,6 +181,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     errorMessage: errorMessage,
                     isChangingSuggestion: isChanging,
                     alternativeMessage: alternativeMessage,
+                    discoveryMode: MealRecommendationService.discoveryMode,
+                    onSelectAiSuggestion: () {
+                      MealRecommendationService.selectDiscoveryMode(
+                        MealDiscoveryMode.aiSuggestion,
+                      );
+                    },
+                    onSelectUseMyIngredients: _handleOpenUseMyIngredients,
+                    onSwitchMode: () {
+                      MealRecommendationService.selectDiscoveryMode(
+                        MealDiscoveryMode.none,
+                        fetch: false,
+                      );
+                    },
                     onChangeSuggestion: () {
                       MealRecommendationService.changeSuggestion(
                         onMessage: (msg) {

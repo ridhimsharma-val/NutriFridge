@@ -454,6 +454,14 @@ serve(async (req: Request) => {
   const message = typeof body.message === 'string' ? body.message.trim() : '';
   const source = typeof body.source === 'string' ? body.source.toLowerCase() : 'text';
   const actionHint = typeof body.actionHint === 'string' ? body.actionHint.toLowerCase() : 'auto';
+  const recipeMode = typeof body.recipeMode === 'string' ? body.recipeMode.toLowerCase().trim() : null;
+  const selectedInventoryItemIds = Array.isArray(body.selectedInventoryItemIds)
+    ? body.selectedInventoryItemIds
+    : null;
+  const rawDishName = typeof body.preferredDishName === 'string' ? body.preferredDishName.trim() : null;
+  const preferredDishName = (rawDishName && rawDishName.length > 0 && rawDishName.length <= 120)
+    ? rawDishName
+    : null;
   const currentMealPeriod = body.currentMealPeriod ?? body.targetMealSlot ?? null;
   const clientLocalTime = body.clientLocalTime ?? null;
   const imageBase64 = body.imageBase64 ?? null;
@@ -552,7 +560,7 @@ serve(async (req: Request) => {
   }
 
   // If query succeeded: use database items if present; if empty (0 rows), allow permitted client fallback
-  const inventoryContext = (fridgeRes.data && fridgeRes.data.length > 0)
+  let inventoryContext = (fridgeRes.data && fridgeRes.data.length > 0)
     ? fridgeRes.data.map((it: any) => ({
         id: it.id,
         name: it.name,
@@ -562,6 +570,109 @@ serve(async (req: Request) => {
         expiryDate: it.expiry_date,
       }))
     : (Array.isArray(body.inventoryContext) ? body.inventoryContext : []);
+
+  // Server-side validation for selected_ingredients mode
+  if (recipeMode === 'selected_ingredients') {
+    // 1. Reject an empty selection
+    if (!selectedInventoryItemIds || selectedInventoryItemIds.length === 0) {
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          action: 'error',
+          assistantMessage: 'Please select at least one ingredient from your fridge.',
+          error: {
+            code: 'EMPTY_SELECTION',
+            message: 'selectedInventoryItemIds array must contain at least one item ID.',
+          },
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 2. Validate UUID syntax
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    for (const rawId of selectedInventoryItemIds) {
+      const idStr = String(rawId).trim();
+      if (!uuidRegex.test(idStr)) {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            action: 'error',
+            assistantMessage: 'One or more selected ingredient IDs are invalid.',
+            error: {
+              code: 'INVALID_UUID_SYNTAX',
+              message: `Invalid UUID: ${idStr}`,
+            },
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // 3. Remove duplicate IDs
+    const uniqueItemIds = Array.from(
+      new Set(selectedInventoryItemIds.map((id: string) => String(id).trim().toLowerCase()))
+    );
+
+    // 4. Query selected records from the authenticated user's fridge_items table using RLS
+    const { data: dbSelectedItems, error: selectErr } = await supabaseUser
+      .from('fridge_items')
+      .select('id, name, category, quantity, unit, expiry_date')
+      .in('id', uniqueItemIds);
+
+    if (selectErr) {
+      console.error('SELECTED_ITEMS_QUERY_FAILED', selectErr);
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          action: 'error',
+          assistantMessage: 'Unable to verify selected ingredients from database. Please tap retry.',
+          error: {
+            code: 'DATABASE_QUERY_ERROR',
+            message: selectErr.message,
+            retryable: true,
+          },
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 5. Verify every requested ID belongs to the authenticated user and exists
+    const foundMap = new Map<string, any>(
+      (dbSelectedItems ?? []).map((it: any) => [String(it.id).toLowerCase(), it])
+    );
+    const missingIds = uniqueItemIds.filter((id) => !foundMap.has(id));
+    if (missingIds.length > 0) {
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          action: 'error',
+          assistantMessage: 'One or more selected items could not be found or do not belong to your account.',
+          error: {
+            code: 'ITEM_NOT_FOUND_OR_UNAUTHORIZED',
+            message: `Requested items not found in authenticated inventory: ${missingIds.join(', ')}`,
+          },
+        }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 6. Use database-returned names, quantities, units and expiry information (ignore client-supplied quantities)
+    const validatedSelectedContext = uniqueItemIds.map((id) => {
+      const it = foundMap.get(id);
+      return {
+        id: it.id,
+        name: it.name,
+        category: it.category,
+        quantity: it.quantity,
+        unit: it.unit,
+        expiryDate: it.expiry_date,
+      };
+    });
+
+    // 7. Only validated selected inventory items become the primary ingredient context
+    inventoryContext = validatedSelectedContext;
+  }
 
   const userPreferences = {
     displayName: profileRes.data?.display_name ?? 'User',
@@ -655,12 +766,23 @@ serve(async (req: Request) => {
     ? 'assistant'
     : actionHint;
 
+  const customMessage = (recipeMode === 'selected_ingredients')
+    ? (message.length > 0
+        ? message
+        : (preferredDishName
+            ? `Create a recipe for ${preferredDishName} using these selected ingredients: ${inventoryContext.map((i: any) => i.name).join(', ')}.`
+            : `Create a recipe using primarily these selected ingredients: ${inventoryContext.map((i: any) => i.name).join(', ')}.`))
+    : message;
+
   const n8nPayload = {
     requestId: `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     userId: userId,
     source: source,
-    message: message,
+    message: customMessage,
     actionHint: n8nActionHint,
+    recipeMode: recipeMode ?? 'ai_suggestion',
+    selectedInventoryItemIds: recipeMode === 'selected_ingredients' ? selectedInventoryItemIds : null,
+    preferredDishName: preferredDishName,
     currentMealPeriod: currentMealPeriod,
     clientLocalTime: clientLocalTime,
     mealContext: body.mealContext ?? null,
