@@ -9,6 +9,8 @@ class FridgeHeader extends StatelessWidget {
   final VoidCallback? onBackTap;
   final VoidCallback? onActionTap;
   final VoidCallback? onExpiringTap;
+  final bool isSelectionMode;
+  final int selectedCount;
 
   const FridgeHeader({
     super.key,
@@ -18,6 +20,8 @@ class FridgeHeader extends StatelessWidget {
     this.onBackTap,
     this.onActionTap,
     this.onExpiringTap,
+    this.isSelectionMode = false,
+    this.selectedCount = 0,
   });
 
   @override
@@ -67,51 +71,90 @@ class FridgeHeader extends StatelessWidget {
                   Text(
                     title,
                     style: AppTypography.screenHeading.copyWith(
-                      fontSize: 22,
+                      fontSize: isSelectionMode ? 20 : 22,
                       fontWeight: FontWeight.w800,
                       color: AppColors.neutralCharcoal,
                       letterSpacing: -0.4,
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // Items count badge pill
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3.5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.sageLight,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: AppColors.sageAccent.withValues(alpha: 0.35),
-                        width: 1,
+                  if (isSelectionMode)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: selectedCount > 0 ? AppColors.paleMint : AppColors.sageLight,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: selectedCount > 0
+                              ? AppColors.forestGreen.withValues(alpha: 0.35)
+                              : AppColors.sageAccent.withValues(alpha: 0.35),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 5.5,
+                            height: 5.5,
+                            decoration: BoxDecoration(
+                              color: selectedCount > 0 ? AppColors.forestGreen : AppColors.neutralMedium,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 4.5),
+                          Text(
+                            selectedCount > 0 ? '$selectedCount selected' : '0 selected',
+                            style: AppTypography.badgeText.copyWith(
+                              color: selectedCount > 0 ? AppColors.forestGreen : AppColors.neutralMedium,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.sageLight,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: AppColors.sageAccent.withValues(alpha: 0.35),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 5.5,
+                            height: 5.5,
+                            decoration: const BoxDecoration(
+                              color: AppColors.forestGreen,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 4.5),
+                          Text(
+                            '$itemCount items',
+                            style: AppTypography.badgeText.copyWith(
+                              color: AppColors.forestGreen,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 5.5,
-                          height: 5.5,
-                          decoration: const BoxDecoration(
-                            color: AppColors.forestGreen,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 4.5),
-                        Text(
-                          '$itemCount items',
-                          style: AppTypography.badgeText.copyWith(
-                            color: AppColors.forestGreen,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (expiringCount != null && expiringCount! > 0) ...[
+                  if (!isSelectionMode && expiringCount != null && expiringCount! > 0) ...[
                     const SizedBox(width: 6),
                     Material(
                       color: Colors.transparent,

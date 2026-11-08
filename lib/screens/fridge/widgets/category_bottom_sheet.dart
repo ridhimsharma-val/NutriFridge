@@ -349,9 +349,11 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
   Widget _buildItemRow(BuildContext context, CategoryFoodItem item) {
     final isSelected = widget.isSelectionMode && CookingBasketService.isSelected(item);
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeInOut,
       decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFFF1F8F1) : AppColors.cardWhite,
+        color: isSelected ? const Color(0xFFEAF7EE) : AppColors.cardWhite,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isSelected ? AppColors.forestGreen : AppColors.cardBorder,
@@ -374,10 +376,12 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
                   width: 50,
                   height: 50,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF7FAF8),
+                    color: isSelected ? const Color(0xFFDDF3E7) : const Color(0xFFF7FAF8),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: AppColors.cardBorder,
+                      color: isSelected
+                          ? AppColors.forestGreen.withValues(alpha: 0.35)
+                          : AppColors.cardBorder,
                       width: 0.8,
                     ),
                   ),

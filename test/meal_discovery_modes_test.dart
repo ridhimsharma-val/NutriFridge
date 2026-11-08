@@ -10,6 +10,7 @@ import 'package:nutrifridge/screens/fridge/widgets/cooking_basket_panel.dart';
 import 'package:nutrifridge/screens/fridge/widgets/top_freezer_refrigerator.dart';
 import 'package:nutrifridge/screens/home/services/meal_recommendation_service.dart';
 import 'package:nutrifridge/screens/home/widgets/recommendation_card.dart';
+import 'package:nutrifridge/screens/meal_detail/models/recipe_preparation_step.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -302,6 +303,7 @@ void main() {
       expect(find.text('1 ingredient selected'), findsOneWidget);
       expect(find.text('Crisp Apple'), findsOneWidget);
       expect(find.text('Clear all'), findsOneWidget);
+      expect(find.text('Generate My Meal · 1'), findsOneWidget);
 
       // Tap remove button on chip
       final removeButton = find.byIcon(Icons.close_rounded);
@@ -310,6 +312,79 @@ void main() {
       await tester.pump();
 
       expect(CookingBasketService.itemCount, equals(0));
+    });
+
+    testWidgets('CookingBasketPanel collapses and expands cleanly', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            bottomNavigationBar: CookingBasketPanel(),
+          ),
+        ),
+      );
+
+      // Initially expanded
+      expect(find.byIcon(Icons.keyboard_arrow_down_rounded), findsOneWidget);
+
+      // Tap collapse
+      await tester.tap(find.byIcon(Icons.keyboard_arrow_down_rounded));
+      await tester.pumpAndSettle();
+
+      // Now collapsed: shows expand chevron
+      expect(find.byIcon(Icons.keyboard_arrow_up_rounded), findsOneWidget);
+
+      // Tap to re-expand
+      await tester.tap(find.text('Your Cooking Basket'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.keyboard_arrow_down_rounded), findsOneWidget);
+    });
+
+    testWidgets('CookingBasketPanel renders intentional AI generation waiting state', (tester) async {
+      CookingBasketService.isGeneratingNotifier.value = true;
+      addTearDown(() => CookingBasketService.isGeneratingNotifier.value = false);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            bottomNavigationBar: CookingBasketPanel(),
+          ),
+        ),
+      );
+
+      expect(find.text('Creating your meal'), findsOneWidget);
+      expect(find.text('Finding the best way to combine your ingredients...'), findsOneWidget);
+      expect(find.text('Checking selected ingredients...'), findsOneWidget);
+    });
+
+    testWidgets('RecommendationCard shows subtle YOUR INGREDIENTS badge when in useMyIngredients mode', (tester) async {
+      const rec = RecipeRecommendation(
+        id: 'rec_custom_test_123',
+        title: 'Fresh Herb Omelette',
+        mealType: 'Breakfast',
+        calories: 320,
+        proteinGrams: 22,
+        fridgeItemsUsed: 2,
+        imageUrl: 'assets/images/food/scrambled_eggs.png',
+        preparationSteps: [
+          RecipePreparationStep(stepNumber: 1, instruction: 'Step 1'),
+          RecipePreparationStep(stepNumber: 2, instruction: 'Step 2'),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: RecommendationCard(
+              discoveryMode: MealDiscoveryMode.useMyIngredients,
+              recommendation: rec,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('YOUR INGREDIENTS'), findsOneWidget);
+      expect(find.text('Fresh Herb Omelette'), findsOneWidget);
     });
 
     testWidgets('CategoryBottomSheet in isSelectionMode enables multi-select with checkmarks', (tester) async {

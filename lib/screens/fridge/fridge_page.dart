@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
 import 'models/category_item.dart';
 import 'models/fridge_preferences.dart';
+import 'services/cooking_basket_service.dart';
 import 'widgets/category_bottom_sheet.dart';
 import 'widgets/cooking_basket_panel.dart';
 import 'widgets/expiring_soon_bottom_sheet.dart';
@@ -95,10 +97,12 @@ class _FridgePageState extends State<FridgePage> {
       listenable: Listenable.merge([
         FridgeCategoryRepository.notifier,
         FridgePreferencesRepository.notifier,
+        CookingBasketService.selectedItemsNotifier,
       ]),
       builder: (context, _) {
         final totalItems = FridgeCategoryRepository.totalFridgeItems;
         final expiringCount = FridgeCategoryRepository.expiringSoonCount;
+        final selectedCount = CookingBasketService.count;
 
         return Scaffold(
           primary: false,
@@ -115,6 +119,8 @@ class _FridgePageState extends State<FridgePage> {
                   title: widget.isSelectionMode ? 'Select Ingredients' : 'My Fridge',
                   itemCount: totalItems,
                   expiringCount: expiringCount,
+                  isSelectionMode: widget.isSelectionMode,
+                  selectedCount: selectedCount,
                   onBackTap: widget.isSelectionMode
                       ? () => Navigator.of(context).maybePop()
                       : null,
@@ -173,22 +179,59 @@ class _FridgePageState extends State<FridgePage> {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16.0, 4.0, 16.0, 12.0),
                     child: Center(
-                      child: FittedBox(
-                        fit: BoxFit.contain,
+                      child: Stack(
                         alignment: Alignment.center,
-                        child: SizedBox(
-                          width: 292.0,
-                          height: 588.0,
-                          child: TopFreezerRefrigerator(
-                            isFreezerOpen: _isFreezerOpen,
-                            isFridgeOpen: _isFridgeOpen,
-                            onFreezerToggle: _toggleFreezer,
-                            onFridgeToggle: _toggleFridge,
-                            onCategoryTap: _onCategoryTap,
-                            preferences: FridgePreferencesRepository.current,
-                            highlightedCategory: _highlightedCategory,
+                        children: [
+                          FittedBox(
+                            fit: BoxFit.contain,
+                            alignment: Alignment.center,
+                            child: SizedBox(
+                              width: 292.0,
+                              height: 588.0,
+                              child: TopFreezerRefrigerator(
+                                isFreezerOpen: _isFreezerOpen,
+                                isFridgeOpen: _isFridgeOpen,
+                                onFreezerToggle: _toggleFreezer,
+                                onFridgeToggle: _toggleFridge,
+                                onCategoryTap: _onCategoryTap,
+                                preferences: FridgePreferencesRepository.current,
+                                highlightedCategory: _highlightedCategory,
+                              ),
+                            ),
                           ),
-                        ),
+                          if (FridgeCategoryRepository.isLoading && totalItems == 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.94),
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: const [AppColors.softShadow],
+                                border: Border.all(color: AppColors.cardBorder),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.forestGreen),
+                                    ),
+                                  ),
+                                  SizedBox(width: 10),
+                                  Text(
+                                    'Loading your fridge...',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.neutralCharcoal,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),

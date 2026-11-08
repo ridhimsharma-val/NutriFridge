@@ -112,7 +112,7 @@ class RecommendationCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
           child: showDualMode
               ? _buildDualModeChoices(context)
-              : _buildStateBody(context, effectiveStatus, rec),
+              : _buildStateBody(context, effectiveStatus, rec, mode),
         ),
       ],
     );
@@ -128,7 +128,7 @@ class RecommendationCard extends StatelessWidget {
           key: const ValueKey('choice_ai_suggestion'),
           title: 'AI Suggestion',
           description:
-              'Let NutriFridge find the perfect meal using your fridge ingredients.',
+              'Let NutriFridge choose a meal using your fridge ingredients.',
           icon: Icons.auto_awesome_rounded,
           iconColor: AppColors.forestGreen,
           iconBgColor: AppColors.paleMint,
@@ -143,8 +143,8 @@ class RecommendationCard extends StatelessWidget {
           key: const ValueKey('choice_use_my_ingredients'),
           title: 'Use My Ingredients',
           description:
-              'Choose your ingredients and let AI create a meal for you.',
-          icon: Icons.inventory_2_rounded,
+              'Pick your ingredients and create something delicious with AI.',
+          icon: Icons.soup_kitchen_rounded,
           iconColor: const Color(0xFFC85A32),
           iconBgColor: const Color(0xFFFFF2EB),
           buttonText: 'Select Items',
@@ -264,6 +264,7 @@ class RecommendationCard extends StatelessWidget {
     BuildContext context,
     RecommendationStatus status,
     RecipeRecommendation? rec,
+    MealDiscoveryMode mode,
   ) {
     switch (status) {
       case RecommendationStatus.empty:
@@ -276,7 +277,7 @@ class RecommendationCard extends StatelessWidget {
         return _buildNoMatchState(context);
       case RecommendationStatus.loaded:
         if (rec != null) {
-          return _buildCardContent(rec);
+          return _buildCardContent(rec, mode);
         }
         return _buildEmptyState(context);
     }
@@ -577,7 +578,10 @@ class RecommendationCard extends StatelessWidget {
   // ==========================================
   // STATE C — LOADED RECOMMENDATION CARD
   // ==========================================
-  Widget _buildCardContent(RecipeRecommendation recommendation) {
+  Widget _buildCardContent(
+    RecipeRecommendation recommendation, [
+    MealDiscoveryMode mode = MealDiscoveryMode.none,
+  ]) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(22),
@@ -635,51 +639,100 @@ class RecommendationCard extends StatelessWidget {
                 Positioned(
                   top: 12,
                   left: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.palePeachSurface,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: AppColors.coralPeach.withValues(alpha: 0.32),
-                        width: 1.0,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.palePeachSurface,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: AppColors.coralPeach.withValues(alpha: 0.32),
+                            width: 1.0,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.08),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: AppColors.coralPeach,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              recommendation.mealType.isNotEmpty
+                                  ? recommendation.mealType.toUpperCase()
+                                  : recommendation.tag,
+                              style: AppTypography.badgeText.copyWith(
+                                color: AppColors.darkPeachText,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 10.5,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+                      if (mode == MealDiscoveryMode.useMyIngredients) ...[
+                        const SizedBox(width: 6),
                         Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(
-                            color: AppColors.coralPeach,
-                            shape: BoxShape.circle,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 5,
                           ),
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          recommendation.mealType.isNotEmpty
-                              ? recommendation.mealType.toUpperCase()
-                              : recommendation.tag,
-                          style: AppTypography.badgeText.copyWith(
-                            color: AppColors.darkPeachText,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 10.5,
-                            letterSpacing: 0.5,
+                          decoration: BoxDecoration(
+                            color: AppColors.paleMint,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: AppColors.forestGreen.withValues(alpha: 0.35),
+                              width: 1.0,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.auto_awesome_rounded,
+                                size: 11,
+                                color: AppColors.forestGreen,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'YOUR INGREDIENTS',
+                                style: TextStyle(
+                                  color: AppColors.forestGreen,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 10,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
                 // Prep time badge if available
