@@ -41,6 +41,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   String? _selectedImageMimeType;
   String? _selectedImageName;
   String? _pendingQuickActionIntent;
+  MealAiContext? _activeMealContext;
+  bool _initialPromptDispatched = false;
 
   @override
   void initState() {
@@ -56,16 +58,23 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       _scrollToBottom();
     });
 
+    _activeMealContext = widget.mealContext;
     final promptToRun = widget.initialPrompt ??
         (widget.mealContext != null
-            ? "I'm viewing ${widget.mealContext!.mealTitle}. Help me prepare this recipe using the ingredients available in my fridge. Suggest alternatives for anything missing."
+            ? "I want to cook ${widget.mealContext!.mealTitle}. Please give me the complete recipe with ingredients from my fridge and step-by-step cooking instructions."
             : null);
 
-    if (promptToRun != null && promptToRun.isNotEmpty) {
+    if (promptToRun != null && promptToRun.isNotEmpty && !_initialPromptDispatched) {
+      _initialPromptDispatched = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _handleSend(
           promptOverride: promptToRun,
-          extraPayload: widget.mealContext != null ? {'mealContext': widget.mealContext!.toJson()} : null,
+          extraPayload: widget.mealContext != null
+              ? {
+                  'mealContext': widget.mealContext!.toJson(),
+                  'actionHint': 'cook_recipe',
+                }
+              : null,
         );
       });
     }
@@ -202,14 +211,18 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
     final currentIntent = _pendingQuickActionIntent;
 
-    // Resolve actionHint based on pending quick-action intent
+    // Resolve actionHint based on pending quick-action intent or active recipe context
     String resolvedActionHint = 'auto';
-    if (currentIntent == 'log_meal') {
+    if (extraPayload != null && extraPayload['actionHint'] is String) {
+      resolvedActionHint = extraPayload['actionHint'] as String;
+    } else if (currentIntent == 'log_meal') {
       resolvedActionHint = 'log_meal';
     } else if (currentIntent == 'add_groceries') {
       resolvedActionHint = 'add_food_multiple';
     } else if (currentIntent == 'recipe_ideas') {
       resolvedActionHint = 'meal_recommendation';
+    } else if (_activeMealContext != null) {
+      resolvedActionHint = 'cook_recipe';
     }
 
     final Map<String, dynamic> combinedPayload = {
@@ -218,8 +231,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     if (currentIntent != null) {
       combinedPayload['quickActionIntent'] = currentIntent;
     }
-    if (widget.mealContext != null) {
-      combinedPayload['mealContext'] = widget.mealContext!.toJson();
+    if (_activeMealContext != null) {
+      combinedPayload['mealContext'] = _activeMealContext!.toJson();
     }
 
     try {

@@ -90,6 +90,11 @@ class MealDetailInfo {
   final List<MealIngredientItem> ingredients;
   final List<RecipePreparationStep> preparationSteps;
   final List<RecipeVideoItem> videos;
+  final int? cookingTimeMinutes;
+  final List<String> cookingTips;
+  final List<String> substitutions;
+  final String? videoSearchQuery;
+  final String? videoUrl;
 
   const MealDetailInfo({
     required this.name,
@@ -108,6 +113,11 @@ class MealDetailInfo {
     required this.ingredients,
     this.preparationSteps = const [],
     this.videos = const [],
+    this.cookingTimeMinutes,
+    this.cookingTips = const [],
+    this.substitutions = const [],
+    this.videoSearchQuery,
+    this.videoUrl,
   });
 
   /// Catalog of real recipe definitions with authentic ingredient measurements and instructions.
@@ -725,7 +735,23 @@ class MealDetailInfo {
     );
 
     // 5. Resolve Preparation Steps
-    final List<RecipePreparationStep> prepSteps = spec?.steps ?? const [];
+    // Priority: AI-generated steps from recommendation -> catalog spec -> empty list (for AI action card)
+    List<RecipePreparationStep> prepSteps = rec.preparationSteps;
+    if (prepSteps.isEmpty && spec != null && spec.steps.isNotEmpty) {
+      prepSteps = spec.steps;
+    }
+
+    // 6. Resolve genuine videos if present from data source
+    final List<RecipeVideoItem> resolvedVideos = [];
+    if (rec.videoUrl != null && rec.videoUrl!.isNotEmpty) {
+      resolvedVideos.add(RecipeVideoItem(
+        id: 'vid_${rec.id.isNotEmpty ? rec.id : 'rec'}',
+        title: '${rec.title} - Video Guide',
+        channelName: 'Cooking Tutorial',
+        duration: 'Guide',
+        videoUrl: rec.videoUrl!,
+      ));
+    }
 
     return MealDetailInfo(
       name: rec.title,
@@ -737,13 +763,18 @@ class MealDetailInfo {
       fatGrams: fat,
       fiberGrams: null,
       prepTimeMinutes: prepTime,
-      servingSize: '1 serving',
+      cookingTimeMinutes: rec.cookingTimeMinutes ?? 15,
+      servingSize: rec.servingSize.isNotEmpty ? rec.servingSize : '1 serving',
       nutritionSourceLabel: sourceLabel,
       nutritionIsEstimate: rec.nutritionIsEstimate,
       whyReasons: dynamicReasons,
       ingredients: resolvedIngredients,
       preparationSteps: prepSteps,
-      videos: const [], // Clean empty state until real backend YouTube API is connected
+      cookingTips: rec.cookingTips,
+      substitutions: rec.substitutions,
+      videos: resolvedVideos,
+      videoSearchQuery: rec.videoSearchQuery ?? '${rec.title} recipe',
+      videoUrl: rec.videoUrl,
     );
   }
 

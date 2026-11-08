@@ -6,6 +6,7 @@ import '../services/meals/meal_tracking_service.dart';
 import '../services/meals/models/meal_models.dart';
 import '../services/profile/profile_service.dart';
 import 'notification_data.dart';
+import '../screens/meal_detail/models/recipe_preparation_step.dart';
 
 /// Supported recommendation lifecycle states.
 enum RecommendationStatus {
@@ -123,6 +124,13 @@ class RecipeRecommendation {
   final List<String> requiredIngredients;
   final List<String> missingIngredients;
   final String? explanation;
+  final int? cookingTimeMinutes;
+  final String servingSize;
+  final List<RecipePreparationStep> preparationSteps;
+  final List<String> cookingTips;
+  final List<String> substitutions;
+  final String? videoSearchQuery;
+  final String? videoUrl;
 
   const RecipeRecommendation({
     this.id = '',
@@ -145,6 +153,13 @@ class RecipeRecommendation {
     this.requiredIngredients = const [],
     this.missingIngredients = const [],
     this.explanation,
+    this.cookingTimeMinutes,
+    this.servingSize = '1 serving',
+    this.preparationSteps = const [],
+    this.cookingTips = const [],
+    this.substitutions = const [],
+    this.videoSearchQuery,
+    this.videoUrl,
   });
 
   /// Factory constructor to parse structured backend recommendation response
@@ -246,6 +261,45 @@ class RecipeRecommendation {
       requiredIngredients: requiredIngs,
       missingIngredients: missingIngs,
       explanation: (json['description'] ?? json['explanation'] ?? reasons.firstOrNull)?.toString(),
+      cookingTimeMinutes: (json['cookingTimeMinutes'] as num? ?? json['cookingTime'] as num?)?.toInt(),
+      servingSize: (json['servingSize'] ?? json['servings'] ?? '1 serving').toString(),
+      preparationSteps: (() {
+        final List<RecipePreparationStep> steps = [];
+        final rawSteps = json['preparationSteps'] ?? json['steps'] ?? json['instructions'];
+        if (rawSteps is List) {
+          for (int i = 0; i < rawSteps.length; i++) {
+            final s = rawSteps[i];
+            if (s is Map) {
+              steps.add(RecipePreparationStep.fromJson(Map<String, dynamic>.from(s), i + 1));
+            } else if (s != null && s.toString().trim().isNotEmpty) {
+              steps.add(RecipePreparationStep(stepNumber: i + 1, instruction: s.toString().trim()));
+            }
+          }
+        }
+        return steps;
+      })(),
+      cookingTips: (() {
+        final List<String> tips = [];
+        final rawTips = json['cookingTips'] ?? json['tips'];
+        if (rawTips is List) {
+          for (final t in rawTips) {
+            if (t != null && t.toString().trim().isNotEmpty) tips.add(t.toString().trim());
+          }
+        }
+        return tips;
+      })(),
+      substitutions: (() {
+        final List<String> subs = [];
+        final rawSubs = json['substitutions'] ?? json['alternatives'];
+        if (rawSubs is List) {
+          for (final s in rawSubs) {
+            if (s != null && s.toString().trim().isNotEmpty) subs.add(s.toString().trim());
+          }
+        }
+        return subs;
+      })(),
+      videoSearchQuery: json['videoSearchQuery']?.toString(),
+      videoUrl: json['videoUrl']?.toString(),
     );
   }
 
@@ -266,6 +320,13 @@ class RecipeRecommendation {
       'missingIngredients': missingIngredients,
       'matchReasons': matchReasons,
       'explanation': explanation,
+      'cookingTimeMinutes': cookingTimeMinutes,
+      'servingSize': servingSize,
+      'preparationSteps': preparationSteps.map((s) => s.toJson()).toList(),
+      'cookingTips': cookingTips,
+      'substitutions': substitutions,
+      'videoSearchQuery': videoSearchQuery,
+      'videoUrl': videoUrl,
     };
   }
 }

@@ -307,7 +307,77 @@ class AiAssistantService {
 
   /// Generates a structured response for widget tests when in forced in-memory test mode
   static Map<String, dynamic> _generateTestModeFallback(String message, String actionHint) {
-    if (actionHint == 'meal_recommendation' || message.toLowerCase().contains('cook') || message.toLowerCase().contains('eat')) {
+    final lowerMsg = message.toLowerCase();
+    if (actionHint == 'cook_recipe' || lowerMsg.contains('cook') || lowerMsg.contains('recipe') || lowerMsg.contains('how to make')) {
+      final isEggs = lowerMsg.contains('egg') || lowerMsg.contains('toast');
+      final recipeTitle = isEggs ? 'Scrambled Eggs on Toast with Milk' : 'Fresh Vegetable Stir Fry';
+      return {
+        'ok': true,
+        'action': 'cook_recipe',
+        'assistantMessage': '''# $recipeTitle
+A delicious, wholesome dish prepared with ingredients from your fridge.
+
+### Preparation Details
+- **Prep Time:** 5 mins
+- **Cooking Time:** 10 mins
+- **Serving Size:** 1 serving
+
+### Ingredients
+- Eggs: 2 large (Available in fridge)
+- Bread: 2 slices (Available in fridge)
+- Milk: 30 ml (Available in fridge)
+- Olive Oil / Butter: 1 tsp (Available in fridge)
+- Salt & Black Pepper: to taste (Available in fridge)
+
+### Step-by-Step Instructions
+1. In a small bowl, whisk 2 eggs with 30ml milk and a pinch of salt until smooth and aerated.
+2. Heat 1 tsp butter or oil in a non-stick pan over medium-low heat.
+3. Pour egg mixture into the pan and let set undisturbed for 15 seconds.
+4. Gently push eggs from edges to center using a spatula to form soft, tender curds.
+5. Toast bread slices until golden brown; spoon creamy scrambled eggs on top and serve hot.
+
+### Chef's Cooking Tips & Substitutions
+- **Tip:** Cook over gentle low heat to ensure fluffy, tender curds without drying out.
+- **Substitution:** Water or almond milk can substitute cow milk for equally light eggs.
+
+### Nutrition Information (Approximate)
+- **Calories:** 340 kcal
+- **Protein:** 19g
+- **Carbs:** 26g
+- **Fat:** 15g''',
+        'requiresConfirmation': false,
+        'meal': {
+          'name': recipeTitle,
+          'mealType': isEggs ? 'breakfast' : 'lunch',
+          'description': 'A delicious, wholesome dish prepared with ingredients from your fridge.',
+          'calories': 340,
+          'proteinG': 19,
+          'carbsG': 26,
+          'fatG': 15,
+          'preparationTimeMinutes': 5,
+          'cookingTimeMinutes': 10,
+          'servings': '1 serving',
+          'ingredients': [
+            {'name': 'Eggs', 'quantity': 2, 'unit': 'pieces', 'availableInFridge': true},
+            {'name': 'Bread', 'quantity': 2, 'unit': 'slices', 'availableInFridge': true},
+            {'name': 'Milk', 'quantity': 30, 'unit': 'ml', 'availableInFridge': true},
+          ],
+          'missingIngredients': <String>[],
+          'preparationSteps': [
+            {'stepNumber': 1, 'instruction': 'Whisk 2 eggs with 30ml milk, salt, and pepper in a bowl.', 'time': '1 min'},
+            {'stepNumber': 2, 'instruction': 'Heat butter in a skillet over medium-low heat.', 'time': '1 min', 'temperature': 'medium-low'},
+            {'stepNumber': 3, 'instruction': 'Pour eggs in and push gently from edges to center to form curds.', 'time': '2 mins'},
+            {'stepNumber': 4, 'instruction': 'Toast bread slices until golden; serve scrambled eggs warm over toast.', 'time': '2 mins'}
+          ],
+          'cookingTips': ['Cook over gentle low heat for soft, creamy texture.'],
+          'substitutions': ['Water or plant milk can replace dairy milk.'],
+          'nutritionIsEstimate': true,
+        },
+        'inventoryItems': <Map<String, dynamic>>[],
+      };
+    }
+
+    if (actionHint == 'meal_recommendation' || lowerMsg.contains('eat')) {
       return {
         'ok': true,
         'action': 'meal_recommendation',
@@ -321,10 +391,19 @@ class AiAssistantService {
           'proteinG': 15,
           'carbsG': 40,
           'fatG': 12,
+          'preparationTimeMinutes': 10,
+          'cookingTimeMinutes': 10,
+          'servings': '1 serving',
           'ingredients': [
             {'name': 'Mixed Vegetables', 'quantity': 200, 'unit': 'g', 'deductionNeedsUserConfirmation': true}
           ],
           'missingIngredients': <String>[],
+          'preparationSteps': [
+            {'stepNumber': 1, 'instruction': 'Chop vegetables into bite-sized florets and slices.', 'time': '5 mins'},
+            {'stepNumber': 2, 'instruction': 'Heat 1 tbsp oil in a wok over high heat.', 'time': '2 mins', 'temperature': 'high'},
+            {'stepNumber': 3, 'instruction': 'Stir-fry vegetables rapidly until crisp-tender.', 'time': '3 mins'}
+          ],
+          'cookingTips': ['Keep heat high for crisp vegetables.'],
           'nutritionIsEstimate': true,
         },
         'inventoryItems': <Map<String, dynamic>>[],

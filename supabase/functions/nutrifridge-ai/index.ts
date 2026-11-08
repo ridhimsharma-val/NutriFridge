@@ -128,6 +128,8 @@ function normalizeN8nResponse(decoded: any): Record<string, any> {
     'clarification_needed',
     'meal_recommendation',
     'no_match',
+    'cook_recipe',
+    'recipe_instructions',
   ];
 
   let action = typeof map.action === 'string' ? map.action.toLowerCase() : 'assistant_reply';
@@ -179,7 +181,7 @@ function normalizeN8nResponse(decoded: any): Record<string, any> {
   }
 
   let meal: Record<string, any> | null = null;
-  if ((action === 'log_meal' || action === 'meal_recommendation') && map.meal && typeof map.meal === 'object') {
+  if ((action === 'log_meal' || action === 'meal_recommendation' || action === 'cook_recipe' || action === 'recipe_instructions') && map.meal && typeof map.meal === 'object') {
     const m = map.meal;
     const ingredients: Array<Record<string, any>> = [];
     if (Array.isArray(m.ingredients)) {
@@ -199,6 +201,43 @@ function normalizeN8nResponse(decoded: any): Record<string, any> {
     }
 
     const rawNutr = m.nutrition && typeof m.nutrition === 'object' ? m.nutrition : {};
+    const preparationSteps: Array<Record<string, any>> = [];
+    const rawSteps = m.preparationSteps || m.steps || m.instructions;
+    if (Array.isArray(rawSteps)) {
+      for (let i = 0; i < rawSteps.length; i++) {
+        const s = rawSteps[i];
+        if (s && typeof s === 'object') {
+          preparationSteps.push({
+            stepNumber: typeof s.stepNumber === 'number' ? s.stepNumber : i + 1,
+            instruction: String(s.instruction || s.text || s.description || '').trim(),
+            time: s.time ? String(s.time).trim() : null,
+            temperature: s.temperature ? String(s.temperature).trim() : null,
+            tip: s.tip ? String(s.tip).trim() : null,
+          });
+        } else if (typeof s === 'string' && s.trim().length > 0) {
+          preparationSteps.push({
+            stepNumber: i + 1,
+            instruction: s.trim(),
+            time: null,
+            temperature: null,
+            tip: null,
+          });
+        }
+      }
+    }
+
+    const cookingTips = Array.isArray(m.cookingTips)
+      ? m.cookingTips.map(String)
+      : Array.isArray(m.tips)
+      ? m.tips.map(String)
+      : [];
+
+    const substitutions = Array.isArray(m.substitutions)
+      ? m.substitutions.map(String)
+      : Array.isArray(m.alternatives)
+      ? m.alternatives.map(String)
+      : [];
+
     meal = {
       name: m.name ? String(m.name).trim() : 'Logged Meal',
       mealType: m.mealType ? String(m.mealType).toLowerCase().trim() : 'lunch',
@@ -210,7 +249,14 @@ function normalizeN8nResponse(decoded: any): Record<string, any> {
         ? String(m.reason).trim()
         : 'A meal prepared with ingredients from your fridge.',
       preparationTimeMinutes: typeof m.preparationTimeMinutes === 'number' ? m.preparationTimeMinutes : 20,
+      cookingTimeMinutes: typeof m.cookingTimeMinutes === 'number' ? m.cookingTimeMinutes : (typeof m.cookingTime === 'number' ? m.cookingTime : 15),
+      servings: m.servings ? String(m.servings).trim() : (m.servingSize ? String(m.servingSize).trim() : '1 serving'),
       missingIngredients: Array.isArray(m.missingIngredients) ? m.missingIngredients.map(String) : [],
+      preparationSteps: preparationSteps,
+      cookingTips: cookingTips,
+      substitutions: substitutions,
+      videoSearchQuery: m.videoSearchQuery ? String(m.videoSearchQuery).trim() : `${m.name || 'recipe'} recipe`,
+      videoUrl: m.videoUrl ? String(m.videoUrl).trim() : null,
       reason: m.reason ? String(m.reason).trim() : 'Uses ingredients from your fridge.',
       imageKey: m.imageKey ? String(m.imageKey).trim() : null,
       nutritionIsEstimate: true,
@@ -610,6 +656,7 @@ serve(async (req: Request) => {
     actionHint: actionHint,
     currentMealPeriod: currentMealPeriod,
     clientLocalTime: clientLocalTime,
+    mealContext: body.mealContext ?? null,
     conversationId: conversationId,
     conversationHistory: clientHistory,
     inventoryContext: inventoryContext,

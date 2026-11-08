@@ -1834,7 +1834,8 @@ void main() {
     await tester.drag(find.byType(SingleChildScrollView), const Offset(0, -320));
     await tester.pumpAndSettle();
     expect(find.text("Watch how it's made"), findsOneWidget);
-    expect(find.text('Video suggestions will appear here when available.'), findsOneWidget);
+    expect(find.text('Find cooking videos'), findsOneWidget);
+    expect(find.text('Watch tutorials for this recipe.'), findsOneWidget);
 
     // 9. Verify Action Buttons at the very bottom of the scroll
     expect(find.text('Cook with AI'), findsOneWidget);
@@ -4025,12 +4026,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Check preparation subtle state
-      expect(find.text("Preparation instructions aren't available for this recipe yet."), findsOneWidget);
+      // Check preparation actionable AI fallback state
+      expect(find.text('Step-by-step instructions available via AI'), findsOneWidget);
       // Check nutrition unavailable message
       expect(find.text('Nutritional information is currently unavailable for this recipe.'), findsOneWidget);
-      // Check YouTube empty state
-      expect(find.text('Video suggestions will appear here when available.'), findsOneWidget);
+      // Check YouTube discovery card
+      expect(find.text('Find cooking videos'), findsOneWidget);
+      expect(find.text('Watch tutorials for this recipe.'), findsOneWidget);
     });
 
     testWidgets('TEST C — Direct Log Meal button updates mock repository and performs inventory deductions for available ingredients only', (WidgetTester tester) async {

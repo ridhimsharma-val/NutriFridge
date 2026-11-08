@@ -1,3 +1,4 @@
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -199,15 +200,19 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
       mealType: meal.tag,
       nutritionSummary: nutritionSummary,
       servingSize: meal.servingSize,
+      prepTimeMinutes: meal.prepTimeMinutes,
+      cookingTimeMinutes: meal.cookingTimeMinutes,
       requiredIngredients: meal.ingredients.map((i) => '${i.name} (${i.recipeQuantityText})').toList(),
       availableFridgeQuantities: availableFridgeMap,
       missingIngredients: missingIngList,
       preparationSteps: meal.preparationSteps.map((s) => s.instruction).toList(),
+      cookingTips: meal.cookingTips,
+      substitutions: meal.substitutions,
       recommendationReasons: meal.whyReasons,
     );
 
     final prompt =
-        'I\'m viewing ${meal.name}. Help me prepare this recipe using the ingredients available in my fridge. Suggest alternatives for anything missing.';
+        'I want to cook ${meal.name}. Please give me the complete recipe with ingredients from my fridge and step-by-step cooking instructions.';
 
     Navigator.of(context).push(
       HeroTransitionRoute(
@@ -217,6 +222,41 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
         ),
       ),
     );
+  }
+
+  void _launchVideoSearch(MealDetailInfo meal) async {
+    final query = Uri.encodeComponent(meal.videoSearchQuery ?? '${meal.name} recipe');
+    final uri = Uri.parse('https://www.youtube.com/results?search_query=$query');
+    await _launchVideoUrl(uri.toString(), meal.name);
+  }
+
+  Future<void> _launchVideoUrl(String urlString, String title) async {
+    final uri = Uri.tryParse(urlString);
+    if (uri == null) return;
+    try {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Opening tutorial for $title...'),
+            backgroundColor: AppColors.primaryForest,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Opening tutorial for $title...'),
+            backgroundColor: AppColors.primaryForest,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -898,20 +938,74 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
         if (steps.isEmpty)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             decoration: BoxDecoration(
               color: AppColors.pureWhite,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(color: const Color(0xFFE2EBE5), width: 1.0),
               boxShadow: const [AppColors.softShadow],
             ),
-            child: const Text(
-              "Preparation instructions aren't available for this recipe yet.",
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: AppColors.mutedText,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.paleMint,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.auto_awesome_rounded,
+                        color: AppColors.primaryForest,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Step-by-step instructions available via AI',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.darkText,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Tap "Cook with AI" to generate full preparation steps, timings, and heat levels tailored to your fridge.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.mutedText,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () => _handleCookWithAi(context, meal),
+                    icon: const Icon(Icons.restaurant_menu_rounded, size: 16),
+                    label: const Text('Cook with AI'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primaryForest,
+                      backgroundColor: AppColors.paleMint,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+              ],
             ),
           )
         else
@@ -1066,19 +1160,72 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
         if (meal.videos.isEmpty)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               color: AppColors.pureWhite,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2EBE5), width: 1.0),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: const Color(0xFFE2EBE5),
+                width: 1.0,
+              ),
               boxShadow: const [AppColors.softShadow],
             ),
-            child: const Text(
-              'Video suggestions will appear here when available.',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: AppColors.mutedText,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () => _launchVideoSearch(meal),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFECE5),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.play_circle_fill_rounded,
+                            color: AppColors.coralPeach,
+                            size: 26,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Find cooking videos',
+                              style: TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.darkText,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Watch tutorials for this recipe.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.mutedText,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.open_in_new_rounded,
+                        color: AppColors.primaryForest,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           )
@@ -1091,7 +1238,10 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
               itemCount: meal.videos.length,
               itemBuilder: (context, index) {
                 final video = meal.videos[index];
-                return RecipeVideoCard(video: video);
+                return RecipeVideoCard(
+                  video: video,
+                  onTap: () => _launchVideoUrl(video.videoUrl, meal.name),
+                );
               },
             ),
           ),
