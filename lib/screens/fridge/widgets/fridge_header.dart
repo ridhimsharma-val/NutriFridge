@@ -8,6 +8,7 @@ class FridgeHeader extends StatelessWidget {
   final int? expiringCount;
   final VoidCallback? onBackTap;
   final VoidCallback? onActionTap;
+  final VoidCallback? onExpiringTap;
 
   const FridgeHeader({
     super.key,
@@ -16,6 +17,7 @@ class FridgeHeader extends StatelessWidget {
     this.expiringCount = 3,
     this.onBackTap,
     this.onActionTap,
+    this.onExpiringTap,
   });
 
   @override
@@ -83,40 +85,49 @@ class FridgeHeader extends StatelessWidget {
                   ),
                   if (expiringCount != null && expiringCount! > 0) ...[
                     const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF2EB),
+                    Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(14),
+                      child: InkWell(
+                        key: const ValueKey('expiring_soon_badge'),
+                        onTap: onExpiringTap,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: AppColors.coralHighlight.withValues(alpha: 0.4),
-                          width: 1,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF2EB),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: AppColors.coralHighlight.withValues(alpha: 0.4),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 5.5,
+                                height: 5.5,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.coralHighlight,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4.5),
+                              Text(
+                                '$expiringCount expiring soon',
+                                style: AppTypography.badgeText.copyWith(
+                                  color: const Color(0xFFC85A32),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 5.5,
-                            height: 5.5,
-                            decoration: const BoxDecoration(
-                              color: AppColors.coralHighlight,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 4.5),
-                          Text(
-                            '$expiringCount expiring soon',
-                            style: AppTypography.badgeText.copyWith(
-                              color: const Color(0xFFC85A32),
-                              fontWeight: FontWeight.w700,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
                       ),
                     ),
                   ],

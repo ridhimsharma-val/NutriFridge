@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'models/category_item.dart';
 import 'models/fridge_preferences.dart';
 import 'widgets/category_bottom_sheet.dart';
+import 'widgets/expiring_soon_bottom_sheet.dart';
 import 'widgets/fridge_header.dart';
 import 'widgets/fridge_preferences_sheet.dart';
 import 'widgets/top_freezer_refrigerator.dart';
@@ -65,6 +66,13 @@ class _FridgePageState extends State<FridgePage> {
     }
   }
 
+  void _openExpiringSoon() async {
+    await ExpiringSoonBottomSheet.show(context: context);
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -88,6 +96,7 @@ class _FridgePageState extends State<FridgePage> {
                   title: 'My Fridge',
                   itemCount: totalItems,
                   expiringCount: expiringCount,
+                  onExpiringTap: _openExpiringSoon,
                   onActionTap: () async {
                     await FridgePreferencesSheet.show(context);
                     if (mounted) {

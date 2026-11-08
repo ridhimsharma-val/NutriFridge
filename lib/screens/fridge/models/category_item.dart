@@ -69,7 +69,7 @@ class CategoryFoodItem {
       return daysAgo == 1 ? 'Expired 1 day ago' : 'Expired $daysAgo days ago';
     }
     if (expiryDays == 0) return 'Expires today';
-    if (expiryDays == 1) return 'Expires in 1 day';
+    if (expiryDays == 1) return 'Expires tomorrow';
     return 'Expires in $expiryDays days';
   }
 
@@ -885,6 +885,34 @@ class FridgeCategoryRepository {
       }
     }
     return count;
+  }
+
+  /// List of items qualifying as expiring soon (0 to 3 days), sorted by earliest expiry first.
+  /// Guarantees that the count exactly matches [expiringSoonCount].
+  static List<CategoryFoodItem> get expiringSoonItems {
+    final list = <CategoryFoodItem>[];
+    for (final entry in _categoryStore.entries) {
+      for (final item in entry.value) {
+        if (item.isExpiringSoon) {
+          final itemWithCategory = item.category != null
+              ? item
+              : item.copyWith(category: entry.key);
+          list.add(itemWithCategory);
+        }
+      }
+    }
+    list.sort((a, b) => (a.expiryDays ?? 999).compareTo(b.expiryDays ?? 999));
+    return list;
+  }
+
+  /// Looks up the category name that contains an item by [itemId].
+  static String? getCategoryNameForItem(String itemId) {
+    for (final entry in _categoryStore.entries) {
+      if (entry.value.any((it) => it.id == itemId)) {
+        return entry.key;
+      }
+    }
+    return null;
   }
 
   /// Add a food item into a category
