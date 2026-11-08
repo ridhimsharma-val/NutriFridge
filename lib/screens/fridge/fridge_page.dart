@@ -34,6 +34,10 @@ class _FridgePageState extends State<FridgePage> {
     super.initState();
     _isFreezerOpen = widget.isSelectionMode;
     _isFridgeOpen = widget.isSelectionMode;
+    if (!FridgeCategoryRepository.isLoadedFromSupabase &&
+        !FridgeCategoryRepository.isLoading) {
+      FridgeCategoryRepository.loadFromSupabase();
+    }
   }
 
   void _toggleFreezer() {

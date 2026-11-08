@@ -88,6 +88,16 @@ class CategoryFoodItem {
     return match != null ? match.group(1)! : 'g';
   }
 
+  /// Formatted quantity string ensuring the unit is not duplicated.
+  String get displayQuantity {
+    final clean = quantity.trim();
+    final u = unit.trim();
+    if (u.isNotEmpty && clean.toLowerCase().endsWith(u.toLowerCase())) {
+      return clean;
+    }
+    return u.isNotEmpty ? '$clean $u' : clean;
+  }
+
   int get stepAmount {
     final u = unit.toLowerCase();
     if (u == 'g' || u == 'ml') return 50;

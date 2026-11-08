@@ -187,6 +187,17 @@ class AiAssistantService {
             await _client.auth.refreshSession();
           } catch (refreshErr) {
             debugPrint('[AiAssistantService] Session auto-refresh failed: $refreshErr');
+            if (session.isExpired) {
+              return {
+                'ok': false,
+                'success': false,
+                'action': 'error',
+                'assistantMessage':
+                    'Your session has expired. Please sign in again to access NutriFridge AI.',
+                'error': 'Session expired and refresh failed: $refreshErr',
+                'requiresConfirmation': false,
+              };
+            }
           }
         }
       }
@@ -269,17 +280,45 @@ class AiAssistantService {
         }
       }
 
+      final detailsString = (e.details?.toString() ?? e.reasonPhrase ?? '').trim();
+      final detailsLower = detailsString.toLowerCase();
+
+      // Check for code inside detailsString if errorCode was not extracted from JSON
+      if (errorCode == null) {
+        if (detailsLower.contains('gemini_rate_limit_exceeded') || detailsLower.contains('rate limit') || e.status == 429) {
+          errorCode = 'GEMINI_RATE_LIMIT_EXCEEDED';
+        } else if (detailsLower.contains('gemini_request_timeout') || detailsLower.contains('timeout') || e.status == 504) {
+          errorCode = 'GEMINI_REQUEST_TIMEOUT';
+        } else if (detailsLower.contains('invalid_uuid_syntax') || detailsLower.contains('invalid uuid') || detailsLower.contains('22p02')) {
+          errorCode = 'INVALID_UUID_SYNTAX';
+        } else if (detailsLower.contains('item_not_found') || detailsLower.contains('unauthorized item')) {
+          errorCode = 'ITEM_NOT_FOUND_OR_UNAUTHORIZED';
+        } else if (detailsLower.contains('user_authentication_failed') || detailsLower.contains('missing_authorization') || detailsLower.contains('jwt') || detailsLower.contains('expired') || e.status == 401) {
+          errorCode = 'USER_AUTHENTICATION_FAILED';
+        } else if (detailsLower.contains('database_query_error') || detailsLower.contains('inventory_fetch_failed')) {
+          errorCode = 'DATABASE_QUERY_ERROR';
+        } else if (detailsLower.contains('empty_selection')) {
+          errorCode = 'EMPTY_SELECTION';
+        } else if (detailsLower.contains('invalid_ai_response')) {
+          errorCode = 'INVALID_AI_RESPONSE';
+        }
+      }
+
       String friendlyMessage;
-      if (backendMessage != null &&
-          backendMessage.isNotEmpty &&
-          !backendMessage.toLowerCase().contains('internal server error')) {
-        friendlyMessage = backendMessage;
-      } else if (e.status == 401 ||
+      if (e.status == 401 ||
           errorCode == 'MISSING_AUTHORIZATION' ||
           errorCode == 'USER_AUTHENTICATION_FAILED' ||
           errorCode == 'INVALID_AUTHORIZATION_FORMAT') {
         friendlyMessage =
-            'Your session has expired. Please sign in again to access the AI Assistant.';
+            'Your session has expired. Please sign in again to access NutriFridge AI.';
+      } else if (errorCode == 'EMPTY_SELECTION') {
+        friendlyMessage = 'Please select at least one ingredient from your fridge.';
+      } else if (errorCode == 'INVALID_UUID_SYNTAX') {
+        friendlyMessage = 'One or more selected ingredient IDs are invalid. Please refresh your inventory.';
+      } else if (errorCode == 'ITEM_NOT_FOUND_OR_UNAUTHORIZED') {
+        friendlyMessage = 'One or more selected items could not be found in your inventory. Please refresh and try again.';
+      } else if (errorCode == 'DATABASE_QUERY_ERROR' || errorCode == 'INVENTORY_FETCH_FAILED') {
+        friendlyMessage = 'Unable to verify selected ingredients from database. Please tap retry.';
       } else if (e.status == 429 || errorCode == 'GEMINI_RATE_LIMIT_EXCEEDED') {
         friendlyMessage =
             'Google Gemini rate limit exceeded. Please wait a moment and tap retry.';
@@ -289,19 +328,27 @@ class AiAssistantService {
       } else if (errorCode == 'GEMINI_INVALID_REQUEST') {
         friendlyMessage =
             'Google Gemini rejected the request format. Please shorten or simplify your input.';
-      } else if (errorCode == 'EMPTY_SELECTION') {
-        friendlyMessage = 'Please select at least one ingredient from your fridge.';
-      } else if (errorCode == 'INVALID_UUID_SYNTAX') {
-        friendlyMessage = 'One or more selected ingredient IDs are invalid.';
-      } else if (errorCode == 'ITEM_NOT_FOUND_OR_UNAUTHORIZED') {
-        friendlyMessage = 'One or more selected items could not be found in your inventory.';
-      } else if (errorCode == 'DATABASE_QUERY_ERROR' || errorCode == 'INVENTORY_FETCH_FAILED') {
-        friendlyMessage = 'Unable to verify selected ingredients from database. Please tap retry.';
+      } else if (errorCode == 'GEMINI_AUTH_FAILED') {
+        friendlyMessage =
+            'Google Gemini authentication failed. Please verify API key configuration.';
+      } else if (errorCode == 'INVALID_AI_RESPONSE') {
+        friendlyMessage =
+            'Received an invalid response format from NutriFridge AI. Please tap retry.';
       } else if (errorCode == 'N8N_NOT_CONFIGURED') {
         friendlyMessage = 'NutriFridge AI service is currently not configured.';
-      } else if (e.status == 503 || e.status == 502) {
+      } else if (e.status == 503 || e.status == 502 || errorCode == 'CONNECTION_FAILED' || (errorCode is String && errorCode.startsWith('N8N_UPSTREAM_'))) {
         friendlyMessage =
             'NutriFridge AI is temporarily experiencing high load. Please tap retry.';
+      } else if (backendMessage != null &&
+          backendMessage.isNotEmpty &&
+          !backendMessage.toLowerCase().contains('internal server error')) {
+        friendlyMessage = backendMessage;
+      } else if (e.status >= 500) {
+        friendlyMessage =
+            'NutriFridge AI is temporarily unavailable. Please tap retry.';
+      } else if (e.status == 400) {
+        friendlyMessage =
+            'Request could not be processed. Please check your selected ingredients.';
       } else {
         friendlyMessage =
             'Unable to reach NutriFridge AI. Please tap retry in a moment.';
@@ -346,13 +393,17 @@ class AiAssistantService {
           errStr.contains('auth') ||
           errStr.contains('jwt') ||
           errStr.contains('unauthorized')) {
-        msg = 'Your session has expired. Please sign in again to access the AI Assistant.';
+        msg = 'Your session has expired. Please sign in again to access NutriFridge AI.';
       } else if (errStr.contains('timeout')) {
         msg = 'NutriFridge AI took longer than expected to respond. Please tap retry.';
       } else if (errStr.contains('429') || errStr.contains('rate limit')) {
         msg = 'Google Gemini rate limit exceeded. Please wait a moment and tap retry.';
       } else if (errStr.contains('format') || errStr.contains('parse') || errStr.contains('json')) {
         msg = 'Received an invalid response format from NutriFridge AI. Please tap retry.';
+      } else if (errStr.contains('invalid uuid') || errStr.contains('uuid')) {
+        msg = 'One or more selected ingredient IDs are invalid. Please refresh your inventory.';
+      } else if (errStr.contains('item not found') || errStr.contains('not found')) {
+        msg = 'One or more selected items could not be found in your inventory. Please refresh and try again.';
       } else {
         msg = 'Unable to reach NutriFridge AI. Please tap retry.';
       }

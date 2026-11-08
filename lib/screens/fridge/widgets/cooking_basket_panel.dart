@@ -515,7 +515,7 @@ class _CookingBasketPanelState extends State<CookingBasketPanel> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '${item.quantity} ${item.unit}',
+                        item.displayQuantity,
                         style: const TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w500,

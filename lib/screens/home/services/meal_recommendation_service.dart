@@ -858,13 +858,28 @@ class MealRecommendationService {
     final now = _currentTimeProvider();
     final slot = resolveActiveMealSlot(now);
 
-    final validUuidIds = selectedItems
+    // Ensure valid UUIDs for selected items by matching against inventory if needed
+    final resolvedSelectedItems = <CategoryFoodItem>[];
+    for (final item in selectedItems) {
+      if (MealTrackingService.isValidUuid(item.id)) {
+        resolvedSelectedItems.add(item);
+      } else {
+        final match = FridgeCategoryRepository.findItemByName(item.name);
+        if (match != null && MealTrackingService.isValidUuid(match.id)) {
+          resolvedSelectedItems.add(item.copyWith(id: match.id));
+        } else {
+          resolvedSelectedItems.add(item);
+        }
+      }
+    }
+
+    final validUuidIds = resolvedSelectedItems
         .where((i) => MealTrackingService.isValidUuid(i.id))
         .map((i) => i.id)
         .toList();
     final itemIds = validUuidIds.isNotEmpty
         ? validUuidIds
-        : selectedItems.map((i) => i.id).toList();
+        : resolvedSelectedItems.map((i) => i.id).toList();
 
     final requestPayload = {
       'userId': MockDataRepository.profile.displayName.isNotEmpty
@@ -875,15 +890,15 @@ class MealRecommendationService {
       'selectedInventoryItemIds': itemIds,
       'preferredDishName': preferredDishName,
       'message': (preferredDishName != null && preferredDishName.trim().isNotEmpty)
-          ? 'Create a recipe for ${preferredDishName.trim()} using these selected ingredients from my fridge: ${selectedItems.map((i) => i.name).join(", ")}.'
-          : 'Create a recipe using primarily these selected ingredients from my fridge: ${selectedItems.map((i) => i.name).join(", ")}.',
+          ? 'Create a recipe for ${preferredDishName.trim()} using these selected ingredients from my fridge: ${resolvedSelectedItems.map((i) => i.name).join(", ")}.'
+          : 'Create a recipe using primarily these selected ingredients from my fridge: ${resolvedSelectedItems.map((i) => i.name).join(", ")}.',
       'currentMealPeriod': slot.displayName,
       'targetMealSlot': slot.displayName,
-      'inventoryContext': selectedItems.map((i) => {
+      'inventoryContext': resolvedSelectedItems.map((i) => {
         'id': i.id,
         'name': i.name,
         'category': i.category,
-        'quantity': i.quantity,
+        'quantity': i.displayQuantity,
         'unit': i.unit,
         'expiryDays': i.expiryDays,
       }).toList(),
@@ -920,7 +935,7 @@ class MealRecommendationService {
         }
 
         // Local dynamic synthesis for test/mock offline execution
-        rec = _synthesizeRecipeFromSelected(selectedItems, preferredDishName, slot);
+        rec = _synthesizeRecipeFromSelected(resolvedSelectedItems, preferredDishName, slot);
       }
 
       _discoveryMode = MealDiscoveryMode.useMyIngredients;
@@ -968,7 +983,7 @@ class MealRecommendationService {
       servingSize: '1 serving',
       fridgeItemsUsed: selectedItems.length,
       imageUrl: 'assets/images/paneer_rice_bowl.jpg',
-      requiredIngredients: selectedItems.map((i) => '${i.name} (${i.quantity} ${i.unit})').toList(),
+      requiredIngredients: selectedItems.map((i) => '${i.name} (${i.displayQuantity})').toList(),
       missingIngredients: const [],
       preparationSteps: [
         RecipePreparationStep(
