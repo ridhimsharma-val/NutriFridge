@@ -233,9 +233,12 @@ class _MagicFridgeSplashScreenState extends State<MagicFridgeSplashScreen>
     final fridgeLeft = centerOffset.dx - fridgeWidth / 2;
     final fridgeTop = centerOffset.dy - fridgeHeight / 2 + fridgeY;
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _navigateToDashboard,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
         // 1. Soft Warm Cream / Sage Background
         Container(color: const Color(0xFFF4F7F4)),
 
@@ -348,6 +351,7 @@ class _MagicFridgeSplashScreenState extends State<MagicFridgeSplashScreen>
             ),
           ),
       ],
-    );
-  }
+    ),
+  );
+}
 }

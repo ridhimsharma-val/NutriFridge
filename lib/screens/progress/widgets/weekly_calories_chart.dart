@@ -325,7 +325,7 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (selectedDay.isToday) ...[
+                      if (selectedDay.isToday && widget.period == 'Week') ...[
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -334,9 +334,9 @@ class _WeeklyCaloriesChartState extends State<WeeklyCaloriesChart>
                             color: AppColors.paleMint,
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: Text(
-                            widget.period == 'Week' ? 'Today (Live)' : 'Current Week',
-                            style: const TextStyle(
+                          child: const Text(
+                            'Today (Live)',
+                            style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                               color: AppColors.forestGreen,

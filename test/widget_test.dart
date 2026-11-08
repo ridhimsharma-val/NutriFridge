@@ -1451,7 +1451,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Weekly averages this month'), findsOneWidget);
     expect(find.text('W1'), findsOneWidget);
+    expect(find.text('W2'), findsOneWidget);
+    expect(find.text('W3'), findsOneWidget);
     expect(find.text('W4'), findsOneWidget);
+    expect(find.text('W5'), findsOneWidget);
+    expect(find.textContaining('Calculated from actual logged meals'), findsNothing);
+    expect(find.textContaining('Meals logged on'), findsNothing);
+    expect(find.textContaining('demo baseline'), findsNothing);
   });
 
   testWidgets('NutriFridge Profile Screen - Preferences, Restrictions, Toggles & Session Persistence', (WidgetTester tester) async {
