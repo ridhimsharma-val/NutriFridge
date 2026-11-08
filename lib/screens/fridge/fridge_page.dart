@@ -68,13 +68,14 @@ class _FridgePageState extends State<FridgePage> {
           return FadeTransition(
             opacity: CurvedAnimation(
               parent: animation,
-              curve: Curves.easeInOut,
+              curve: Curves.fastOutSlowIn,
+              reverseCurve: Curves.easeInOutCubic,
             ),
             child: child,
           );
         },
-        transitionDuration: const Duration(milliseconds: 380),
-        reverseTransitionDuration: const Duration(milliseconds: 320),
+        transitionDuration: const Duration(milliseconds: 320),
+        reverseTransitionDuration: const Duration(milliseconds: 280),
       ),
     );
   }
@@ -150,7 +151,7 @@ class _FridgePageState extends State<FridgePage> {
         return Scaffold(
           primary: false,
           resizeToAvoidBottomInset: widget.isSelectionMode,
-          backgroundColor: Colors.transparent,
+          backgroundColor: widget.isSelectionMode ? AppColors.warmCream : Colors.transparent,
           body: SafeArea(
             child: Column(
               children: [
@@ -281,19 +282,51 @@ class _FridgePageState extends State<FridgePage> {
                 if (widget.isSelectionMode) ...[
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 12.0),
-                    child: Center(
-                      child: Hero(
-                        tag: 'cooking_pan_hero',
-                        child: CookingPanVisual(
-                          key: _mainPanKey,
-                          panKey: _mainPanKey,
-                          width: 275.0,
-                          height: 142.0,
-                          isCompact: false,
-                          showEmptyGuide: true,
-                          onTap: () => _openCookingWorkspace(context),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Center(
+                          child: Hero(
+                            tag: 'cooking_pan_hero',
+                            flightShuttleBuilder: (
+                              flightContext,
+                              animation,
+                              flightDirection,
+                              fromHeroContext,
+                              toHeroContext,
+                            ) {
+                              final Hero toHero = toHeroContext.widget as Hero;
+                              return Material(
+                                color: Colors.transparent,
+                                child: toHero.child,
+                              );
+                            },
+                            child: CookingPanVisual(
+                              key: _mainPanKey,
+                              panKey: _mainPanKey,
+                              width: 240.0,
+                              height: 130.0,
+                              isCompact: false,
+                              showEmptyGuide: false,
+                              onTap: () => _openCookingWorkspace(context),
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 4),
+                        GestureDetector(
+                          onTap: () => _openCookingWorkspace(context),
+                          child: Text(
+                            selectedCount > 0
+                                ? '$selectedCount ingredient${selectedCount > 1 ? 's' : ''} in pan · Tap to open'
+                                : 'Your pan is ready · Tap ingredients to cook',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.forestGreen,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],

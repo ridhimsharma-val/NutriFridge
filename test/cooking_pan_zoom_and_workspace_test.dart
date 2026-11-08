@@ -104,7 +104,7 @@ void main() {
 
       // Workspace screen is now active
       expect(find.byType(CookingWorkspaceScreen), findsOneWidget);
-      expect(find.text('Cooking Workspace'), findsOneWidget);
+      expect(find.text('Your Cooking Workspace'), findsOneWidget);
 
       // Pan is present as the Hero object in the workspace
       final heroFinder = find.byWidgetPredicate(

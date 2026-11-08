@@ -12,9 +12,9 @@ import '../../home/services/meal_recommendation_service.dart';
 ///
 /// Features:
 /// - Reached via a continuous shared-element `Hero` zoom transition from the collapsed pan.
-/// - The cooking pan remains the hero object at the top of the workspace.
+/// - The cooking pan is the commanding hero element dominating the upper workspace.
 /// - First form element: "What would you like to cook?" (dish name input).
-/// - Second section: "Selected ingredients · N" with compact removable chips.
+/// - Second section: "Selected ingredients · N" with compact removable chips directly on cream canvas.
 /// - Primary CTA: "Generate My Meal", supporting both selected ingredients and dish-name-only mode.
 class CookingWorkspaceScreen extends StatefulWidget {
   const CookingWorkspaceScreen({super.key});
@@ -88,6 +88,10 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final panWidth = (screenWidth - 32).clamp(320.0, 410.0);
+    final panHeight = panWidth * 0.54;
+
     return ListenableBuilder(
       listenable: Listenable.merge([
         CookingBasketService.selectedItemsNotifier,
@@ -108,7 +112,7 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen> {
           body: SafeArea(
             child: Column(
               children: [
-                // 1. Workspace Header
+                // 1. Workspace Minimal Header
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                   child: Row(
@@ -138,9 +142,9 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Cooking Workspace',
+                          'Your Cooking Workspace',
                           style: AppTypography.screenHeading.copyWith(
-                            fontSize: 20,
+                            fontSize: 19,
                             fontWeight: FontWeight.w800,
                             color: AppColors.neutralCharcoal,
                             letterSpacing: -0.3,
@@ -176,19 +180,31 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen> {
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Hero Zoomed Cooking Pan
+                        // Hero Substantially Zoomed Cooking Pan (Dominates the screen)
                         Center(
                           child: Hero(
                             tag: 'cooking_pan_hero',
+                            flightShuttleBuilder: (
+                              flightContext,
+                              animation,
+                              flightDirection,
+                              fromHeroContext,
+                              toHeroContext,
+                            ) {
+                              final Hero toHero = toHeroContext.widget as Hero;
+                              return Material(
+                                color: Colors.transparent,
+                                child: toHero.child,
+                              );
+                            },
                             child: CookingPanVisual(
-                              width: 320.0,
-                              height: 175.0,
+                              width: panWidth,
+                              height: panHeight,
                               isExpanded: true,
-                              showEmptyGuide: true,
                             ),
                           ),
                         ),
@@ -199,21 +215,21 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen> {
                                 ? '$count ingredient${count > 1 ? 's' : ''} in pan'
                                 : 'Your pan is ready',
                             style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.neutralMedium,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.forestGreen,
                             ),
                           ),
                         ),
 
                         const SizedBox(height: 20),
 
-                        // FIRST FORM ELEMENT: Dish Name Input
+                        // FIRST FORM ELEMENT: Dish Name Input (Directly on canvas, no heavy box)
                         _buildDishNameSection(),
 
                         const SizedBox(height: 20),
 
-                        // SECOND FORM SECTION: Selected Ingredients
+                        // SECOND SECTION: Selected Ingredients (Directly on canvas, no heavy box)
                         _buildSelectedIngredientsSection(selectedItems),
 
                         // Inline Error Message (if any)
@@ -262,7 +278,7 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen> {
                           ),
                         ],
 
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
                       ],
                     ),
                   ),
@@ -353,179 +369,161 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen> {
     );
   }
 
-  /// First Form Section: Dish Name Input
+  /// First Form Section: Dish Name Input (Minimal, no oversized card)
   Widget _buildDishNameSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.cardBorder),
-        boxShadow: const [AppColors.softShadow],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Expanded(
-                child: Text(
-                  'What would you like to cook?',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.neutralCharcoal,
-                  ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'What would you like to cook?',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.neutralCharcoal,
+                  letterSpacing: -0.2,
                 ),
               ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(8),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE5E7EB),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text(
+                'Optional',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.neutralMedium,
                 ),
-                child: const Text(
-                  'Optional',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.neutralMedium,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _dishNameController,
-            focusNode: _dishNameFocusNode,
-            maxLength: 120,
-            decoration: InputDecoration(
-              hintText: 'e.g. Chicken Curry, Fried Rice, Paneer Tikka...',
-              hintStyle: TextStyle(
-                fontSize: 13,
-                color: AppColors.neutralCharcoal.withValues(alpha: 0.45),
-              ),
-              filled: true,
-              fillColor: const Color(0xFFF9FAFB),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              counterText: '',
-              prefixIcon: const Icon(
-                Icons.restaurant_menu_rounded,
-                size: 20,
-                color: AppColors.forestGreen,
-              ),
-              suffixIcon: _dishNameController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear_rounded, size: 18),
-                      onPressed: () {
-                        _dishNameController.clear();
-                        CookingBasketService.setPreferredDishName(null);
-                        setState(() {});
-                      },
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.forestGreen, width: 1.5),
               ),
             ),
-            style: const TextStyle(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w600,
-              color: AppColors.neutralCharcoal,
+          ],
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _dishNameController,
+          focusNode: _dishNameFocusNode,
+          maxLength: 120,
+          decoration: InputDecoration(
+            hintText: 'e.g. Chicken Curry, Pasta, Salad...',
+            hintStyle: TextStyle(
+              fontSize: 13,
+              color: AppColors.neutralCharcoal.withValues(alpha: 0.45),
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            counterText: '',
+            prefixIcon: const Icon(
+              Icons.restaurant_menu_rounded,
+              size: 20,
+              color: AppColors.forestGreen,
+            ),
+            suffixIcon: _dishNameController.text.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear_rounded, size: 18),
+                    onPressed: () {
+                      _dishNameController.clear();
+                      CookingBasketService.setPreferredDishName(null);
+                      setState(() {});
+                    },
+                  )
+                : null,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: AppColors.forestGreen, width: 1.5),
             ),
           ),
-          const SizedBox(height: 6),
-          const Text(
-            'Leave empty and let AI surprise you.',
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w500,
-              color: AppColors.neutralMedium,
-            ),
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
+            color: AppColors.neutralCharcoal,
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 5),
+        const Text(
+          'Leave empty and let AI surprise you.',
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w500,
+            color: AppColors.neutralMedium,
+          ),
+        ),
+      ],
     );
   }
 
-  /// Second Form Section: Selected Ingredients
+  /// Second Section: Selected Ingredients (Directly on canvas, no outer card)
   Widget _buildSelectedIngredientsSection(List<CategoryFoodItem> selectedItems) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.cardBorder),
-        boxShadow: const [AppColors.softShadow],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  'Selected ingredients · ${selectedItems.length}',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.neutralCharcoal,
-                  ),
-                ),
-              ),
-              if (selectedItems.isNotEmpty) ...[
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () {
-                    CookingBasketService.clear();
-                    _dishNameController.clear();
-                  },
-                  child: const Text(
-                    'Clear all',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.coralPeach,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (selectedItems.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
               child: Text(
-                'No ingredients selected from fridge yet. Enter a dish name above or return to the fridge to add ingredients.',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.neutralCharcoal.withValues(alpha: 0.60),
+                'Selected ingredients · ${selectedItems.length}',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.neutralCharcoal,
+                  letterSpacing: -0.2,
                 ),
               ),
-            )
-          else
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: selectedItems.map((item) => _buildIngredientChip(item)).toList(),
             ),
-        ],
-      ),
+            if (selectedItems.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () {
+                  CookingBasketService.clear();
+                  _dishNameController.clear();
+                },
+                child: const Text(
+                  'Clear all',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.coralPeach,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (selectedItems.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
+            child: Text(
+              'No ingredients selected from fridge yet. Enter a dish name above or return to the fridge to add ingredients.',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppColors.neutralCharcoal.withValues(alpha: 0.60),
+              ),
+            ),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: selectedItems.map((item) => _buildIngredientChip(item)).toList(),
+          ),
+      ],
     );
   }
 
@@ -534,9 +532,16 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen> {
     return Container(
       padding: const EdgeInsets.fromLTRB(6, 4, 8, 4),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F7F5),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD6E4DC), width: 1),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F000000),
+            blurRadius: 3,
+            offset: Offset(0, 1),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -547,7 +552,7 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen> {
             child: Container(
               width: 24,
               height: 24,
-              color: Colors.white,
+              color: const Color(0xFFF3F7F5),
               child: ((item.imageAsset != null && item.imageAsset!.isNotEmpty) ||
                       (item.iconEmoji == null && item.effectiveImageAsset != null))
                   ? Image.asset(

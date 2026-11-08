@@ -147,10 +147,10 @@ class CookingPanVisualState extends State<CookingPanVisual>
                           borderRadius: BorderRadius.all(Radius.elliptical(rx, ry * 0.45)),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0x3D0B120E),
-                              blurRadius: widget.isCompact ? 8 : (widget.isExpanded ? 24 : 18),
-                              spreadRadius: widget.isCompact ? 1 : (widget.isExpanded ? 4 : 2),
-                              offset: Offset(0, widget.isCompact ? 4 : 8),
+                              color: const Color(0x380B120E),
+                              blurRadius: widget.isCompact ? 8 : (widget.isExpanded ? 24 : 16),
+                              spreadRadius: widget.isCompact ? 1 : (widget.isExpanded ? 3 : 1),
+                              offset: Offset(0, widget.isCompact ? 4 : 6),
                             ),
                           ],
                         ),
@@ -175,22 +175,19 @@ class CookingPanVisualState extends State<CookingPanVisual>
                       ),
                     ),
 
-                    // 3. Interior Cooking Basin (Holds Selected Ingredients or Empty Guide)
-                    Positioned(
-                      left: (panCenterX - rx).clamp(0.0, widget.width),
-                      top: (panCenterY - ry).clamp(0.0, widget.height),
-                      width: (rx * 2).clamp(10.0, widget.width),
-                      height: (ry * 2).clamp(10.0, widget.height),
-                      child: ClipOval(
-                        child: Center(
-                          child: count == 0
-                              ? (widget.showEmptyGuide
-                                  ? _buildEmptyGuide()
-                                  : const SizedBox.shrink())
-                              : _buildIngredientsCluster(allItems),
+                    // 3. Interior Cooking Basin (Holds Selected Ingredients ONLY — NO embedded text)
+                    if (count > 0)
+                      Positioned(
+                        left: (panCenterX - rx).clamp(0.0, widget.width),
+                        top: (panCenterY - ry).clamp(0.0, widget.height),
+                        width: (rx * 2).clamp(10.0, widget.width),
+                        height: (ry * 2).clamp(10.0, widget.height),
+                        child: ClipOval(
+                          child: Center(
+                            child: _buildIngredientsCluster(allItems),
+                          ),
                         ),
                       ),
-                    ),
 
                     // 4. Landing Ripple Glow
                     if (_rippleAnimation.value > 0.0 && _rippleAnimation.value < 1.0)
@@ -220,57 +217,6 @@ class CookingPanVisualState extends State<CookingPanVisual>
           ),
         );
       },
-    );
-  }
-
-  /// Empty state subtle guide inside pan
-  Widget _buildEmptyGuide() {
-    if (widget.isCompact) {
-      return const SizedBox.shrink();
-    }
-
-    final double fontSize = widget.isExpanded ? 13.0 : 11.0;
-    final double iconSize = widget.isExpanded ? 18.0 : 14.0;
-
-    return FittedBox(
-      fit: BoxFit.contain,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.soup_kitchen_rounded,
-              size: iconSize,
-              color: Colors.white.withValues(alpha: 0.65),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              'Your pan is ready',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.92),
-                fontSize: fontSize,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.2,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 1),
-            Text(
-              widget.isExpanded
-                  ? 'Add ingredients or name a dish'
-                  : 'Tap ingredients from fridge',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.60),
-                fontSize: fontSize * 0.78,
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
     );
   }
 
