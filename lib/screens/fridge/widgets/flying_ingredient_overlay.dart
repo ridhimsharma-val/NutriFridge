@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/category_item.dart';
+import '../services/cooking_basket_service.dart';
+import 'cooking_pan_visual.dart';
 import 'cooking_pan_widget.dart';
 
 /// Helper that orchestrates the flying ingredient animation from an inventory card
@@ -13,7 +15,7 @@ class FlyingIngredientHelper {
     required GlobalKey targetKey,
     required CategoryFoodItem item,
     VoidCallback? onLanded,
-    Duration duration = const Duration(milliseconds: 500),
+    Duration duration = const Duration(milliseconds: 460),
   }) {
     final overlayState = Overlay.maybeOf(context, rootOverlay: true);
     if (overlayState == null) {
@@ -39,11 +41,22 @@ class FlyingIngredientHelper {
       Offset(sourceBox.size.width / 2, sourceBox.size.height / 2),
     );
 
-    // Cooking pan interior center (account for handle on left)
-    final double targetCenterOffsetX = targetBox.size.width * 0.62;
-    final double targetCenterOffsetY = targetBox.size.height * 0.48;
-    final Offset targetCenter = targetBox.localToGlobal(
-      Offset(targetCenterOffsetX, targetCenterOffsetY),
+    // Calculate reserved destination position directly inside the pan's cooking surface
+    final int currentCount = CookingBasketService.selectedItems.length;
+    int targetIndex = CookingBasketService.selectedItems.indexWhere((it) => it.id == item.id);
+    if (targetIndex < 0) {
+      targetIndex = currentCount;
+    }
+    final int targetTotal = math.max(currentCount, targetIndex + 1);
+
+    final Offset targetCenter = CookingPanVisual.getReservedSlotGlobalPosition(
+      panBox: targetBox,
+      itemIndex: targetIndex,
+      totalCount: targetTotal,
+    );
+
+    final double targetTokenSize = CookingPanVisual.getTokenSize(
+      CookingPanVisual.getBasinMetrics(targetBox.size).rx,
     );
 
     CookingPanCoordinator.addFlyingItem(item.id);
@@ -54,6 +67,7 @@ class FlyingIngredientHelper {
       builder: (ctx) => _FlyingThumbnailWidget(
         sourceCenter: sourceCenter,
         targetCenter: targetCenter,
+        targetTokenSize: targetTokenSize,
         item: item,
         duration: duration,
         onComplete: () {
@@ -74,6 +88,7 @@ class FlyingIngredientHelper {
 class _FlyingThumbnailWidget extends StatefulWidget {
   final Offset sourceCenter;
   final Offset targetCenter;
+  final double targetTokenSize;
   final CategoryFoodItem item;
   final Duration duration;
   final VoidCallback onComplete;
@@ -81,6 +96,7 @@ class _FlyingThumbnailWidget extends StatefulWidget {
   const _FlyingThumbnailWidget({
     required this.sourceCenter,
     required this.targetCenter,
+    required this.targetTokenSize,
     required this.item,
     required this.duration,
     required this.onComplete,
@@ -105,7 +121,7 @@ class _FlyingThumbnailWidgetState extends State<_FlyingThumbnailWidget>
 
     _curveAnimation = CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeInOutCubic,
+      curve: Curves.easeOutCubic,
     );
 
     _controller.addStatusListener((status) {
@@ -130,24 +146,25 @@ class _FlyingThumbnailWidgetState extends State<_FlyingThumbnailWidget>
     final double x2 = widget.targetCenter.dx;
     final double y2 = widget.targetCenter.dy;
 
-    // Bezier control point: midpoint X, elevated Y (arc trajectory)
+    // Bezier control point: natural upward arc trajectory
     final double dx = x2 - x1;
     final double dy = y2 - y1;
     final double distance = math.sqrt(dx * dx + dy * dy);
 
-    // Height of arc proportional to distance, capped between 60 and 110 px
-    final double arcHeight = (distance * 0.22).clamp(60.0, 110.0);
-    final double xc = (x1 + x2) / 2 - (dx * 0.08); // subtle lateral curvature
+    // Height of arc proportional to distance
+    final double arcHeight = (distance * 0.18).clamp(35.0, 85.0);
+    final double xc = (x1 + x2) / 2 - (dx * 0.05); // slight natural lateral curvature
     final double yc = math.min(y1, y2) - arcHeight; // jump upwards into air
 
-    final double tokenBaseSize = 46.0;
+    final double startSize = 46.0;
+    final double endSize = widget.targetTokenSize;
 
     return AnimatedBuilder(
       animation: _curveAnimation,
       builder: (context, _) {
         final double t = _curveAnimation.value;
 
-        // Quadratic Bezier interpolation
+        // Quadratic Bezier interpolation directly landing in reserved pan slot
         final double oneMinusT = 1.0 - t;
         final double x = (oneMinusT * oneMinusT * x1) +
             (2 * oneMinusT * t * xc) +
@@ -156,68 +173,66 @@ class _FlyingThumbnailWidgetState extends State<_FlyingThumbnailWidget>
             (2 * oneMinusT * t * yc) +
             (t * t * y2);
 
-        // Scale: lifts off (1.0 -> 1.25 at t=0.25), then shrinks (-> 0.68 at t=1.0)
-        double scale;
+        // Size: starts at card size (~46px), expands slightly to ~50px as it lifts, shrinks to endSize on landing
+        double currentSize;
         if (t < 0.25) {
-          scale = 1.0 + (t / 0.25) * 0.25;
+          final double subT = t / 0.25;
+          currentSize = startSize + (subT * 4.0);
         } else {
           final double subT = (t - 0.25) / 0.75;
-          scale = 1.25 - (subT * 0.57); // lands at ~0.68
+          currentSize = 50.0 - (subT * (50.0 - endSize));
         }
 
-        // Rotation: 0 -> 0.28 rad (16°) -> 0 rad
-        final double rotation = math.sin(t * math.pi) * 0.28;
+        // Gentle rotation: 0 -> 0.18 rad (~10°) -> 0 rad on landing
+        final double rotation = math.sin(t * math.pi) * 0.18;
 
-        // Shadow elevation: grows as it lifts into air, diminishes on landing
-        final double shadowElevation = math.sin(t * math.pi) * 8.0;
+        // Shadow elevation: expands in air, settles on landing
+        final double shadowElevation = math.sin(t * math.pi) * 6.0;
+
+        final String? imgAsset = widget.item.effectiveImageAsset ?? widget.item.imageAsset;
 
         return Positioned(
-          left: x - (tokenBaseSize / 2),
-          top: y - (tokenBaseSize / 2),
+          left: x - (currentSize / 2),
+          top: y - (currentSize / 2),
           child: IgnorePointer(
             child: Transform.rotate(
               angle: rotation,
-              child: Transform.scale(
-                scale: scale,
-                child: Container(
-                  width: tokenBaseSize,
-                  height: tokenBaseSize,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF7FAF8),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white,
-                      width: 2.0,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color.fromRGBO(0, 0, 0, (0.15 + (shadowElevation * 0.025)).clamp(0.0, 0.40)),
-                        blurRadius: 4.0 + shadowElevation,
-                        offset: Offset(0, 2.0 + (shadowElevation * 0.6)),
-                      ),
-                    ],
+              child: Container(
+                width: currentSize,
+                height: currentSize,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.92),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.95),
+                    width: 0.8,
                   ),
-                  child: ClipOval(
-                    child: Center(
-                      child: ((widget.item.imageAsset != null &&
-                                  widget.item.imageAsset!.isNotEmpty) ||
-                              (widget.item.iconEmoji == null &&
-                                  widget.item.effectiveImageAsset != null))
-                          ? Image.asset(
-                              widget.item.effectiveImageAsset ?? widget.item.imageAsset!,
-                              width: tokenBaseSize * 0.74,
-                              height: tokenBaseSize * 0.74,
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) => Text(
-                                widget.item.iconEmoji ?? '🥗',
-                                style: const TextStyle(fontSize: 22),
-                              ),
-                            )
-                          : Text(
-                              widget.item.iconEmoji ?? '🥗',
-                              style: const TextStyle(fontSize: 22),
-                            ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color.fromRGBO(0, 0, 0, (0.14 + (shadowElevation * 0.02)).clamp(0.0, 0.35)),
+                      blurRadius: 3.5 + shadowElevation,
+                      offset: Offset(0, 1.5 + (shadowElevation * 0.5)),
                     ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: Center(
+                    child: ((imgAsset != null && imgAsset.isNotEmpty) ||
+                            (widget.item.iconEmoji == null && widget.item.effectiveImageAsset != null))
+                        ? Image.asset(
+                            imgAsset!,
+                            width: currentSize * 0.84,
+                            height: currentSize * 0.84,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) => Text(
+                              widget.item.iconEmoji ?? '🥗',
+                              style: TextStyle(fontSize: currentSize * 0.52),
+                            ),
+                          )
+                        : Text(
+                            widget.item.iconEmoji ?? '🥗',
+                            style: TextStyle(fontSize: currentSize * 0.52),
+                          ),
                   ),
                 ),
               ),

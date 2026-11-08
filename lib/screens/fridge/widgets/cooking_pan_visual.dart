@@ -5,6 +5,25 @@ import '../services/cooking_basket_service.dart';
 import 'cooking_pan_painter.dart';
 import 'cooking_pan_widget.dart';
 
+/// Geometric metrics of the inner cooking basin for the physical pan
+class BasinMetrics {
+  final double panCenterX;
+  final double panCenterY;
+  final double rx;
+  final double ry;
+  final double renderedWidth;
+  final double renderedHeight;
+
+  const BasinMetrics({
+    required this.panCenterX,
+    required this.panCenterY,
+    required this.rx,
+    required this.ry,
+    required this.renderedWidth,
+    required this.renderedHeight,
+  });
+}
+
 /// Reusable physical cooking pan visual component for NutriFridge.
 ///
 /// Supports:
@@ -37,6 +56,116 @@ class CookingPanVisual extends StatefulWidget {
     this.onTap,
     this.panKey,
   });
+
+  /// Calculates the exact rendered bounds and inner cooking basin parameters
+  static BasinMetrics getBasinMetrics(Size size) {
+    final FittedSizes fittedSizes = applyBoxFit(
+      BoxFit.contain,
+      const Size(825.0, 822.0),
+      size,
+    );
+    final double renderedWidth = fittedSizes.destination.width;
+    final double renderedHeight = fittedSizes.destination.height;
+    final double imageLeft = (size.width - renderedWidth) / 2.0;
+    final double imageTop = (size.height - renderedHeight) / 2.0;
+
+    // Actual inner cooking surface center of the 3/4 perspective pan
+    final double panCenterX = imageLeft + (renderedWidth * 0.354);
+    final double panCenterY = imageTop + (renderedHeight * 0.585);
+    // Safe inner cooking surface radii (stays cleanly inside the pan rim)
+    final double rx = renderedWidth * 0.250;
+    final double ry = renderedHeight * 0.145;
+
+    return BasinMetrics(
+      panCenterX: panCenterX,
+      panCenterY: panCenterY,
+      rx: rx,
+      ry: ry,
+      renderedWidth: renderedWidth,
+      renderedHeight: renderedHeight,
+    );
+  }
+
+  /// Adaptive layout offsets for ingredient count inside the pan basin:
+  /// - 1 ingredient: centered.
+  /// - 2 ingredients: balanced side by side.
+  /// - 3 ingredients: balanced triangular arrangement.
+  /// - 4 ingredients: symmetric 2 × 2 arrangement.
+  /// - 5 ingredients: three in the upper row and two centered underneath.
+  /// - 6 ingredients: balanced 3 × 2 arrangement.
+  /// - More than 6: 5 food items + dedicated non-overlapping +N badge slot.
+  static List<Offset> getAdaptiveOffsets(int total, double rx, double ry) {
+    final double hStep = rx * 0.44;
+    final double vStep = ry * 0.44;
+
+    if (total <= 1) {
+      return const [Offset(0.0, 0.0)];
+    } else if (total == 2) {
+      return [
+        Offset(-hStep * 0.85, 0.0),
+        Offset(hStep * 0.85, 0.0),
+      ];
+    } else if (total == 3) {
+      return [
+        Offset(0.0, -vStep * 0.90),
+        Offset(-hStep * 0.85, vStep * 0.80),
+        Offset(hStep * 0.85, vStep * 0.80),
+      ];
+    } else if (total == 4) {
+      return [
+        Offset(-hStep * 0.80, -vStep * 0.85),
+        Offset(hStep * 0.80, -vStep * 0.85),
+        Offset(-hStep * 0.80, vStep * 0.85),
+        Offset(hStep * 0.80, vStep * 0.85),
+      ];
+    } else if (total == 5) {
+      return [
+        Offset(-hStep * 1.10, -vStep * 0.85),
+        Offset(0.0, -vStep * 0.85),
+        Offset(hStep * 1.10, -vStep * 0.85),
+        Offset(-hStep * 0.65, vStep * 0.85),
+        Offset(hStep * 0.65, vStep * 0.85),
+      ];
+    } else {
+      // 6 items (3 x 2 grid) or > 6 items (5 food items + 1 overflow badge)
+      return [
+        Offset(-hStep * 1.10, -vStep * 0.85),
+        Offset(0.0, -vStep * 0.85),
+        Offset(hStep * 1.10, -vStep * 0.85),
+        Offset(-hStep * 1.10, vStep * 0.85),
+        Offset(0.0, vStep * 0.85),
+        Offset(hStep * 1.10, vStep * 0.85),
+      ];
+    }
+  }
+
+  /// Calculates the exact global target screen position for a specific reserved thumbnail slot
+  static Offset getReservedSlotGlobalPosition({
+    required RenderBox panBox,
+    required int itemIndex,
+    required int totalCount,
+  }) {
+    final BasinMetrics m = getBasinMetrics(panBox.size);
+    final effectiveCount = totalCount > 6 ? 6 : totalCount;
+    final slot = itemIndex.clamp(0, effectiveCount - 1);
+    final offsets = getAdaptiveOffsets(effectiveCount, m.rx, m.ry);
+    final offset = slot < offsets.length ? offsets[slot] : Offset.zero;
+
+    return panBox.localToGlobal(
+      Offset(m.panCenterX + offset.dx, m.panCenterY + offset.dy),
+    );
+  }
+
+  /// Calculates the proportional token size for the pan
+  static double getTokenSize(double rx, {bool isCompact = false, bool isExpanded = false}) {
+    if (isCompact) {
+      return (rx * 0.40).clamp(15.0, 20.0);
+    } else if (isExpanded) {
+      return (rx * 0.42).clamp(20.0, 26.0);
+    } else {
+      return (rx * 0.40).clamp(18.0, 23.0);
+    }
+  }
 
   @override
   State<CookingPanVisual> createState() => CookingPanVisualState();
@@ -106,13 +235,19 @@ class CookingPanVisualState extends State<CookingPanVisual>
         final allItems = CookingBasketService.selectedItems;
         final count = allItems.length;
 
-        // Interior basin coordinates for the user-supplied 3/4 angle pan image:
-        // Center: X ≈ 36.2% of width, Y ≈ 58.0% of height
-        // Radius: Rx ≈ 28.0% of width, Ry ≈ 16.0% of height
-        final double panCenterX = widget.width * 0.362;
-        final double panCenterY = widget.height * 0.580;
-        final double rx = widget.width * 0.280;
-        final double ry = widget.height * 0.160;
+        // Accurate inner cooking basin coordinates and metrics
+        final BasinMetrics metrics = CookingPanVisual.getBasinMetrics(
+          Size(widget.width, widget.height),
+        );
+        final double panCenterX = metrics.panCenterX;
+        final double panCenterY = metrics.panCenterY;
+        final double rx = metrics.rx;
+        final double ry = metrics.ry;
+        final double tokenSize = CookingPanVisual.getTokenSize(
+          rx,
+          isCompact: widget.isCompact,
+          isExpanded: widget.isExpanded,
+        );
 
         return RepaintBoundary(
           child: GestureDetector(
@@ -137,11 +272,11 @@ class CookingPanVisualState extends State<CookingPanVisual>
                   clipBehavior: Clip.none,
                   alignment: Alignment.center,
                   children: [
-                    // 1. Ambient drop shadow under the pan
+                    // 1. Ambient drop shadow under the pan basin
                     Positioned(
-                      left: panCenterX - rx - (widget.isCompact ? 4 : 10),
+                      left: panCenterX - rx - (widget.isCompact ? 4 : 8),
                       top: panCenterY + (ry * 0.35),
-                      width: (rx * 2) + (widget.isCompact ? 8 : 20),
+                      width: (rx * 2) + (widget.isCompact ? 8 : 16),
                       height: ry * 0.85,
                       child: Container(
                         decoration: BoxDecoration(
@@ -177,24 +312,22 @@ class CookingPanVisualState extends State<CookingPanVisual>
                       ),
                     ),
 
-                    // 3. Interior Cooking Basin (Holds Selected Ingredients ONLY — NO embedded text)
+                    // 3. Interior Cooking Basin (Holds Selected Ingredients ONLY — centered on inner cooking surface)
                     if (count > 0)
                       Positioned(
-                        left: (panCenterX - rx).clamp(0.0, widget.width),
-                        top: (panCenterY - ry).clamp(0.0, widget.height),
-                        width: (rx * 2).clamp(10.0, widget.width),
-                        height: (ry * 2).clamp(10.0, widget.height),
+                        left: panCenterX - rx,
+                        top: panCenterY - ry,
+                        width: rx * 2,
+                        height: ry * 2,
                         child: ClipOval(
                           child: Opacity(
                             opacity: widget.contentOpacity.clamp(0.0, 1.0),
-                            child: Center(
-                              child: _buildIngredientsCluster(allItems),
-                            ),
+                            child: _buildIngredientsCluster(allItems, rx, ry, tokenSize),
                           ),
                         ),
                       ),
 
-                    // 4. Landing Ripple Glow
+                    // 4. Landing Ripple Glow emanating from true basin center
                     if (_rippleAnimation.value > 0.0 && _rippleAnimation.value < 1.0)
                       Positioned(
                         left: panCenterX - (rx * _rippleAnimation.value),
@@ -225,123 +358,143 @@ class CookingPanVisualState extends State<CookingPanVisual>
     );
   }
 
-  /// Arranges selected ingredient thumbnails naturally within the pan interior
-  Widget _buildIngredientsCluster(List<CategoryFoodItem> items) {
+  /// Arranges selected ingredient thumbnails in an adaptive, balanced, centered composition
+  Widget _buildIngredientsCluster(
+    List<CategoryFoodItem> items,
+    double rx,
+    double ry,
+    double tokenSize,
+  ) {
     final int total = items.length;
-    final double tokenSize = widget.isCompact
-        ? 18.0
-        : (widget.isExpanded ? 26.0 : 22.0);
+    final bool hasOverflow = total > 6;
+    final int displayItemCount = hasOverflow ? 5 : total;
+    final List<CategoryFoodItem> displayItems = items.take(displayItemCount).toList();
+    final int overflowCount = total - displayItemCount;
 
-    // Limit to 3 visible elements in basin to prevent crowded stacking
-    final int maxVisible = 3;
-    final int displayCount = total > maxVisible ? (maxVisible - 1) : total;
-    final List<CategoryFoodItem> displayItems = items.take(displayCount).toList();
-    final int overflowCount = total - displayCount;
-    final int totalElements = displayCount + (overflowCount > 0 ? 1 : 0);
+    final int layoutCount = hasOverflow ? 6 : total;
+    final List<Offset> offsets = CookingPanVisual.getAdaptiveOffsets(layoutCount, rx, ry);
 
-    return FittedBox(
-      fit: BoxFit.contain,
-      child: SizedBox(
-        width: 120,
-        height: 70,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            for (int i = 0; i < displayItems.length; i++)
-              _buildPositionedToken(
-                item: displayItems[i],
-                index: i,
-                total: totalElements,
-                tokenSize: tokenSize,
-              ),
-            if (overflowCount > 0)
-              _buildOverflowToken(
-                count: overflowCount,
-                index: displayCount,
-                total: totalElements,
-                tokenSize: tokenSize,
-              ),
-          ],
-        ),
+    return SizedBox(
+      width: rx * 2,
+      height: ry * 2,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          for (int i = 0; i < displayItems.length; i++)
+            _buildAnimatedItemToken(
+              item: displayItems[i],
+              offset: i < offsets.length ? offsets[i] : Offset.zero,
+              rx: rx,
+              ry: ry,
+              tokenSize: tokenSize,
+              index: i,
+            ),
+          if (hasOverflow && offsets.length >= 6)
+            _buildAnimatedOverflowBadge(
+              overflowCount: overflowCount,
+              offset: offsets[5],
+              rx: rx,
+              ry: ry,
+              tokenSize: tokenSize,
+            ),
+        ],
       ),
     );
   }
 
-  /// Single ingredient thumbnail token inside the pan
-  Widget _buildPositionedToken({
+  /// Animated single ingredient thumbnail with smooth gliding transitions and landing reveal
+  Widget _buildAnimatedItemToken({
     required CategoryFoodItem item,
-    required int index,
-    required int total,
+    required Offset offset,
+    required double rx,
+    required double ry,
     required double tokenSize,
+    required int index,
   }) {
-    final Offset pos = _getOffsetForIndex(index, total);
+    final bool isFlying = CookingPanCoordinator.isFlying(item.id);
     final double angle = _getAngleForIndex(index);
 
-    return Positioned(
-      left: 60.0 + pos.dx - (tokenSize / 2),
-      top: 35.0 + pos.dy - (tokenSize / 2),
-      child: Transform.rotate(
-        angle: angle,
-        child: AnimatedScale(
-          scale: 1.0,
-          duration: const Duration(milliseconds: 240),
-          curve: Curves.elasticOut,
-          child: Container(
-            width: tokenSize,
-            height: tokenSize,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.88),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.92),
-                width: 0.8,
-              ),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x33000000),
-                  blurRadius: 3.0,
-                  offset: Offset(0, 1.5),
-                ),
-              ],
-            ),
-            child: ClipOval(
-              child: Center(
-                child: ((item.imageAsset != null && item.imageAsset!.isNotEmpty) ||
-                        (item.iconEmoji == null && item.effectiveImageAsset != null))
-                    ? Image.asset(
-                        item.effectiveImageAsset ?? item.imageAsset!,
-                        width: tokenSize * 0.88,
-                        height: tokenSize * 0.88,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => Text(
-                          item.iconEmoji ?? '🥘',
-                          style: TextStyle(fontSize: tokenSize * 0.50),
-                        ),
-                      )
-                    : Text(
-                        item.iconEmoji ?? '🥘',
-                        style: TextStyle(fontSize: tokenSize * 0.50),
-                      ),
-              ),
-            ),
-          ),
+    return AnimatedPositioned(
+      key: ValueKey(item.id),
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      left: rx + offset.dx - (tokenSize / 2),
+      top: ry + offset.dy - (tokenSize / 2),
+      width: tokenSize,
+      height: tokenSize,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 140),
+        opacity: isFlying ? 0.0 : 1.0,
+        child: Transform.rotate(
+          angle: angle,
+          child: _buildTokenCard(item, tokenSize),
         ),
       ),
     );
   }
 
-  /// Overflow '+N' token
-  Widget _buildOverflowToken({
-    required int count,
-    required int index,
-    required int total,
+  /// Single ingredient thumbnail card inside the pan basin
+  Widget _buildTokenCard(CategoryFoodItem item, double tokenSize) {
+    final String? imgAsset = item.effectiveImageAsset ?? item.imageAsset;
+
+    return Container(
+      width: tokenSize,
+      height: tokenSize,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.90),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.95),
+          width: 0.8,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 3.0,
+            offset: Offset(0, 1.2),
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: Center(
+          child: ((imgAsset != null && imgAsset.isNotEmpty) ||
+                  (item.iconEmoji == null && item.effectiveImageAsset != null))
+              ? Image.asset(
+                  item.effectiveImageAsset ?? item.imageAsset!,
+                  width: tokenSize * 0.86,
+                  height: tokenSize * 0.86,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => Text(
+                    item.iconEmoji ?? '🥘',
+                    style: TextStyle(fontSize: tokenSize * 0.50),
+                  ),
+                )
+              : Text(
+                  item.iconEmoji ?? '🥘',
+                  style: TextStyle(fontSize: tokenSize * 0.50),
+                ),
+        ),
+      ),
+    );
+  }
+
+  /// Animated separate '+N' indicator in its own dedicated non-overlapping slot
+  Widget _buildAnimatedOverflowBadge({
+    required int overflowCount,
+    required Offset offset,
+    required double rx,
+    required double ry,
     required double tokenSize,
   }) {
-    final Offset pos = _getOffsetForIndex(index, total);
-
-    return Positioned(
-      left: 60.0 + pos.dx - (tokenSize / 2),
-      top: 35.0 + pos.dy - (tokenSize / 2),
+    return AnimatedPositioned(
+      key: const ValueKey('pan_overflow_badge'),
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      left: rx + offset.dx - (tokenSize / 2),
+      top: ry + offset.dy - (tokenSize / 2),
+      width: tokenSize,
+      height: tokenSize,
       child: Container(
         width: tokenSize,
         height: tokenSize,
@@ -356,17 +509,18 @@ class CookingPanVisualState extends State<CookingPanVisual>
             BoxShadow(
               color: Color(0x33000000),
               blurRadius: 3.0,
-              offset: Offset(0, 1.5),
+              offset: Offset(0, 1.2),
             ),
           ],
         ),
         child: Center(
           child: Text(
-            '+$count',
+            '+$overflowCount',
             style: TextStyle(
               color: Colors.white,
-              fontSize: widget.isCompact ? 8.5 : (widget.isExpanded ? 11.5 : 10.0),
+              fontSize: tokenSize * 0.44,
               fontWeight: FontWeight.w800,
+              letterSpacing: -0.2,
             ),
           ),
         ),
@@ -374,47 +528,17 @@ class CookingPanVisualState extends State<CookingPanVisual>
     );
   }
 
-  /// Organic placement offsets inside the basin
-  Offset _getOffsetForIndex(int index, int total) {
-    if (total == 1) return const Offset(0, 0);
-    if (total == 2) {
-      return index == 0 ? const Offset(-16, 0) : const Offset(16, 0);
-    }
-    // 3 elements (either 3 items, or 2 items + 1 overflow badge)
-    if (total == 3) {
-      switch (index) {
-        case 0:
-          return const Offset(-15, -6);
-        case 1:
-          return const Offset(15, -6);
-        default:
-          return const Offset(0, 8);
-      }
-    }
-    // Fallback for 4 elements if needed
-    switch (index) {
-      case 0:
-        return const Offset(-16, -6);
-      case 1:
-        return const Offset(16, -6);
-      case 2:
-        return const Offset(-10, 8);
-      default:
-        return const Offset(12, 8);
-    }
-  }
-
-  /// Slight rotation for resting natural look
+  /// Subtle rotation angle for natural resting look inside pan
   double _getAngleForIndex(int index) {
     switch (index % 4) {
       case 0:
-        return -0.08;
+        return -0.06;
       case 1:
-        return 0.12;
+        return 0.08;
       case 2:
-        return -0.05;
+        return -0.04;
       default:
-        return 0.09;
+        return 0.06;
     }
   }
 }

@@ -428,9 +428,10 @@ void main() {
   });
 
   group('Phase 9: Interactive Cooking Pan Layout & Workspace Carousel', () {
-    testWidgets('CookingPanVisual basin renders at most 3 items with +N badge for overflow',
+    testWidgets('CookingPanVisual renders adaptive balanced layout for 1-6 items and separate +N badge for >6',
         (tester) async {
-      final items = [
+      // 5 items: all 5 displayed in 3 + 2 layout with NO overflow indicator
+      final items5 = [
         CategoryFoodItem(id: '1', name: 'Apples', category: 'Fruits', quantity: '2', expiryDays: 3),
         CategoryFoodItem(id: '2', name: 'Bananas', category: 'Fruits', quantity: '3', expiryDays: 2),
         CategoryFoodItem(id: '3', name: 'Milk', category: 'Dairy', quantity: '1 L', expiryDays: 4),
@@ -438,7 +439,7 @@ void main() {
         CategoryFoodItem(id: '5', name: 'Tomatoes', category: 'Vegetables', quantity: '400 g', expiryDays: 6),
       ];
 
-      for (final it in items) {
+      for (final it in items5) {
         CookingBasketService.toggleItem(it);
       }
 
@@ -457,8 +458,81 @@ void main() {
       );
       await tester.pump();
 
-      // Overflow indicator should show +3 (5 items total - 2 displayed = +3 overflow)
-      expect(find.text('+3'), findsOneWidget);
+      // For 5 items, no overflow badge should be rendered
+      expect(find.byKey(const ValueKey('pan_overflow_badge')), findsNothing);
+
+      // Add 2 more items (total 7 > 6): shows 5 food items + '+2' badge in slot 5
+      final item6 = CategoryFoodItem(id: '6', name: 'Eggs', category: 'Dairy', quantity: '6 pcs', expiryDays: 7);
+      final item7 = CategoryFoodItem(id: '7', name: 'Cheese', category: 'Dairy', quantity: '200 g', expiryDays: 8);
+      CookingBasketService.toggleItem(item6);
+      CookingBasketService.toggleItem(item7);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: CookingPanVisual(
+                width: 340,
+                height: 184,
+                isExpanded: true,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Overflow indicator should show +2 (7 items total - 5 displayed = +2 overflow)
+      expect(find.text('+2'), findsOneWidget);
+      expect(find.byKey(const ValueKey('pan_overflow_badge')), findsOneWidget);
+    });
+
+    test('CookingPanVisual adaptive offsets math provides centered, non-overlapping layouts for counts 1 to 6', () {
+      const double rx = 50.0;
+      const double ry = 28.0;
+
+      // 1 item: centered
+      final off1 = CookingPanVisual.getAdaptiveOffsets(1, rx, ry);
+      expect(off1.length, 1);
+      expect(off1[0], const Offset(0.0, 0.0));
+
+      // 2 items: balanced side by side
+      final off2 = CookingPanVisual.getAdaptiveOffsets(2, rx, ry);
+      expect(off2.length, 2);
+      expect(off2[0].dx, lessThan(0));
+      expect(off2[1].dx, greaterThan(0));
+      expect(off2[0].dy, 0.0);
+      expect(off2[1].dy, 0.0);
+
+      // 3 items: balanced triangular
+      final off3 = CookingPanVisual.getAdaptiveOffsets(3, rx, ry);
+      expect(off3.length, 3);
+      expect(off3[0].dy, lessThan(0)); // top center
+      expect(off3[1].dy, greaterThan(0)); // bottom left
+      expect(off3[2].dy, greaterThan(0)); // bottom right
+
+      // 4 items: symmetric 2 x 2
+      final off4 = CookingPanVisual.getAdaptiveOffsets(4, rx, ry);
+      expect(off4.length, 4);
+      expect(off4[0].dy, lessThan(0));
+      expect(off4[1].dy, lessThan(0));
+      expect(off4[2].dy, greaterThan(0));
+      expect(off4[3].dy, greaterThan(0));
+
+      // 5 items: 3 upper, 2 centered underneath
+      final off5 = CookingPanVisual.getAdaptiveOffsets(5, rx, ry);
+      expect(off5.length, 5);
+      expect(off5[0].dy, lessThan(0));
+      expect(off5[1].dy, lessThan(0));
+      expect(off5[2].dy, lessThan(0));
+      expect(off5[3].dy, greaterThan(0));
+      expect(off5[4].dy, greaterThan(0));
+
+      // 6 items: balanced 3 x 2
+      final off6 = CookingPanVisual.getAdaptiveOffsets(6, rx, ry);
+      expect(off6.length, 6);
+      expect(off6.where((o) => o.dy < 0).length, 3);
+      expect(off6.where((o) => o.dy > 0).length, 3);
     });
 
     testWidgets('Tapping empty pan in CookingWorkspaceScreen shows informative snackbar without opening carousel',
