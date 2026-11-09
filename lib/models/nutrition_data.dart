@@ -162,6 +162,60 @@ class RecipeRecommendation {
     this.videoUrl,
   });
 
+  RecipeRecommendation copyWith({
+    String? id,
+    String? title,
+    int? calories,
+    int? proteinGrams,
+    int? carbsGrams,
+    int? fatGrams,
+    int? prepTimeMinutes,
+    int? fridgeItemsUsed,
+    String? tag,
+    String? mealType,
+    String? imageUrl,
+    String? imageKey,
+    bool? nutritionIsEstimate,
+    List<String>? matchReasons,
+    List<String>? requiredIngredients,
+    List<String>? missingIngredients,
+    String? explanation,
+    int? cookingTimeMinutes,
+    String? servingSize,
+    List<RecipePreparationStep>? preparationSteps,
+    List<String>? cookingTips,
+    List<String>? substitutions,
+    String? videoSearchQuery,
+    String? videoUrl,
+  }) {
+    return RecipeRecommendation(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      calories: calories ?? this.calories,
+      proteinGrams: proteinGrams ?? this.proteinGrams,
+      carbsGrams: carbsGrams ?? this.carbsGrams,
+      fatGrams: fatGrams ?? this.fatGrams,
+      prepTimeMinutes: prepTimeMinutes ?? this.prepTimeMinutes,
+      fridgeItemsUsed: fridgeItemsUsed ?? this.fridgeItemsUsed,
+      tag: tag ?? this.tag,
+      mealType: mealType ?? this.mealType,
+      imageUrl: imageUrl ?? this.imageUrl,
+      imageKey: imageKey ?? this.imageKey,
+      nutritionIsEstimate: nutritionIsEstimate ?? this.nutritionIsEstimate,
+      matchReasons: matchReasons ?? this.matchReasons,
+      requiredIngredients: requiredIngredients ?? this.requiredIngredients,
+      missingIngredients: missingIngredients ?? this.missingIngredients,
+      explanation: explanation ?? this.explanation,
+      cookingTimeMinutes: cookingTimeMinutes ?? this.cookingTimeMinutes,
+      servingSize: servingSize ?? this.servingSize,
+      preparationSteps: preparationSteps ?? this.preparationSteps,
+      cookingTips: cookingTips ?? this.cookingTips,
+      substitutions: substitutions ?? this.substitutions,
+      videoSearchQuery: videoSearchQuery ?? this.videoSearchQuery,
+      videoUrl: videoUrl ?? this.videoUrl,
+    );
+  }
+
   /// Factory constructor to parse structured backend recommendation response
   factory RecipeRecommendation.fromJson(Map<String, dynamic> json) {
     final title = (json['name'] ?? json['title'] ?? 'Chef Special').toString();
@@ -942,22 +996,12 @@ class MockDataRepository {
         imageUrl: imageUrl,
       );
 
-      final index = _currentMeals.indexWhere((m) {
+      final placeholderIndex = _currentMeals.indexWhere((m) {
         final itemSlot = m.mealType.isNotEmpty ? m.mealType.toLowerCase() : m.name.toLowerCase();
-        return itemSlot == cleanType || (itemSlot.startsWith('snack') && cleanType.startsWith('snack'));
+        return !m.isCompleted && (itemSlot == cleanType || (itemSlot.startsWith('snack') && cleanType.startsWith('snack')));
       });
-      if (index != -1) {
-        _currentMeals[index] = _currentMeals[index].copyWith(
-          id: newMealItem.id,
-          mealType: formattedSlot,
-          status: MealStatus.completed,
-          time: timeString,
-          calories: calories,
-          proteinG: protein,
-          carbsG: carbs,
-          fatG: fat,
-          imageUrl: imageUrl,
-        );
+      if (placeholderIndex != -1) {
+        _currentMeals[placeholderIndex] = newMealItem;
       } else {
         _currentMeals.add(newMealItem);
       }

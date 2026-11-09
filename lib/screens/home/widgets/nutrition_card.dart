@@ -538,7 +538,6 @@ class NutritionCard extends StatelessWidget {
 
   Widget _buildMealBreakdownList() {
     final meals = MockDataRepository.meals;
-    final history = MockDataRepository.loggedMealsHistory;
     final unknownCount = MockDataRepository.mealsWithUnknownNutrition;
 
     if (meals.isEmpty) {
@@ -580,29 +579,11 @@ class NutritionCard extends StatelessWidget {
           ),
         ...meals.map((meal) {
         final isCompleted = meal.isCompleted;
-
-        // Find details from logged history if available
-        Map<String, dynamic>? loggedRecord;
-        for (final item in history.reversed) {
-          if (item['mealType'].toString().toLowerCase() ==
-              meal.name.toLowerCase()) {
-            loggedRecord = item;
-            break;
-          }
-        }
-
-        String displayName = meal.name;
-        int calories = 0;
-        String macroInfo = '';
-
-        if (isCompleted && loggedRecord != null) {
-          displayName = loggedRecord['mealName'] ?? meal.name;
-          calories = (loggedRecord['calories'] as num?)?.toInt() ?? 0;
-          final p = loggedRecord['protein'] ?? 0;
-          final c = loggedRecord['carbs'] ?? 0;
-          final f = loggedRecord['fat'] ?? 0;
-          macroInfo = '${p}g P · ${c}g C · ${f}g F';
-        }
+        final slotLabel = meal.mealType.isNotEmpty ? meal.mealType : meal.name;
+        final badgeText = slotLabel.substring(0, slotLabel.length > 3 ? 3 : slotLabel.length).toUpperCase();
+        final String displayName = meal.name.isNotEmpty ? meal.name : slotLabel;
+        final int calories = meal.calories;
+        final String macroInfo = '${meal.proteinG}g P · ${meal.carbsG}g C · ${meal.fatG}g F';
 
         return Container(
           margin: const EdgeInsets.only(bottom: 6),
@@ -627,7 +608,7 @@ class NutritionCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  meal.name.substring(0, meal.name.length > 3 ? 3 : meal.name.length).toUpperCase(),
+                  badgeText,
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
@@ -644,7 +625,7 @@ class NutritionCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      meal.name,
+                      slotLabel,
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,

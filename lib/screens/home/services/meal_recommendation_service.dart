@@ -428,44 +428,18 @@ class MealRecommendationService {
     }
   }
 
-  /// Determines the next appropriate unlogged meal slot based on both
-  /// current local time and today's completed meal slots.
-  /// Progression order: Breakfast -> Lunch -> Snacks -> Dinner -> tomorrow's Breakfast.
+  /// Determines the active meal slot based on current local time.
+  /// Meal slot categories remain stable and are not automatically switched
+  /// when one or more meals are logged in the same slot.
   static MealTimeSlot resolveActiveMealSlot([DateTime? time]) {
     final dt = time ?? currentTimeProvider();
-    final completed = getCompletedMealSlotsToday(dt);
 
     // Late night (23:00 - 04:59) -> upcoming Breakfast
     if (isLateNightWindow(dt)) {
       return MealTimeSlot.breakfast;
     }
 
-    final clockSlot = getMealTimeSlot(dt);
-
-    // If clock slot has NOT yet been completed today, recommend it
-    if (!completed.contains(clockSlot)) {
-      return clockSlot;
-    }
-
-    // Clock slot is already completed today:
-    // Advance to the next unlogged upcoming slot today
-    const order = [
-      MealTimeSlot.breakfast,
-      MealTimeSlot.lunch,
-      MealTimeSlot.snack,
-      MealTimeSlot.dinner,
-    ];
-
-    final currentIndex = order.indexOf(clockSlot);
-    for (int i = currentIndex + 1; i < order.length; i++) {
-      if (!completed.contains(order[i])) {
-        return order[i];
-      }
-    }
-
-    // No suitable remaining slot exists today (e.g. Dinner completed or all completed)
-    // -> Advance to tomorrow's Breakfast
-    return MealTimeSlot.breakfast;
+    return getMealTimeSlot(dt);
   }
 
   /// Alias for resolveActiveMealSlot
@@ -894,6 +868,14 @@ class MealRecommendationService {
       }
     }
 
+    if (rec != null) {
+      final authoritativeSlot = (targetSlot ?? slot).displayName;
+      rec = rec.copyWith(
+        mealType: authoritativeSlot,
+        tag: authoritativeSlot.toUpperCase(),
+      );
+    }
+
     return rec;
   }
 
@@ -994,7 +976,7 @@ class MealRecommendationService {
     _alternativeMessage = null;
     recommendationNotifier.value = null;
 
-    final nextSlot = resolveActiveMealSlot(time);
+    final nextSlot = loggedSlot ?? resolveActiveMealSlot(time);
     return fetchRecommendation(
       forceRefresh: true,
       targetSlot: nextSlot,
@@ -1007,6 +989,7 @@ class MealRecommendationService {
   static Future<RecipeRecommendation?> generateFromSelectedIngredients({
     required List<CategoryFoodItem> selectedItems,
     String? preferredDishName,
+    MealTimeSlot? targetSlot,
     BuildContext? context,
   }) async {
     ensureInitialized();
@@ -1015,6 +998,7 @@ class MealRecommendationService {
       if (preferredDishName != null && preferredDishName.trim().isNotEmpty) {
         return generateFromDishName(
           dishName: preferredDishName.trim(),
+          targetSlot: targetSlot,
           context: context,
         );
       }
@@ -1030,6 +1014,7 @@ class MealRecommendationService {
         recipeMode: 'selected_ingredients',
         selectedItems: selectedItems,
         preferredDishName: preferredDishName,
+        targetSlot: targetSlot,
         context: context,
       );
 
@@ -1125,6 +1110,7 @@ class MealRecommendationService {
   /// AI evaluates complete available fridge inventory for ingredient availability.
   static Future<RecipeRecommendation?> generateFromDishName({
     required String dishName,
+    MealTimeSlot? targetSlot,
     BuildContext? context,
   }) async {
     ensureInitialized();
@@ -1142,6 +1128,7 @@ class MealRecommendationService {
       final rec = await executeMealRecommendationPipeline(
         recipeMode: 'named_dish_from_inventory',
         preferredDishName: cleanDishName,
+        targetSlot: targetSlot,
         context: context,
       );
 

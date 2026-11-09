@@ -724,6 +724,7 @@ void main() {
         missingIngredients: const [],
         preparationSteps: const [],
       );
+      expect(customRec.title, equals('Custom Stir Fry'));
 
       MealRecommendationService.selectDiscoveryMode(MealDiscoveryMode.useMyIngredients, fetch: false);
       expect(MealRecommendationService.recipeOrigin, equals(RecipeOrigin.customIngredients));

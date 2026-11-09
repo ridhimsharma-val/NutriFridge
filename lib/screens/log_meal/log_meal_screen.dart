@@ -11,7 +11,12 @@ import 'models/detected_food_item.dart';
 
 /// Screen 1 of the Log Meal feature: Photo capture and plate selection.
 class LogMealScreen extends StatefulWidget {
-  const LogMealScreen({super.key});
+  final String? initialMealType;
+
+  const LogMealScreen({
+    super.key,
+    this.initialMealType,
+  });
 
   @override
   State<LogMealScreen> createState() => _LogMealScreenState();
@@ -205,6 +210,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
             imageFile: _selectedImage,
             initialMealName: mealName,
             initialFoods: detectedFoods,
+            initialMealType: widget.initialMealType,
           ),
         ),
       );
@@ -218,6 +224,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
             builder: (context) => MealAnalysisScreen(
               imageBytes: _imageBytes,
               imageFile: _selectedImage,
+              initialMealType: widget.initialMealType,
             ),
           ),
         );

@@ -280,7 +280,7 @@ void main() {
   });
 
   group('Meal Slot Progression & Recommendation Safety Tests', () {
-    test('MealRecommendationService advances correctly after logging breakfast', () {
+    test('MealRecommendationService preserves breakfast slot and does not switch categories automatically', () {
       MockDataRepository.forceInMemoryForTesting = true;
 
       // Log Breakfast
@@ -304,8 +304,8 @@ void main() {
       final nextSlot = MealRecommendationService.resolveActiveMealSlot(
         DateTime(2026, 11, 6, 8, 30), // During breakfast window
       );
-      // Since breakfast is logged, should advance to lunch!
-      expect(nextSlot, MealTimeSlot.lunch);
+      // Selected/clock slot must be authoritative and not automatically switch categories
+      expect(nextSlot, MealTimeSlot.breakfast);
     });
 
     test('Duplicate meal responses do not cause second progression events', () {

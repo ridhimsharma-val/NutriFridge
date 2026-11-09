@@ -76,6 +76,7 @@ class _RecipeCatalogSpec {
 class MealDetailInfo {
   final String name;
   final String tag;
+  final String? mealType;
   final String imageUrl;
   final int? calories;
   final int? proteinGrams;
@@ -99,6 +100,7 @@ class MealDetailInfo {
   const MealDetailInfo({
     required this.name,
     required this.tag,
+    this.mealType,
     required this.imageUrl,
     this.calories,
     this.proteinGrams,
@@ -753,9 +755,16 @@ class MealDetailInfo {
       ));
     }
 
+    final String effectiveMealType = rec.mealType.isNotEmpty
+        ? rec.mealType
+        : (['breakfast', 'lunch', 'dinner', 'snack'].contains(rec.tag.toLowerCase()) ? rec.tag : '');
+
     return MealDetailInfo(
       name: rec.title,
-      tag: rec.tag.isNotEmpty ? rec.tag : 'Picked for your fridge',
+      tag: effectiveMealType.isNotEmpty
+          ? effectiveMealType.toUpperCase()
+          : (rec.tag.isNotEmpty ? rec.tag : 'Picked for your fridge'),
+      mealType: effectiveMealType.isNotEmpty ? effectiveMealType : null,
       imageUrl: rec.imageUrl,
       calories: cal,
       proteinGrams: protein,

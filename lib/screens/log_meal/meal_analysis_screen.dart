@@ -15,6 +15,7 @@ class MealAnalysisScreen extends StatefulWidget {
   final XFile? imageFile;
   final String? initialMealName;
   final List<DetectedFoodItem>? initialFoods;
+  final String? initialMealType;
 
   const MealAnalysisScreen({
     super.key,
@@ -22,6 +23,7 @@ class MealAnalysisScreen extends StatefulWidget {
     this.imageFile,
     this.initialMealName,
     this.initialFoods,
+    this.initialMealType,
   });
 
   @override
@@ -515,6 +517,7 @@ class _MealAnalysisScreenState extends State<MealAnalysisScreen> {
           imageFile: widget.imageFile,
           detectedFoods: _detectedFoods,
           nutritionEstimate: MealNutritionEstimate.fromIngredients(_detectedFoods),
+          initialMealType: widget.initialMealType,
         ),
       ),
     );

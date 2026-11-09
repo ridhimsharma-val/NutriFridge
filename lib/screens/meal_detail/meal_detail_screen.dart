@@ -90,8 +90,22 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
           ? widget.recommendation.id
           : null;
 
+      // Prioritize authoritative meal slot
+      String rawSlot = '';
+      if (widget.recommendation.mealType.isNotEmpty) {
+        rawSlot = widget.recommendation.mealType;
+      } else if (meal.mealType != null && meal.mealType!.isNotEmpty) {
+        rawSlot = meal.mealType!;
+      } else if (meal.tag.isNotEmpty &&
+          ['breakfast', 'lunch', 'dinner', 'snack'].contains(meal.tag.toLowerCase())) {
+        rawSlot = meal.tag;
+      } else {
+        rawSlot = MealRecommendationService.resolveActiveMealSlot().displayName;
+      }
+      final cleanMealType = MealTrackingService.normalizeMealSlot(rawSlot);
+
       final result = await MockDataRepository.logMeal(
-        mealType: meal.tag.isNotEmpty ? meal.tag.toLowerCase() : 'lunch',
+        mealType: cleanMealType,
         mealName: meal.name,
         calories: meal.calories ?? 0,
         protein: meal.proteinGrams ?? 0,
@@ -131,7 +145,7 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
       } else {
         if (!isDuplicate) {
           MealRecommendationService.advanceAfterMealLogged(
-            loggedSlot: MealRecommendationService.parseMealSlot(meal.tag),
+            loggedSlot: MealRecommendationService.parseMealSlot(cleanMealType),
           );
         }
       }

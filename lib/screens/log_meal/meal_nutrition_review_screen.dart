@@ -18,6 +18,7 @@ class MealNutritionReviewScreen extends StatefulWidget {
   final XFile? imageFile;
   final List<DetectedFoodItem> detectedFoods;
   final MealNutritionEstimate? nutritionEstimate;
+  final String? initialMealType;
 
   const MealNutritionReviewScreen({
     super.key,
@@ -26,6 +27,7 @@ class MealNutritionReviewScreen extends StatefulWidget {
     this.imageFile,
     required this.detectedFoods,
     this.nutritionEstimate,
+    this.initialMealType,
   });
 
   @override
@@ -52,7 +54,9 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
   void initState() {
     super.initState();
     _mealName = widget.mealName.trim().isEmpty ? 'Paneer Rice Bowl' : widget.mealName;
-    _selectedMealType = _detectDefaultMealType();
+    _selectedMealType = (widget.initialMealType != null && widget.initialMealType!.trim().isNotEmpty)
+        ? widget.initialMealType!.trim()
+        : _detectDefaultMealType();
     _nutrition = widget.nutritionEstimate ?? MealNutritionEstimate.fromIngredients(widget.detectedFoods);
     _inventoryStatuses = FridgeInventoryService.inspectIngredients(widget.detectedFoods);
   }
