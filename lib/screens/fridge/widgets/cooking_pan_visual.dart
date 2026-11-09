@@ -164,6 +164,57 @@ class CookingPanVisual extends StatefulWidget {
     }
   }
 
+  /// Resolves the dedicated transparent food cutout asset for cooking pan rendering.
+  /// Prioritizes clean transparent PNG cutouts over JPGs with baked-in backgrounds.
+  static String? resolvePanAsset(CategoryFoodItem item) {
+    // 1. If item already points to a transparent PNG/WebP, use it directly
+    final explicit = item.effectiveImageAsset ?? item.imageAsset;
+    if (explicit != null &&
+        explicit.isNotEmpty &&
+        (explicit.toLowerCase().endsWith('.png') || explicit.toLowerCase().endsWith('.webp'))) {
+      return explicit;
+    }
+
+    final cleanName = item.name.trim().toLowerCase();
+
+    // 2. Map food name to dedicated transparent cutout in assets/images/foods/
+    if (cleanName.contains('egg')) return 'assets/images/foods/eggs.png';
+    if (cleanName.contains('chicken')) return 'assets/images/foods/chicken.png';
+    if (cleanName.contains('apple') && !cleanName.contains('juice')) return 'assets/images/foods/apple.png';
+    if (cleanName.contains('banana')) return 'assets/images/foods/banana.png';
+    if (cleanName.contains('tomato')) return 'assets/images/foods/tomato.png';
+    if (cleanName.contains('carrot')) return 'assets/images/foods/carrot.png';
+    if (cleanName.contains('broccoli')) return 'assets/images/foods/broccoli.png';
+    if (cleanName.contains('capsicum') || cleanName.contains('pepper')) return 'assets/images/foods/capsicum.png';
+    if (cleanName.contains('orange') && !cleanName.contains('juice')) return 'assets/images/foods/orange.png';
+    if (cleanName.contains('grape')) return 'assets/images/foods/grapes.png';
+    if (cleanName.contains('milk')) return 'assets/images/foods/milk.png';
+    if (cleanName.contains('paneer') || cleanName.contains('cheese')) return 'assets/images/foods/paneer.png';
+    if (cleanName.contains('butter')) return 'assets/images/foods/butter.png';
+    if (cleanName.contains('curd') || cleanName.contains('yogurt')) return 'assets/images/foods/curd.png';
+    if (cleanName.contains('fish') || cleanName.contains('salmon')) return 'assets/images/foods/fish.png';
+    if (cleanName.contains('bread')) return 'assets/images/foods/bread.png';
+    if (cleanName.contains('pea')) return 'assets/images/foods/peas.png';
+    if (cleanName.contains('corn')) return 'assets/images/foods/frozen_corn.png';
+    if (cleanName.contains('almond')) return 'assets/images/foods/almonds.png';
+    if (cleanName.contains('cashew')) return 'assets/images/foods/cashews.png';
+    if (cleanName.contains('peanut butter')) return 'assets/images/foods/peanut_butter.png';
+    if (cleanName.contains('dry fruit') || cleanName.contains('nuts')) return 'assets/images/foods/dry_fruits_mix.png';
+    if (cleanName.contains('juice')) return 'assets/images/foods/juice.png';
+    if (cleanName.contains('avocado')) return 'assets/images/foods/avocado.png';
+    if (cleanName.contains('lemon')) return 'assets/images/foods/lemon.png';
+
+    // 3. Fallback: if explicit asset has a .png sibling in foods, use it
+    if (explicit != null && explicit.isNotEmpty) {
+      if (explicit.endsWith('.jpg')) {
+        return explicit.replaceAll('.jpg', '.png');
+      }
+      return explicit;
+    }
+
+    return null;
+  }
+
   @override
   State<CookingPanVisual> createState() => CookingPanVisualState();
 }
@@ -433,12 +484,13 @@ class CookingPanVisualState extends State<CookingPanVisual>
 
   /// Single ingredient thumbnail card inside the pan basin:
   /// - Transparent PNG cutouts sit directly on the dark cooking surface with a natural contact shadow.
-  /// - JPG items are smoothly masked in an organic rounded shape without thick white borders or white plates.
+  /// - Prepared dish JPGs (dal rice, pasta) retain rich photo appearance with subtle natural shadows and no white plates.
   /// - Emoji items fallback smoothly with soft contact depth.
   Widget _buildTokenCard(CategoryFoodItem item, double tokenSize) {
-    final String? imgAsset = item.effectiveImageAsset ?? item.imageAsset;
+    final String? imgAsset = CookingPanVisual.resolvePanAsset(item);
     final bool hasValidImage = (imgAsset != null && imgAsset.isNotEmpty);
-    final bool isCutout = hasValidImage && imgAsset.toLowerCase().endsWith('.png');
+    final bool isCutout = hasValidImage &&
+        (imgAsset.toLowerCase().endsWith('.png') || imgAsset.toLowerCase().endsWith('.webp'));
 
     if (isCutout) {
       // Natural transparent food cutout resting directly on the dark cooking surface
@@ -447,16 +499,17 @@ class CookingPanVisualState extends State<CookingPanVisual>
         height: tokenSize,
         child: Stack(
           alignment: Alignment.center,
+          clipBehavior: Clip.none,
           children: [
             // Soft subtle contact shadow on dark metallic skillet surface
             Positioned(
               bottom: 1.0,
               child: Container(
-                width: tokenSize * 0.78,
-                height: tokenSize * 0.32,
+                width: tokenSize * 0.76,
+                height: tokenSize * 0.28,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.all(
-                    Radius.elliptical(tokenSize * 0.39, tokenSize * 0.16),
+                    Radius.elliptical(tokenSize * 0.38, tokenSize * 0.14),
                   ),
                   boxShadow: const [
                     BoxShadow(
@@ -469,7 +522,7 @@ class CookingPanVisualState extends State<CookingPanVisual>
                 ),
               ),
             ),
-            // Transparent food cutout asset
+            // Transparent food cutout asset directly over dark skillet
             Image.asset(
               imgAsset,
               width: tokenSize,
@@ -481,7 +534,7 @@ class CookingPanVisualState extends State<CookingPanVisual>
         ),
       );
     } else if (hasValidImage) {
-      // JPG / full-bleed photo: smoothly masked with subtle depth shadow and NO white plate
+      // Prepared dish / rich photo retained appearance: natural depth shadow, no white background or plate
       return Container(
         width: tokenSize,
         height: tokenSize,
@@ -493,30 +546,16 @@ class CookingPanVisualState extends State<CookingPanVisual>
               blurRadius: 3.5,
               offset: Offset(0, 1.8),
             ),
-            BoxShadow(
-              color: Color(0x24000000),
-              blurRadius: 1.2,
-              offset: Offset(0, 0.6),
-            ),
           ],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(tokenSize * 0.28),
-          child: Container(
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.15),
-                width: 0.5,
-              ),
-              borderRadius: BorderRadius.circular(tokenSize * 0.28),
-            ),
-            child: Image.asset(
-              imgAsset,
-              width: tokenSize,
-              height: tokenSize,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => _buildEmojiFallback(item, tokenSize),
-            ),
+          child: Image.asset(
+            imgAsset,
+            width: tokenSize,
+            height: tokenSize,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => _buildEmojiFallback(item, tokenSize),
           ),
         ),
       );

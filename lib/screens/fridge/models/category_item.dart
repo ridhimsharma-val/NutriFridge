@@ -224,31 +224,31 @@ class FoodItemAssetRegistry {
     'cheese': 'assets/images/foods/paneer.png',
 
     // Vegetables
-    'tomato': 'assets/images/foods/tomato.jpg',
-    'tomatoes': 'assets/images/foods/tomato.jpg',
-    'carrot': 'assets/images/foods/carrot.jpg',
-    'carrots': 'assets/images/foods/carrot.jpg',
-    'broccoli': 'assets/images/foods/broccoli.jpg',
-    'capsicum': 'assets/images/foods/capsicum.jpg',
-    'bell pepper': 'assets/images/foods/capsicum.jpg',
-    'pepper': 'assets/images/foods/capsicum.jpg',
+    'tomato': 'assets/images/foods/tomato.png',
+    'tomatoes': 'assets/images/foods/tomato.png',
+    'carrot': 'assets/images/foods/carrot.png',
+    'carrots': 'assets/images/foods/carrot.png',
+    'broccoli': 'assets/images/foods/broccoli.png',
+    'capsicum': 'assets/images/foods/capsicum.png',
+    'bell pepper': 'assets/images/foods/capsicum.png',
+    'pepper': 'assets/images/foods/capsicum.png',
 
     // Fruits
-    'apple': 'assets/images/foods/apple.jpg',
-    'apples': 'assets/images/foods/apple.jpg',
-    'banana': 'assets/images/foods/banana.jpg',
-    'bananas': 'assets/images/foods/banana.jpg',
-    'orange': 'assets/images/foods/orange.jpg',
-    'oranges': 'assets/images/foods/orange.jpg',
-    'grape': 'assets/images/foods/grapes.jpg',
-    'grapes': 'assets/images/foods/grapes.jpg',
+    'apple': 'assets/images/foods/apple.png',
+    'apples': 'assets/images/foods/apple.png',
+    'banana': 'assets/images/foods/banana.png',
+    'bananas': 'assets/images/foods/banana.png',
+    'orange': 'assets/images/foods/orange.png',
+    'oranges': 'assets/images/foods/orange.png',
+    'grape': 'assets/images/foods/grapes.png',
+    'grapes': 'assets/images/foods/grapes.png',
 
     // Non-Veg
-    'egg': 'assets/images/foods/eggs.jpg',
-    'eggs': 'assets/images/foods/eggs.jpg',
-    'chicken': 'assets/images/foods/chicken.jpg',
-    'fish': 'assets/images/foods/fish.jpg',
-    'salmon': 'assets/images/foods/fish.jpg',
+    'egg': 'assets/images/foods/eggs.png',
+    'eggs': 'assets/images/foods/eggs.png',
+    'chicken': 'assets/images/foods/chicken.png',
+    'fish': 'assets/images/foods/fish.png',
+    'salmon': 'assets/images/foods/fish.png',
 
     // Meals & Leftovers
     'paneer curry': 'assets/images/foods/paneer_curry.jpg',
@@ -261,14 +261,15 @@ class FoodItemAssetRegistry {
     'paneer rice bowl': 'assets/images/foods/paneer_curry.jpg',
 
     // Packaged Food
-    'bread': 'assets/images/foods/bread.jpg',
-    'peanut butter': 'assets/images/foods/peanut_butter.jpg',
+    'bread': 'assets/images/foods/bread.png',
+    'peanut butter': 'assets/images/foods/peanut_butter.png',
     'jam': 'assets/images/foods/jam.jpg',
 
     // Drinks & Juices
-    'orange juice': 'assets/images/foods/orange_juice.jpg',
-    'apple juice': 'assets/images/foods/apple_juice.jpg',
-    'juice': 'assets/images/foods/orange_juice.jpg',
+    'watermelon juice': 'assets/images/foods/juice.png',
+    'orange juice': 'assets/images/foods/juice.png',
+    'apple juice': 'assets/images/foods/apple_juice.png',
+    'juice': 'assets/images/foods/juice.png',
     'water': 'assets/images/foods/water.jpg',
 
     // Ice Cream
@@ -277,23 +278,23 @@ class FoodItemAssetRegistry {
     'ice cream': 'assets/images/foods/vanilla_ice_cream.jpg',
 
     // Frozen Food
-    'frozen peas': 'assets/images/foods/frozen_peas.jpg',
-    'peas': 'assets/images/foods/frozen_peas.jpg',
-    'frozen corn': 'assets/images/foods/frozen_corn.jpg',
-    'corn': 'assets/images/foods/frozen_corn.jpg',
+    'frozen peas': 'assets/images/foods/frozen_peas.png',
+    'peas': 'assets/images/foods/frozen_peas.png',
+    'frozen corn': 'assets/images/foods/frozen_corn.png',
+    'corn': 'assets/images/foods/frozen_corn.png',
     'french fries': 'assets/images/foods/french_fries.jpg',
     'fries': 'assets/images/foods/french_fries.jpg',
 
     // Dry Fruits
-    'almond': 'assets/images/foods/almonds.jpg',
-    'almonds': 'assets/images/foods/almonds.jpg',
-    'cashew': 'assets/images/foods/cashews.jpg',
-    'cashews': 'assets/images/foods/cashews.jpg',
+    'almond': 'assets/images/foods/almonds.png',
+    'almonds': 'assets/images/foods/almonds.png',
+    'cashew': 'assets/images/foods/cashews.png',
+    'cashews': 'assets/images/foods/cashews.png',
     'raisin': 'assets/images/foods/raisins.jpg',
     'raisins': 'assets/images/foods/raisins.jpg',
-    'dry fruits': 'assets/images/foods/dry_fruits_mix.jpg',
-    'dry fruits mix': 'assets/images/foods/dry_fruits_mix.jpg',
-    'mixed nuts': 'assets/images/foods/dry_fruits_mix.jpg',
+    'dry fruits': 'assets/images/foods/dry_fruits_mix.png',
+    'dry fruits mix': 'assets/images/foods/dry_fruits_mix.png',
+    'mixed nuts': 'assets/images/foods/dry_fruits_mix.png',
 
     // Others
     'honey': 'assets/images/foods/honey.jpg',
@@ -321,19 +322,19 @@ class FoodItemAssetRegistry {
     if (category != null) {
       final cat = category.toLowerCase();
       if (cat.contains('dairy')) return 'assets/images/foods/milk.png';
-      if (cat.contains('veg')) return 'assets/images/foods/tomato.jpg';
-      if (cat.contains('fruit') && !cat.contains('dry')) return 'assets/images/foods/apple.jpg';
-      if (cat.contains('non-veg') || cat.contains('non veg')) return 'assets/images/foods/chicken.jpg';
+      if (cat.contains('veg')) return 'assets/images/foods/tomato.png';
+      if (cat.contains('fruit') && !cat.contains('dry')) return 'assets/images/foods/apple.png';
+      if (cat.contains('non-veg') || cat.contains('non veg')) return 'assets/images/foods/chicken.png';
       if (cat.contains('meal') || cat.contains('leftover')) return 'assets/images/foods/paneer_curry.jpg';
-      if (cat.contains('package')) return 'assets/images/foods/bread.jpg';
-      if (cat.contains('drink') || cat.contains('juice')) return 'assets/images/foods/orange_juice.jpg';
+      if (cat.contains('package')) return 'assets/images/foods/bread.png';
+      if (cat.contains('drink') || cat.contains('juice')) return 'assets/images/foods/juice.png';
       if (cat.contains('ice cream')) return 'assets/images/foods/vanilla_ice_cream.jpg';
-      if (cat.contains('frozen')) return 'assets/images/foods/frozen_peas.jpg';
-      if (cat.contains('dry fruit')) return 'assets/images/foods/almonds.jpg';
+      if (cat.contains('frozen')) return 'assets/images/foods/frozen_peas.png';
+      if (cat.contains('dry fruit')) return 'assets/images/foods/almonds.png';
       if (cat.contains('other')) return 'assets/images/foods/honey.jpg';
     }
 
-    return 'assets/images/foods/apple.jpg';
+    return 'assets/images/foods/apple.png';
   }
 
   /// Returns a clean representative emoji for a canonical fridge category.
@@ -570,7 +571,7 @@ class FridgeCategoryRepository {
           name: 'Dry Fruits',
           quantity: '250 g',
           expiryDays: 30,
-          imageAsset: 'assets/images/foods/dry_fruits_mix.jpg',
+          imageAsset: 'assets/images/foods/dry_fruits_mix.png',
           iconEmoji: '🥜',
         ),
         const CategoryFoodItem(
@@ -596,7 +597,7 @@ class FridgeCategoryRepository {
           name: 'Eggs',
           quantity: '6 pieces',
           expiryDays: 10,
-          imageAsset: 'assets/images/foods/eggs.jpg',
+          imageAsset: 'assets/images/foods/eggs.png',
           iconEmoji: '🥚',
         ),
         const CategoryFoodItem(
@@ -604,7 +605,7 @@ class FridgeCategoryRepository {
           name: 'Chicken',
           quantity: '500 g',
           expiryDays: 2,
-          imageAsset: 'assets/images/foods/chicken.jpg',
+          imageAsset: 'assets/images/foods/chicken.png',
           iconEmoji: '🍗',
         ),
         const CategoryFoodItem(
@@ -612,7 +613,7 @@ class FridgeCategoryRepository {
           name: 'Fish',
           quantity: '400 g',
           expiryDays: 3,
-          imageAsset: 'assets/images/foods/fish.jpg',
+          imageAsset: 'assets/images/foods/fish.png',
           iconEmoji: '🐟',
         ),
       ],
@@ -648,7 +649,7 @@ class FridgeCategoryRepository {
           name: 'Bread',
           quantity: '1 pack',
           expiryDays: 4,
-          imageAsset: 'assets/images/foods/bread.jpg',
+          imageAsset: 'assets/images/foods/bread.png',
           iconEmoji: '🍞',
         ),
         const CategoryFoodItem(
@@ -656,7 +657,7 @@ class FridgeCategoryRepository {
           name: 'Peanut Butter',
           quantity: '340 g',
           expiryDays: 60,
-          imageAsset: 'assets/images/foods/peanut_butter.jpg',
+          imageAsset: 'assets/images/foods/peanut_butter.png',
           iconEmoji: '🥜',
         ),
         const CategoryFoodItem(
@@ -674,7 +675,7 @@ class FridgeCategoryRepository {
           name: 'Orange Juice',
           quantity: '1 L',
           expiryDays: 5,
-          imageAsset: 'assets/images/foods/orange_juice.jpg',
+          imageAsset: 'assets/images/foods/juice.png',
           iconEmoji: '🍊',
         ),
         const CategoryFoodItem(
@@ -682,7 +683,7 @@ class FridgeCategoryRepository {
           name: 'Apple Juice',
           quantity: '1 L',
           expiryDays: 7,
-          imageAsset: 'assets/images/foods/apple_juice.jpg',
+          imageAsset: 'assets/images/foods/apple_juice.png',
           iconEmoji: '🧃',
         ),
         const CategoryFoodItem(
@@ -700,7 +701,7 @@ class FridgeCategoryRepository {
           name: 'Tomato',
           quantity: '5 pieces',
           expiryDays: 3,
-          imageAsset: 'assets/images/foods/tomato.jpg',
+          imageAsset: 'assets/images/foods/tomato.png',
           iconEmoji: '🍅',
         ),
         const CategoryFoodItem(
@@ -708,7 +709,7 @@ class FridgeCategoryRepository {
           name: 'Carrot',
           quantity: '500 g',
           expiryDays: 7,
-          imageAsset: 'assets/images/foods/carrot.jpg',
+          imageAsset: 'assets/images/foods/carrot.png',
           iconEmoji: '🥕',
         ),
         const CategoryFoodItem(
@@ -716,7 +717,7 @@ class FridgeCategoryRepository {
           name: 'Broccoli',
           quantity: '1 piece',
           expiryDays: 4,
-          imageAsset: 'assets/images/foods/broccoli.jpg',
+          imageAsset: 'assets/images/foods/broccoli.png',
           iconEmoji: '🥦',
         ),
         const CategoryFoodItem(
@@ -724,7 +725,7 @@ class FridgeCategoryRepository {
           name: 'Capsicum',
           quantity: '3 pieces',
           expiryDays: 5,
-          imageAsset: 'assets/images/foods/capsicum.jpg',
+          imageAsset: 'assets/images/foods/capsicum.png',
           iconEmoji: '🫑',
         ),
       ],
@@ -734,7 +735,7 @@ class FridgeCategoryRepository {
           name: 'Apple',
           quantity: '4 pieces',
           expiryDays: 6,
-          imageAsset: 'assets/images/foods/apple.jpg',
+          imageAsset: 'assets/images/foods/apple.png',
           iconEmoji: '🍎',
         ),
         const CategoryFoodItem(
@@ -742,7 +743,7 @@ class FridgeCategoryRepository {
           name: 'Banana',
           quantity: '6 pieces',
           expiryDays: 2,
-          imageAsset: 'assets/images/foods/banana.jpg',
+          imageAsset: 'assets/images/foods/banana.png',
           iconEmoji: '🍌',
         ),
         const CategoryFoodItem(
@@ -750,7 +751,7 @@ class FridgeCategoryRepository {
           name: 'Orange',
           quantity: '3 pieces',
           expiryDays: 8,
-          imageAsset: 'assets/images/foods/orange.jpg',
+          imageAsset: 'assets/images/foods/orange.png',
           iconEmoji: '🍊',
         ),
         const CategoryFoodItem(
@@ -758,7 +759,7 @@ class FridgeCategoryRepository {
           name: 'Grapes',
           quantity: '500 g',
           expiryDays: 4,
-          imageAsset: 'assets/images/foods/grapes.jpg',
+          imageAsset: 'assets/images/foods/grapes.png',
           iconEmoji: '🍇',
         ),
       ],
@@ -786,7 +787,7 @@ class FridgeCategoryRepository {
           name: 'Frozen Peas',
           quantity: '500 g',
           expiryDays: 45,
-          imageAsset: 'assets/images/foods/frozen_peas.jpg',
+          imageAsset: 'assets/images/foods/frozen_peas.png',
           iconEmoji: '🫛',
         ),
         const CategoryFoodItem(
@@ -794,7 +795,7 @@ class FridgeCategoryRepository {
           name: 'Frozen Corn',
           quantity: '500 g',
           expiryDays: 45,
-          imageAsset: 'assets/images/foods/frozen_corn.jpg',
+          imageAsset: 'assets/images/foods/frozen_corn.png',
           iconEmoji: '🌽',
         ),
         const CategoryFoodItem(
@@ -812,7 +813,7 @@ class FridgeCategoryRepository {
           name: 'Almonds',
           quantity: '200 g',
           expiryDays: 90,
-          imageAsset: 'assets/images/foods/almonds.jpg',
+          imageAsset: 'assets/images/foods/almonds.png',
           iconEmoji: '🌰',
         ),
         const CategoryFoodItem(
@@ -820,7 +821,7 @@ class FridgeCategoryRepository {
           name: 'Cashews',
           quantity: '200 g',
           expiryDays: 90,
-          imageAsset: 'assets/images/foods/cashews.jpg',
+          imageAsset: 'assets/images/foods/cashews.png',
           iconEmoji: '🥜',
         ),
         const CategoryFoodItem(

@@ -189,9 +189,10 @@ class _FlyingThumbnailWidgetState extends State<_FlyingThumbnailWidget>
         // Shadow elevation: expands in air, settles on landing
         final double shadowElevation = math.sin(t * math.pi) * 6.0;
 
-        final String? imgAsset = widget.item.effectiveImageAsset ?? widget.item.imageAsset;
+        final String? imgAsset = CookingPanVisual.resolvePanAsset(widget.item);
         final bool hasValidImage = (imgAsset != null && imgAsset.isNotEmpty);
-        final bool isCutout = hasValidImage && imgAsset.toLowerCase().endsWith('.png');
+        final bool isCutout = hasValidImage &&
+            (imgAsset.toLowerCase().endsWith('.png') || imgAsset.toLowerCase().endsWith('.webp'));
 
         return Positioned(
           left: x - (currentSize / 2),
@@ -205,15 +206,16 @@ class _FlyingThumbnailWidgetState extends State<_FlyingThumbnailWidget>
                       height: currentSize,
                       child: Stack(
                         alignment: Alignment.center,
+                        clipBehavior: Clip.none,
                         children: [
                           Positioned(
                             bottom: 1.0,
                             child: Container(
-                              width: currentSize * 0.78,
-                              height: currentSize * 0.32,
+                              width: currentSize * 0.76,
+                              height: currentSize * 0.28,
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.all(
-                                  Radius.elliptical(currentSize * 0.39, currentSize * 0.16),
+                                  Radius.elliptical(currentSize * 0.38, currentSize * 0.14),
                                 ),
                                 boxShadow: [
                                   BoxShadow(
@@ -259,34 +261,25 @@ class _FlyingThumbnailWidgetState extends State<_FlyingThumbnailWidget>
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(currentSize * 0.28),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.15),
-                              width: 0.5,
-                            ),
-                            borderRadius: BorderRadius.circular(currentSize * 0.28),
-                          ),
-                          child: hasValidImage
-                              ? Image.asset(
-                                  imgAsset,
-                                  width: currentSize,
-                                  height: currentSize,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => Center(
-                                    child: Text(
-                                      widget.item.iconEmoji ?? '🥗',
-                                      style: TextStyle(fontSize: currentSize * 0.52),
-                                    ),
-                                  ),
-                                )
-                              : Center(
+                        child: hasValidImage
+                            ? Image.asset(
+                                imgAsset,
+                                width: currentSize,
+                                height: currentSize,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => Center(
                                   child: Text(
                                     widget.item.iconEmoji ?? '🥗',
                                     style: TextStyle(fontSize: currentSize * 0.52),
                                   ),
                                 ),
-                        ),
+                              )
+                            : Center(
+                                child: Text(
+                                  widget.item.iconEmoji ?? '🥗',
+                                  style: TextStyle(fontSize: currentSize * 0.52),
+                                ),
+                              ),
                       ),
                     ),
             ),
