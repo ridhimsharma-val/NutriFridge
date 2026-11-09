@@ -190,6 +190,8 @@ class _FlyingThumbnailWidgetState extends State<_FlyingThumbnailWidget>
         final double shadowElevation = math.sin(t * math.pi) * 6.0;
 
         final String? imgAsset = widget.item.effectiveImageAsset ?? widget.item.imageAsset;
+        final bool hasValidImage = (imgAsset != null && imgAsset.isNotEmpty);
+        final bool isCutout = hasValidImage && imgAsset.toLowerCase().endsWith('.png');
 
         return Positioned(
           left: x - (currentSize / 2),
@@ -197,45 +199,96 @@ class _FlyingThumbnailWidgetState extends State<_FlyingThumbnailWidget>
           child: IgnorePointer(
             child: Transform.rotate(
               angle: rotation,
-              child: Container(
-                width: currentSize,
-                height: currentSize,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.92),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.95),
-                    width: 0.8,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Color.fromRGBO(0, 0, 0, (0.14 + (shadowElevation * 0.02)).clamp(0.0, 0.35)),
-                      blurRadius: 3.5 + shadowElevation,
-                      offset: Offset(0, 1.5 + (shadowElevation * 0.5)),
-                    ),
-                  ],
-                ),
-                child: ClipOval(
-                  child: Center(
-                    child: ((imgAsset != null && imgAsset.isNotEmpty) ||
-                            (widget.item.iconEmoji == null && widget.item.effectiveImageAsset != null))
-                        ? Image.asset(
-                            imgAsset!,
-                            width: currentSize * 0.84,
-                            height: currentSize * 0.84,
+              child: isCutout
+                  ? SizedBox(
+                      width: currentSize,
+                      height: currentSize,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Positioned(
+                            bottom: 1.0,
+                            child: Container(
+                              width: currentSize * 0.78,
+                              height: currentSize * 0.32,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.all(
+                                  Radius.elliptical(currentSize * 0.39, currentSize * 0.16),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Color.fromRGBO(
+                                      0, 0, 0,
+                                      (0.18 + (shadowElevation * 0.03)).clamp(0.0, 0.45),
+                                    ),
+                                    blurRadius: 3.5 + shadowElevation,
+                                    offset: Offset(0, 1.5 + (shadowElevation * 0.5)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Image.asset(
+                            imgAsset,
+                            width: currentSize,
+                            height: currentSize,
                             fit: BoxFit.contain,
                             errorBuilder: (context, error, stackTrace) => Text(
                               widget.item.iconEmoji ?? '🥗',
                               style: TextStyle(fontSize: currentSize * 0.52),
                             ),
-                          )
-                        : Text(
-                            widget.item.iconEmoji ?? '🥗',
-                            style: TextStyle(fontSize: currentSize * 0.52),
                           ),
-                  ),
-                ),
-              ),
+                        ],
+                      ),
+                    )
+                  : Container(
+                      width: currentSize,
+                      height: currentSize,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(currentSize * 0.28),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Color.fromRGBO(
+                              0, 0, 0,
+                              (0.18 + (shadowElevation * 0.03)).clamp(0.0, 0.45),
+                            ),
+                            blurRadius: 3.5 + shadowElevation,
+                            offset: Offset(0, 1.5 + (shadowElevation * 0.5)),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(currentSize * 0.28),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.15),
+                              width: 0.5,
+                            ),
+                            borderRadius: BorderRadius.circular(currentSize * 0.28),
+                          ),
+                          child: hasValidImage
+                              ? Image.asset(
+                                  imgAsset,
+                                  width: currentSize,
+                                  height: currentSize,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Center(
+                                    child: Text(
+                                      widget.item.iconEmoji ?? '🥗',
+                                      style: TextStyle(fontSize: currentSize * 0.52),
+                                    ),
+                                  ),
+                                )
+                              : Center(
+                                  child: Text(
+                                    widget.item.iconEmoji ?? '🥗',
+                                    style: TextStyle(fontSize: currentSize * 0.52),
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
             ),
           ),
         );

@@ -95,46 +95,43 @@ class CookingPanVisual extends StatefulWidget {
   /// - 6 ingredients: balanced 3 × 2 arrangement.
   /// - More than 6: 5 food items + dedicated non-overlapping +N badge slot.
   static List<Offset> getAdaptiveOffsets(int total, double rx, double ry) {
-    final double hStep = rx * 0.44;
-    final double vStep = ry * 0.44;
-
     if (total <= 1) {
       return const [Offset(0.0, 0.0)];
     } else if (total == 2) {
       return [
-        Offset(-hStep * 0.85, 0.0),
-        Offset(hStep * 0.85, 0.0),
+        Offset(-rx * 0.48, 0.0),
+        Offset(rx * 0.48, 0.0),
       ];
     } else if (total == 3) {
       return [
-        Offset(0.0, -vStep * 0.90),
-        Offset(-hStep * 0.85, vStep * 0.80),
-        Offset(hStep * 0.85, vStep * 0.80),
+        Offset(0.0, -ry * 0.46),
+        Offset(-rx * 0.50, ry * 0.42),
+        Offset(rx * 0.50, ry * 0.42),
       ];
     } else if (total == 4) {
       return [
-        Offset(-hStep * 0.80, -vStep * 0.85),
-        Offset(hStep * 0.80, -vStep * 0.85),
-        Offset(-hStep * 0.80, vStep * 0.85),
-        Offset(hStep * 0.80, vStep * 0.85),
+        Offset(-rx * 0.46, -ry * 0.44),
+        Offset(rx * 0.46, -ry * 0.44),
+        Offset(-rx * 0.46, ry * 0.44),
+        Offset(rx * 0.46, ry * 0.44),
       ];
     } else if (total == 5) {
       return [
-        Offset(-hStep * 1.10, -vStep * 0.85),
-        Offset(0.0, -vStep * 0.85),
-        Offset(hStep * 1.10, -vStep * 0.85),
-        Offset(-hStep * 0.65, vStep * 0.85),
-        Offset(hStep * 0.65, vStep * 0.85),
+        Offset(-rx * 0.56, -ry * 0.42),
+        Offset(0.0, -ry * 0.44),
+        Offset(rx * 0.56, -ry * 0.42),
+        Offset(-rx * 0.32, ry * 0.44),
+        Offset(rx * 0.32, ry * 0.44),
       ];
     } else {
       // 6 items (3 x 2 grid) or > 6 items (5 food items + 1 overflow badge)
       return [
-        Offset(-hStep * 1.10, -vStep * 0.85),
-        Offset(0.0, -vStep * 0.85),
-        Offset(hStep * 1.10, -vStep * 0.85),
-        Offset(-hStep * 1.10, vStep * 0.85),
-        Offset(0.0, vStep * 0.85),
-        Offset(hStep * 1.10, vStep * 0.85),
+        Offset(-rx * 0.56, -ry * 0.44),
+        Offset(0.0, -ry * 0.44),
+        Offset(rx * 0.56, -ry * 0.44),
+        Offset(-rx * 0.56, ry * 0.44),
+        Offset(0.0, ry * 0.44),
+        Offset(rx * 0.56, ry * 0.44),
       ];
     }
   }
@@ -434,46 +431,120 @@ class CookingPanVisualState extends State<CookingPanVisual>
     );
   }
 
-  /// Single ingredient thumbnail card inside the pan basin
+  /// Single ingredient thumbnail card inside the pan basin:
+  /// - Transparent PNG cutouts sit directly on the dark cooking surface with a natural contact shadow.
+  /// - JPG items are smoothly masked in an organic rounded shape without thick white borders or white plates.
+  /// - Emoji items fallback smoothly with soft contact depth.
   Widget _buildTokenCard(CategoryFoodItem item, double tokenSize) {
     final String? imgAsset = item.effectiveImageAsset ?? item.imageAsset;
+    final bool hasValidImage = (imgAsset != null && imgAsset.isNotEmpty);
+    final bool isCutout = hasValidImage && imgAsset.toLowerCase().endsWith('.png');
 
+    if (isCutout) {
+      // Natural transparent food cutout resting directly on the dark cooking surface
+      return SizedBox(
+        width: tokenSize,
+        height: tokenSize,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Soft subtle contact shadow on dark metallic skillet surface
+            Positioned(
+              bottom: 1.0,
+              child: Container(
+                width: tokenSize * 0.78,
+                height: tokenSize * 0.32,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.all(
+                    Radius.elliptical(tokenSize * 0.39, tokenSize * 0.16),
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x66000000),
+                      blurRadius: 3.5,
+                      spreadRadius: 0.5,
+                      offset: Offset(0, 1.5),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Transparent food cutout asset
+            Image.asset(
+              imgAsset,
+              width: tokenSize,
+              height: tokenSize,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => _buildEmojiFallback(item, tokenSize),
+            ),
+          ],
+        ),
+      );
+    } else if (hasValidImage) {
+      // JPG / full-bleed photo: smoothly masked with subtle depth shadow and NO white plate
+      return Container(
+        width: tokenSize,
+        height: tokenSize,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(tokenSize * 0.28),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x5A000000),
+              blurRadius: 3.5,
+              offset: Offset(0, 1.8),
+            ),
+            BoxShadow(
+              color: Color(0x24000000),
+              blurRadius: 1.2,
+              offset: Offset(0, 0.6),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(tokenSize * 0.28),
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.15),
+                width: 0.5,
+              ),
+              borderRadius: BorderRadius.circular(tokenSize * 0.28),
+            ),
+            child: Image.asset(
+              imgAsset,
+              width: tokenSize,
+              height: tokenSize,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => _buildEmojiFallback(item, tokenSize),
+            ),
+          ),
+        ),
+      );
+    } else {
+      // Emoji fallback: clean presentation with subtle shadow
+      return _buildEmojiFallback(item, tokenSize);
+    }
+  }
+
+  /// Clean emoji fallback with subtle contact shadow
+  Widget _buildEmojiFallback(CategoryFoodItem item, double tokenSize) {
     return Container(
       width: tokenSize,
       height: tokenSize,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.90),
+      decoration: const BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.95),
-          width: 0.8,
-        ),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x33000000),
+            color: Color(0x40000000),
             blurRadius: 3.0,
-            offset: Offset(0, 1.2),
+            offset: Offset(0, 1.5),
           ),
         ],
       ),
-      child: ClipOval(
-        child: Center(
-          child: ((imgAsset != null && imgAsset.isNotEmpty) ||
-                  (item.iconEmoji == null && item.effectiveImageAsset != null))
-              ? Image.asset(
-                  item.effectiveImageAsset ?? item.imageAsset!,
-                  width: tokenSize * 0.86,
-                  height: tokenSize * 0.86,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) => Text(
-                    item.iconEmoji ?? '🥘',
-                    style: TextStyle(fontSize: tokenSize * 0.50),
-                  ),
-                )
-              : Text(
-                  item.iconEmoji ?? '🥘',
-                  style: TextStyle(fontSize: tokenSize * 0.50),
-                ),
+      child: Center(
+        child: Text(
+          item.iconEmoji ?? '🥘',
+          style: TextStyle(fontSize: tokenSize * 0.60),
         ),
       ),
     );
@@ -487,29 +558,31 @@ class CookingPanVisualState extends State<CookingPanVisual>
     required double ry,
     required double tokenSize,
   }) {
+    final double badgeSize = (tokenSize * 0.84).clamp(16.0, 22.0);
+
     return AnimatedPositioned(
       key: const ValueKey('pan_overflow_badge'),
       duration: const Duration(milliseconds: 260),
       curve: Curves.easeOutCubic,
-      left: rx + offset.dx - (tokenSize / 2),
-      top: ry + offset.dy - (tokenSize / 2),
-      width: tokenSize,
-      height: tokenSize,
+      left: rx + offset.dx - (badgeSize / 2),
+      top: ry + offset.dy - (badgeSize / 2),
+      width: badgeSize,
+      height: badgeSize,
       child: Container(
-        width: tokenSize,
-        height: tokenSize,
+        width: badgeSize,
+        height: badgeSize,
         decoration: BoxDecoration(
           color: AppColors.forestGreen,
           shape: BoxShape.circle,
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.95),
-            width: 1.0,
+            color: Colors.white.withValues(alpha: 0.85),
+            width: 0.8,
           ),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x33000000),
+              color: Color(0x44000000),
               blurRadius: 3.0,
-              offset: Offset(0, 1.2),
+              offset: Offset(0, 1.4),
             ),
           ],
         ),
@@ -518,7 +591,7 @@ class CookingPanVisualState extends State<CookingPanVisual>
             '+$overflowCount',
             style: TextStyle(
               color: Colors.white,
-              fontSize: tokenSize * 0.44,
+              fontSize: badgeSize * 0.46,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.2,
             ),
