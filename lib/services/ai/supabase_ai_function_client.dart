@@ -575,38 +575,37 @@ class SupabaseAiFunctionClient {
     } else if (errorCode == 'EMPTY_SELECTION') {
       return 'Please select at least one ingredient from your fridge.';
     } else if (errorCode == 'INVALID_UUID_SYNTAX') {
-      return 'One or more selected ingredient IDs are invalid. Please refresh your inventory.';
+      return 'One or more selected ingredient IDs are invalid. Please refresh your fridge and retry.';
     } else if (errorCode == 'ITEM_NOT_FOUND_OR_UNAUTHORIZED') {
-      return 'One or more selected items could not be found in your inventory. Please refresh and try again.';
+      return 'Some selected ingredients could not be verified. Please refresh your fridge and retry.';
     } else if (errorCode == 'DATABASE_QUERY_ERROR' || errorCode == 'INVENTORY_FETCH_FAILED') {
       return 'Unable to verify selected ingredients from database. Please tap retry.';
     } else if (e.status == 429 || errorCode == 'GEMINI_RATE_LIMIT_EXCEEDED') {
-      return 'Google Gemini rate limit exceeded. Please wait a moment and tap retry.';
+      return 'Google Gemini rate limit exceeded. AI usage limit reached. Please try again later.';
     } else if (e.status == 504 || errorCode == 'GEMINI_REQUEST_TIMEOUT') {
-      return 'NutriFridge AI took longer than expected to respond. Please tap retry.';
+      return 'NutriFridge AI took longer than expected to respond. Please retry.';
     } else if (errorCode == 'GEMINI_INVALID_REQUEST') {
       return 'Google Gemini rejected the request format. Please shorten or simplify your input.';
     } else if (errorCode == 'GEMINI_AUTH_FAILED') {
       return 'Google Gemini authentication failed. Please verify API key configuration.';
-    } else if (errorCode == 'INVALID_AI_RESPONSE') {
-      return 'Received an invalid response format from NutriFridge AI. Please tap retry.';
-    } else if (errorCode == 'N8N_NOT_CONFIGURED') {
-      return 'NutriFridge AI service is currently not configured.';
-    } else if (e.status == 503 ||
+    } else if (errorCode == 'INVALID_AI_RESPONSE' || errorCode == 'INVALID_N8N_RESPONSE') {
+      return 'NutriFridge AI returned an unexpected response. Please retry.';
+    } else if (errorCode == 'N8N_NOT_CONFIGURED' ||
+        e.status == 503 ||
         e.status == 502 ||
         errorCode == 'CONNECTION_FAILED' ||
         (errorCode is String && errorCode.startsWith('N8N_UPSTREAM_'))) {
-      return 'NutriFridge AI is temporarily experiencing high load. Please tap retry.';
+      return 'NutriFridge AI is temporarily unavailable. Please try again.';
     } else if (backendMessage != null &&
         backendMessage.isNotEmpty &&
         !backendMessage.toLowerCase().contains('internal server error')) {
       return backendMessage;
     } else if (e.status >= 500) {
-      return 'NutriFridge AI is temporarily unavailable. Please tap retry.';
+      return 'NutriFridge AI is temporarily unavailable. Please try again.';
     } else if (e.status == 400) {
       return 'Request could not be processed. Please check your selected ingredients.';
     }
-    return 'Unable to reach NutriFridge AI. Please tap retry in a moment.';
+    return 'Unable to connect to NutriFridge AI. Please check your connection and retry.';
   }
 
   static String _mapNetworkExceptionToMessage(dynamic e, {required bool isAfterRetry}) {
@@ -619,20 +618,23 @@ class SupabaseAiFunctionClient {
         errStr.contains('failed host lookup') ||
         errStr.contains('network') ||
         errStr.contains('connection refused') ||
-        errStr.contains('clientexception')) {
-      return 'Unable to reach NutriFridge AI. Please check your internet connection and tap retry.';
+        errStr.contains('clientexception') ||
+        errStr.contains('xmlhttprequest') ||
+        errStr.contains('cors')) {
+      return 'Unable to connect to NutriFridge AI. Please check your connection and retry.';
     } else if (errStr.contains('timeout')) {
-      return 'NutriFridge AI took longer than expected to respond. Please tap retry.';
+      return 'NutriFridge AI took longer than expected to respond. Please retry.';
     } else if (errStr.contains('429') || errStr.contains('rate limit')) {
-      return 'Google Gemini rate limit exceeded. Please wait a moment and tap retry.';
+      return 'Google Gemini rate limit exceeded. AI usage limit reached. Please try again later.';
     } else if (errStr.contains('format') || errStr.contains('parse') || errStr.contains('json')) {
-      return 'Received an invalid response format from NutriFridge AI. Please tap retry.';
-    } else if (errStr.contains('invalid uuid') || errStr.contains('uuid')) {
-      return 'One or more selected ingredient IDs are invalid. Please refresh your inventory.';
-    } else if (errStr.contains('item not found') || errStr.contains('not found')) {
-      return 'One or more selected items could not be found in your inventory. Please refresh and try again.';
+      return 'NutriFridge AI returned an unexpected response. Please retry.';
+    } else if (errStr.contains('invalid uuid') ||
+        errStr.contains('uuid') ||
+        errStr.contains('item not found') ||
+        errStr.contains('not found')) {
+      return 'Some selected ingredients could not be verified. Please refresh your fridge and retry.';
     }
-    return 'Unable to reach NutriFridge AI. Please tap retry.';
+    return 'Unable to connect to NutriFridge AI. Please check your connection and retry.';
   }
 
   /// Normalizes incoming edge function / n8n JSON responses into standard contract maps.

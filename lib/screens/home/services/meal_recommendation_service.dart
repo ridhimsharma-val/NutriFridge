@@ -933,19 +933,21 @@ class MealRecommendationService {
 
       // If backend responded with error or empty meal:
       if (rec == null) {
-        final isRateLimit = response['action'] == 'error' &&
-            (response['assistantMessage']?.toString().toLowerCase().contains('rate limit') == true ||
-             response['error']?.toString().toLowerCase().contains('rate_limit') == true);
-
-        if (isRateLimit) {
+        if (response['action'] == 'error' || response['ok'] == false) {
           final errMsg = response['assistantMessage']?.toString() ??
               response['error']?.toString() ??
-              'Google Gemini rate limit exceeded. Please wait a moment and tap retry.';
+              'Unable to generate recipe with selected ingredients.';
           throw Exception(errMsg);
         }
 
-        // Dynamic local synthesis for offline/unreachable fallback execution
-        rec = _synthesizeRecipeFromSelected(resolvedSelectedItems, preferredDishName, slot);
+        // Only in forced unit/widget test environments without real backend
+        if (MockDataRepository.forceInMemoryForTesting) {
+          rec = _synthesizeRecipeFromSelected(resolvedSelectedItems, preferredDishName, slot);
+        } else {
+          final errMsg = response['assistantMessage']?.toString() ??
+              'Unable to generate recipe with selected ingredients.';
+          throw Exception(errMsg);
+        }
       }
 
       _discoveryMode = MealDiscoveryMode.useMyIngredients;
@@ -962,25 +964,9 @@ class MealRecommendationService {
     } catch (e) {
       debugPrint('[MealRecommendationService] generateFromSelectedIngredients error: $e');
       final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
-      if (cleanMsg.toLowerCase().contains('rate limit')) {
-        CookingBasketService.generationErrorNotifier.value = cleanMsg;
-        CookingBasketService.isGeneratingNotifier.value = false;
-        return null;
-      }
-
-      // Graceful dynamic synthesis fallback when remote AI is unreachable or offline
-      final rec = _synthesizeRecipeFromSelected(resolvedSelectedItems, preferredDishName, slot);
-      _discoveryMode = MealDiscoveryMode.useMyIngredients;
-      discoveryModeNotifier.value = MealDiscoveryMode.useMyIngredients;
-      _currentRecommendation = rec;
-      _currentStatus = RecommendationStatus.loaded;
-      _errorMessage = null;
-      _alternativeMessage = null;
-      statusNotifier.value = RecommendationStatus.loaded;
-      recommendationNotifier.value = rec;
-      CookingBasketService.generationErrorNotifier.value = null;
+      CookingBasketService.generationErrorNotifier.value = cleanMsg;
       CookingBasketService.isGeneratingNotifier.value = false;
-      return rec;
+      return null;
     } finally {
       _isFetching = false;
       CookingBasketService.isGeneratingNotifier.value = false;
@@ -1117,19 +1103,21 @@ class MealRecommendationService {
       }
 
       if (rec == null) {
-        final isRateLimit = response['action'] == 'error' &&
-            (response['assistantMessage']?.toString().toLowerCase().contains('rate limit') == true ||
-             response['error']?.toString().toLowerCase().contains('rate_limit') == true);
-
-        if (isRateLimit) {
+        if (response['action'] == 'error' || response['ok'] == false) {
           final errMsg = response['assistantMessage']?.toString() ??
               response['error']?.toString() ??
-              'Google Gemini rate limit exceeded. Please wait a moment and tap retry.';
+              'Unable to generate recipe for $cleanDishName.';
           throw Exception(errMsg);
         }
 
-        // Dynamic local synthesis for offline/unreachable fallback execution
-        rec = _synthesizeRecipeFromDishName(cleanDishName, allItems, slot);
+        // Only in forced unit/widget test environments without real backend
+        if (MockDataRepository.forceInMemoryForTesting) {
+          rec = _synthesizeRecipeFromDishName(cleanDishName, allItems, slot);
+        } else {
+          final errMsg = response['assistantMessage']?.toString() ??
+              'Unable to generate recipe for $cleanDishName.';
+          throw Exception(errMsg);
+        }
       }
 
       _discoveryMode = MealDiscoveryMode.useMyIngredients;
@@ -1146,25 +1134,9 @@ class MealRecommendationService {
     } catch (e) {
       debugPrint('[MealRecommendationService] generateFromDishName error: $e');
       final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
-      if (cleanMsg.toLowerCase().contains('rate limit')) {
-        CookingBasketService.generationErrorNotifier.value = cleanMsg;
-        CookingBasketService.isGeneratingNotifier.value = false;
-        return null;
-      }
-
-      // Graceful dynamic synthesis fallback when remote AI is unreachable or offline
-      final rec = _synthesizeRecipeFromDishName(cleanDishName, allItems, slot);
-      _discoveryMode = MealDiscoveryMode.useMyIngredients;
-      discoveryModeNotifier.value = MealDiscoveryMode.useMyIngredients;
-      _currentRecommendation = rec;
-      _currentStatus = RecommendationStatus.loaded;
-      _errorMessage = null;
-      _alternativeMessage = null;
-      statusNotifier.value = RecommendationStatus.loaded;
-      recommendationNotifier.value = rec;
-      CookingBasketService.generationErrorNotifier.value = null;
+      CookingBasketService.generationErrorNotifier.value = cleanMsg;
       CookingBasketService.isGeneratingNotifier.value = false;
-      return rec;
+      return null;
     } finally {
       _isFetching = false;
       CookingBasketService.isGeneratingNotifier.value = false;

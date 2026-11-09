@@ -556,8 +556,9 @@ void main() {
       expect(MealRecommendationService.discoveryMode, equals(MealDiscoveryMode.none));
     });
 
-    test('generateFromSelectedIngredients on network or unreachable AI gracefully falls back to local synthesis', () async {
+    test('generateFromSelectedIngredients on network or AI failure does NOT fall back to synthetic recipe', () async {
       MealRecommendationService.reset();
+      MockDataRepository.forceInMemoryForTesting = false;
 
       const item1 = CategoryFoodItem(
         id: '11111111-2222-3333-4444-555555555555',
@@ -574,12 +575,13 @@ void main() {
       CookingBasketService.clear();
       CookingBasketService.toggleItem(item1);
       CookingBasketService.toggleItem(item2);
+      CookingBasketService.setPreferredDishName('Egg Scramble');
 
       AiAssistantService.mockHandler = (payload) async {
         return {
           'ok': false,
           'action': 'error',
-          'assistantMessage': 'Unable to reach NutriFridge AI. Please tap retry.',
+          'assistantMessage': 'Unable to connect to NutriFridge AI. Please check your connection and retry.',
           'error': 'Connection refused',
         };
       };
@@ -589,11 +591,15 @@ void main() {
         preferredDishName: 'Egg Scramble',
       );
 
-      expect(rec, isNotNull);
-      expect(rec!.title, equals('Egg Scramble'));
-      expect(rec.requiredIngredients.length, equals(2));
-      expect(CookingBasketService.generationError, isNull);
-      expect(MealRecommendationService.discoveryMode, equals(MealDiscoveryMode.useMyIngredients));
+      // Must be null: NO fake synthetic recipe allowed on failure
+      expect(rec, isNull);
+      // Honest error message displayed
+      expect(CookingBasketService.generationError, contains('Unable to connect to NutriFridge AI'));
+      // Selected basket items and dish name remain 100% intact
+      expect(CookingBasketService.itemCount, equals(2));
+      expect(CookingBasketService.preferredDishName, equals('Egg Scramble'));
+      // Dashboard is not marked as loaded
+      expect(MealRecommendationService.currentRecommendation, isNull);
     });
 
     testWidgets('FridgePage in selection mode opens doors immediately to reveal shelves', (tester) async {
