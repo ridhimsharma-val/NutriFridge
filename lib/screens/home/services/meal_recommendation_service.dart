@@ -521,71 +521,13 @@ class MealRecommendationService {
     statusNotifier.value = RecommendationStatus.loading;
 
     try {
-      final now = time ?? currentTimeProvider();
-      final inventoryContext = AiAssistantService.getInventoryContext();
-      final userPreferences = AiAssistantService.getProfilePreferences();
-      final nutritionContext = AiAssistantService.getNutritionContext();
-
       final exclusions = excludedRecipeIds ?? _rejectedRecipeIds;
-      final completedSlots = getCompletedMealSlotsToday(now);
-      final nextSlot = getNextUnloggedMealSlot(now);
-
-      final remainingCalories = (MockDataRepository.nutrition.targetCalories -
-              MockDataRepository.nutrition.consumedCalories)
-          .clamp(0, 9999);
-      final remainingProtein = (MockDataRepository.nutrition.protein.targetGrams -
-              MockDataRepository.nutrition.protein.amountGrams)
-          .clamp(0, 999);
-      final remainingCarbs = (MockDataRepository.nutrition.carbs.targetGrams -
-              MockDataRepository.nutrition.carbs.amountGrams)
-          .clamp(0, 999);
-      final remainingFat = (MockDataRepository.nutrition.fat.targetGrams -
-              MockDataRepository.nutrition.fat.amountGrams)
-          .clamp(0, 999);
-
-      final requestPayload = {
-        'userId': MockDataRepository.profile.displayName.isNotEmpty
-            ? MockDataRepository.profile.displayName
-            : 'guest_user',
-        'actionHint': 'meal_recommendation',
-        'message': isAlternativeRequest
-            ? 'Suggest an alternative meal recommendation for ${slot.displayName} based on current fridge inventory, excluding previously rejected recipes.'
-            : 'Generate a meal recommendation for ${slot.displayName} based on current fridge inventory.',
-        'currentMealPeriod': slot.displayName,
-        'targetMealSlot': slot.displayName,
-        'nextMealSlot': nextSlot.displayName,
-        'completedMealSlots': completedSlots.map((s) => s.displayName).toList(),
-        'todayLoggedMeals': MockDataRepository.todayLoggedMealsHistory.map((m) {
-          final ts = m['timestamp'];
-          return {
-            'mealType': m['mealType'],
-            'mealName': m['mealName'],
-            'calories': m['calories'],
-            'protein': m['protein'],
-            'carbs': m['carbs'],
-            'fat': m['fat'],
-            'timestamp': ts is DateTime ? ts.toIso8601String() : ts?.toString(),
-          };
-        }).toList(),
-        'clientLocalTime': now.toIso8601String(),
-        'inventoryContext': inventoryContext,
-        'userPreferences': userPreferences,
-        'todayNutrition': nutritionContext,
-        'remainingTargets': {
-          'calories': remainingCalories,
-          'proteinG': remainingProtein,
-          'carbsG': remainingCarbs,
-          'fatG': remainingFat,
-        },
-        'excludedRecipeIds': exclusions.toList(),
-        'rejectedRecipeIds': exclusions.toList(),
-        'isAlternative': isAlternativeRequest,
-      };
-
-      Map<String, dynamic> response = await AiAssistantService.sendRequest(
-        message: requestPayload['message'] as String,
-        actionHint: 'meal_recommendation',
-        extraPayload: requestPayload,
+      final rec = await executeMealRecommendationPipeline(
+        recipeMode: 'ai_suggestion',
+        time: time,
+        targetSlot: slot,
+        isAlternativeRequest: isAlternativeRequest,
+        excludedRecipeIds: exclusions,
       );
 
       // Discard stale responses if newer request has been triggered
@@ -593,50 +535,7 @@ class MealRecommendationService {
         return _currentRecommendation;
       }
 
-      // If n8n backend rejects 'meal_recommendation' with HTTP 400 (e.g. un-updated live deployment),
-      // gracefully fall back to actionHint: 'auto' with recommendation context
-      if (response['error'] != null &&
-          response['error'].toString().contains('400') &&
-          response['action'] == 'error') {
-        debugPrint(
-            '[MealRecommendationService] Live n8n rejected meal_recommendation; falling back to actionHint: auto');
-        final fallbackPayload = Map<String, dynamic>.from(requestPayload);
-        fallbackPayload['actionHint'] = 'auto';
-        response = await AiAssistantService.sendRequest(
-          message: requestPayload['message'] as String,
-          actionHint: 'auto',
-          extraPayload: fallbackPayload,
-        );
-        if (thisRequestId != _currentRequestId) {
-          return _currentRecommendation;
-        }
-      }
-
-      // 4. Handle Backend failure (TEST 11)
-      if (response['success'] == false ||
-          response['ok'] == false ||
-          response['action'] == 'error' ||
-          (response['error'] != null && response['meal'] == null)) {
-        if (!isAlternativeRequest) {
-          _currentRecommendation = null;
-        }
-        _currentStatus = RecommendationStatus.error;
-        _errorMessage = response['assistantMessage'] as String? ??
-            response['error'] as String? ??
-            'Unable to reach NutriFridge AI. Please check your connection and tap retry.';
-        statusNotifier.value = RecommendationStatus.error;
-        if (!isAlternativeRequest) {
-          recommendationNotifier.value = null;
-        }
-        _isFetching = false;
-        return null;
-      }
-
-      // 5. Parse backend structured meal recommendation
-      if (response['meal'] != null && response['meal'] is Map) {
-        final mealJson = Map<String, dynamic>.from(response['meal'] as Map);
-        final rec = RecipeRecommendation.fromJson(mealJson);
-
+      if (rec != null) {
         if (!exclusions.contains(rec.id) && !exclusions.contains(rec.title)) {
           _currentRecommendation = rec;
           _currentStatus = RecommendationStatus.loaded;
@@ -649,20 +548,6 @@ class MealRecommendationService {
           recommendationNotifier.value = rec;
           _isFetching = false;
           return rec;
-        }
-      }
-
-      // 6. Handle explicit no-match condition from backend
-      if (response['action'] == 'no_match' || response['noMatch'] == true) {
-        if (!isAlternativeRequest) {
-          _currentRecommendation = null;
-          _currentStatus = RecommendationStatus.noMatch;
-          _errorMessage = response['assistantMessage'] as String? ??
-              "We couldn't find a suitable meal with your current ingredients.";
-          statusNotifier.value = RecommendationStatus.noMatch;
-          recommendationNotifier.value = null;
-          _isFetching = false;
-          return null;
         }
       }
 
@@ -739,6 +624,223 @@ class MealRecommendationService {
     } finally {
       _isFetching = false;
     }
+  }
+
+  /// Unified, centralized AI request pipeline executing all meal recommendation requests:
+  /// - `recipeMode: 'ai_suggestion'` (Mode A: Dashboard AI Suggestion)
+  /// - `recipeMode: 'selected_ingredients'` (Mode B: "Use My Ingredients" with pan items)
+  /// - `recipeMode: 'named_dish_from_inventory'` (Mode C: Custom dish name using full fridge)
+  ///
+  /// Guarantees:
+  /// - All modes invoke the exact same authenticated Supabase Edge Function (`nutrifridge-ai`),
+  ///   passing through the centralized [AiAssistantService] and [SupabaseAiFunctionClient].
+  /// - All modes set `actionHint: 'meal_recommendation'`.
+  /// - Eliminates non-serializable objects (e.g. DailyNutritionData or raw Sets) to prevent client-side encoding crashes.
+  /// - Provides safe, non-sensitive diagnostic checkpoints before invocation and immediately after response.
+  /// - Enforces honest error propagation without silent synthetic recipe fallbacks in production.
+  static Future<RecipeRecommendation?> executeMealRecommendationPipeline({
+    required String recipeMode,
+    List<CategoryFoodItem>? selectedItems,
+    String? preferredDishName,
+    DateTime? time,
+    MealTimeSlot? targetSlot,
+    bool isAlternativeRequest = false,
+    Set<String>? excludedRecipeIds,
+    BuildContext? context,
+  }) async {
+    ensureInitialized();
+
+    final now = time ?? currentTimeProvider();
+    final slot = targetSlot ?? resolveActiveMealSlot(now);
+
+    final List<Map<String, dynamic>> inventoryContext;
+    final List<String>? selectedInventoryItemIds;
+    final resolvedSelectedItems = <CategoryFoodItem>[];
+
+    if (recipeMode == 'selected_ingredients') {
+      for (final item in (selectedItems ?? <CategoryFoodItem>[])) {
+        if (MealTrackingService.isValidUuid(item.id)) {
+          resolvedSelectedItems.add(item);
+        } else {
+          final match = FridgeCategoryRepository.findItemByName(item.name);
+          if (match != null && MealTrackingService.isValidUuid(match.id)) {
+            resolvedSelectedItems.add(item.copyWith(id: match.id));
+          } else {
+            resolvedSelectedItems.add(item);
+          }
+        }
+      }
+
+      final validUuidIds = resolvedSelectedItems
+          .where((i) => MealTrackingService.isValidUuid(i.id))
+          .map((i) => i.id)
+          .toList();
+      selectedInventoryItemIds = validUuidIds.isNotEmpty
+          ? validUuidIds
+          : resolvedSelectedItems.map((i) => i.id).toList();
+
+      inventoryContext = resolvedSelectedItems.map((i) => {
+        'id': i.id,
+        'name': i.name,
+        'category': i.category,
+        'quantity': i.displayQuantity,
+        'unit': i.unit,
+        'expiryDays': i.expiryDays,
+      }).toList();
+    } else {
+      selectedInventoryItemIds = null;
+      inventoryContext = AiAssistantService.getInventoryContext();
+    }
+
+    // Standardized, safe JSON-encodable contexts
+    final userPreferences = AiAssistantService.getProfilePreferences();
+    final nutritionContext = AiAssistantService.getNutritionContext();
+    final exclusions = excludedRecipeIds ?? _rejectedRecipeIds;
+    final completedSlots = getCompletedMealSlotsToday(now);
+    final nextSlot = getNextUnloggedMealSlot(now);
+
+    final remainingCalories = (MockDataRepository.nutrition.targetCalories -
+            MockDataRepository.nutrition.consumedCalories)
+        .clamp(0, 9999);
+    final remainingProtein = (MockDataRepository.nutrition.protein.targetGrams -
+            MockDataRepository.nutrition.protein.amountGrams)
+        .clamp(0, 999);
+    final remainingCarbs = (MockDataRepository.nutrition.carbs.targetGrams -
+            MockDataRepository.nutrition.carbs.amountGrams)
+        .clamp(0, 999);
+    final remainingFat = (MockDataRepository.nutrition.fat.targetGrams -
+            MockDataRepository.nutrition.fat.amountGrams)
+        .clamp(0, 999);
+
+    final String message;
+    if (recipeMode == 'selected_ingredients') {
+      message = (preferredDishName != null && preferredDishName.trim().isNotEmpty)
+          ? 'Create a recipe for ${preferredDishName.trim()} using these selected ingredients from my fridge: ${resolvedSelectedItems.map((i) => i.name).join(", ")}.'
+          : 'Create a recipe using primarily these selected ingredients from my fridge: ${resolvedSelectedItems.map((i) => i.name).join(", ")}.';
+    } else if (recipeMode == 'named_dish_from_inventory') {
+      message =
+          'Create a recipe for ${preferredDishName!.trim()}. Check what ingredients are available in my fridge inventory, identify which required ingredients are present and which are missing, and suggest reasonable substitutions for any missing ingredients.';
+    } else {
+      message = isAlternativeRequest
+          ? 'Suggest an alternative meal recommendation for ${slot.displayName} based on current fridge inventory, excluding previously rejected recipes.'
+          : 'Generate a meal recommendation for ${slot.displayName} based on current fridge inventory.';
+    }
+
+    final requestPayload = <String, dynamic>{
+      'userId': MockDataRepository.profile.displayName.isNotEmpty
+          ? MockDataRepository.profile.displayName
+          : 'guest_user',
+      'actionHint': 'meal_recommendation',
+      'recipeMode': recipeMode,
+      'selectedInventoryItemIds': ?selectedInventoryItemIds,
+      if (preferredDishName != null && preferredDishName.trim().isNotEmpty)
+        'preferredDishName': preferredDishName.trim(),
+      'message': message,
+      'currentMealPeriod': slot.displayName,
+      'targetMealSlot': slot.displayName,
+      'nextMealSlot': nextSlot.displayName,
+      'completedMealSlots': completedSlots.map((s) => s.displayName).toList(),
+      'todayLoggedMeals': MockDataRepository.todayLoggedMealsHistory.map((m) {
+        final ts = m['timestamp'];
+        return {
+          'mealType': m['mealType'],
+          'mealName': m['mealName'],
+          'calories': m['calories'],
+          'protein': m['protein'],
+          'carbs': m['carbs'],
+          'fat': m['fat'],
+          'timestamp': ts is DateTime ? ts.toIso8601String() : ts?.toString(),
+        };
+      }).toList(),
+      'clientLocalTime': now.toIso8601String(),
+      'inventoryContext': inventoryContext,
+      'userPreferences': userPreferences,
+      'todayNutrition': nutritionContext,
+      'remainingTargets': {
+        'calories': remainingCalories,
+        'proteinG': remainingProtein,
+        'carbsG': remainingCarbs,
+        'fatG': remainingFat,
+      },
+      'excludedRecipeIds': exclusions.toList(),
+      'rejectedRecipeIds': exclusions.toList(),
+      'isAlternative': isAlternativeRequest,
+    };
+
+    // Safe diagnostic checkpoint 1: Pre-invocation state (no secrets/JWTs)
+    debugPrint(
+      '[UnifiedAI] Dispatching meal request -> mode: $recipeMode, actionHint: meal_recommendation, itemsCount: ${selectedInventoryItemIds?.length ?? inventoryContext.length}, dishName: $preferredDishName',
+    );
+
+    Map<String, dynamic> response = await AiAssistantService.sendRequest(
+      message: message,
+      actionHint: 'meal_recommendation',
+      extraPayload: requestPayload,
+    );
+
+    // Gracefully handle n8n legacy route fallback if 400 returned
+    if (response['error'] != null &&
+        response['error'].toString().contains('400') &&
+        response['action'] == 'error') {
+      debugPrint(
+        '[UnifiedAI] Live n8n rejected meal_recommendation; retrying with actionHint: auto',
+      );
+      final fallbackPayload = Map<String, dynamic>.from(requestPayload);
+      fallbackPayload['actionHint'] = 'auto';
+      response = await AiAssistantService.sendRequest(
+        message: message,
+        actionHint: 'auto',
+        extraPayload: fallbackPayload,
+      );
+    }
+
+    // Safe diagnostic checkpoint 2: Post-response state
+    debugPrint(
+      '[UnifiedAI] Received response -> mode: $recipeMode, ok: ${response['ok']}, action: ${response['action']}, hasMeal: ${response['meal'] != null}',
+    );
+
+    RecipeRecommendation? rec;
+    if (response['meal'] != null && response['meal'] is Map) {
+      rec = RecipeRecommendation.fromJson(Map<String, dynamic>.from(response['meal'] as Map));
+    } else if (response['success'] == true && response['data'] != null && response['data']['meal'] is Map) {
+      rec = RecipeRecommendation.fromJson(Map<String, dynamic>.from(response['data']['meal'] as Map));
+    }
+
+    if (rec == null) {
+      if (response['action'] == 'no_match' || response['noMatch'] == true) {
+        return null;
+      }
+
+      if (response['action'] == 'error' || response['ok'] == false || response['error'] != null) {
+        final errMsg = response['assistantMessage']?.toString() ??
+            response['error']?.toString() ??
+            'Unable to generate meal recommendation.';
+        throw Exception(errMsg);
+      }
+
+      if (recipeMode == 'ai_suggestion') {
+        rec = _computeLocalRecommendation(slot, excludedRecipeIds: exclusions);
+      } else if (MockDataRepository.forceInMemoryForTesting) {
+        if (recipeMode == 'selected_ingredients') {
+          rec = _synthesizeRecipeFromSelected(resolvedSelectedItems, preferredDishName, slot);
+        } else if (recipeMode == 'named_dish_from_inventory') {
+          final allItems = FridgeCategoryRepository.canonicalCategories
+              .expand((c) => FridgeCategoryRepository.getCategoryData(c).items)
+              .toList();
+          rec = _synthesizeRecipeFromDishName(
+            preferredDishName ?? 'Custom Dish',
+            allItems,
+            slot,
+          );
+        }
+      } else {
+        final errMsg = response['assistantMessage']?.toString() ??
+            'Unable to generate meal recommendation.';
+        throw Exception(errMsg);
+      }
+    }
+
+    return rec;
   }
 
   /// Requests another valid recommendation for the current meal slot without
@@ -861,94 +963,13 @@ class MealRecommendationService {
     CookingBasketService.isGeneratingNotifier.value = true;
     CookingBasketService.generationErrorNotifier.value = null;
 
-    final now = _currentTimeProvider();
-    final slot = resolveActiveMealSlot(now);
-
-    // Ensure valid UUIDs for selected items by matching against inventory if needed
-    final resolvedSelectedItems = <CategoryFoodItem>[];
-    for (final item in selectedItems) {
-      if (MealTrackingService.isValidUuid(item.id)) {
-        resolvedSelectedItems.add(item);
-      } else {
-        final match = FridgeCategoryRepository.findItemByName(item.name);
-        if (match != null && MealTrackingService.isValidUuid(match.id)) {
-          resolvedSelectedItems.add(item.copyWith(id: match.id));
-        } else {
-          resolvedSelectedItems.add(item);
-        }
-      }
-    }
-
-    final validUuidIds = resolvedSelectedItems
-        .where((i) => MealTrackingService.isValidUuid(i.id))
-        .map((i) => i.id)
-        .toList();
-    final itemIds = validUuidIds.isNotEmpty
-        ? validUuidIds
-        : resolvedSelectedItems.map((i) => i.id).toList();
-
-    final requestPayload = {
-      'userId': MockDataRepository.profile.displayName.isNotEmpty
-          ? MockDataRepository.profile.displayName
-          : 'guest_user',
-      'actionHint': 'meal_recommendation',
-      'recipeMode': 'selected_ingredients',
-      'selectedInventoryItemIds': itemIds,
-      'preferredDishName': preferredDishName,
-      'message': (preferredDishName != null && preferredDishName.trim().isNotEmpty)
-          ? 'Create a recipe for ${preferredDishName.trim()} using these selected ingredients from my fridge: ${resolvedSelectedItems.map((i) => i.name).join(", ")}.'
-          : 'Create a recipe using primarily these selected ingredients from my fridge: ${resolvedSelectedItems.map((i) => i.name).join(", ")}.',
-      'currentMealPeriod': slot.displayName,
-      'targetMealSlot': slot.displayName,
-      'inventoryContext': resolvedSelectedItems.map((i) => {
-        'id': i.id,
-        'name': i.name,
-        'category': i.category,
-        'quantity': i.displayQuantity,
-        'unit': i.unit,
-        'expiryDays': i.expiryDays,
-      }).toList(),
-      'userPreferences': {
-        'dietaryPreference': MockDataRepository.profile.dietaryPreference,
-        'allergies': MockDataRepository.profile.allergies,
-        'avoidedFoods': MockDataRepository.profile.avoidedFoods,
-      },
-      'todayNutrition': MockDataRepository.nutrition,
-      'clientLocalTime': now.toIso8601String(),
-    };
-
     try {
-      final response = await AiAssistantService.sendRequest(
-        message: requestPayload['message'] as String,
-        actionHint: 'meal_recommendation',
-        extraPayload: requestPayload,
+      final rec = await executeMealRecommendationPipeline(
+        recipeMode: 'selected_ingredients',
+        selectedItems: selectedItems,
+        preferredDishName: preferredDishName,
+        context: context,
       );
-
-      RecipeRecommendation? rec;
-      if (response['meal'] != null && response['meal'] is Map) {
-        rec = RecipeRecommendation.fromJson(Map<String, dynamic>.from(response['meal'] as Map));
-      } else if (response['success'] == true && response['data'] != null && response['data']['meal'] is Map) {
-        rec = RecipeRecommendation.fromJson(Map<String, dynamic>.from(response['data']['meal'] as Map));
-      }
-
-      // If backend responded with error or empty meal:
-      if (rec == null) {
-        if (response['action'] == 'error' || response['ok'] == false) {
-          final errMsg = response['assistantMessage']?.toString() ??
-              response['error']?.toString() ??
-              'Unable to generate recipe with selected ingredients.';
-          throw Exception(errMsg);
-        }
-
-        // Only in forced unit/widget test environments without real backend
-        if (MockDataRepository.forceInMemoryForTesting) {
-          rec = _synthesizeRecipeFromSelected(resolvedSelectedItems, preferredDishName, slot);
-        } else {
-          final errMsg = response['assistantMessage']?.toString() ??
-              'Unable to generate recipe with selected ingredients.';
-          throw Exception(errMsg);
-        }
-      }
 
       _discoveryMode = MealDiscoveryMode.useMyIngredients;
       discoveryModeNotifier.value = MealDiscoveryMode.useMyIngredients;
@@ -1052,73 +1073,12 @@ class MealRecommendationService {
     CookingBasketService.isGeneratingNotifier.value = true;
     CookingBasketService.generationErrorNotifier.value = null;
 
-    final now = _currentTimeProvider();
-    final slot = resolveActiveMealSlot(now);
-
-    final allItems = FridgeCategoryRepository.canonicalCategories
-        .expand((c) => FridgeCategoryRepository.getCategoryData(c).items)
-        .toList();
-    final inventoryContext = allItems.map((i) => {
-      'id': i.id,
-      'name': i.name,
-      'category': i.category,
-      'quantity': i.displayQuantity,
-      'unit': i.unit,
-      'expiryDays': i.expiryDays,
-    }).toList();
-
-    final requestPayload = {
-      'userId': MockDataRepository.profile.displayName.isNotEmpty
-          ? MockDataRepository.profile.displayName
-          : 'guest_user',
-      'actionHint': 'meal_recommendation',
-      'recipeMode': 'named_dish_from_inventory',
-      'preferredDishName': cleanDishName,
-      'message':
-          'Create a recipe for $cleanDishName. Check what ingredients are available in my fridge inventory, identify which required ingredients are present and which are missing, and suggest reasonable substitutions for any missing ingredients.',
-      'currentMealPeriod': slot.displayName,
-      'targetMealSlot': slot.displayName,
-      'inventoryContext': inventoryContext,
-      'userPreferences': {
-        'dietaryPreference': MockDataRepository.profile.dietaryPreference,
-        'allergies': MockDataRepository.profile.allergies,
-        'avoidedFoods': MockDataRepository.profile.avoidedFoods,
-      },
-      'todayNutrition': MockDataRepository.nutrition,
-      'clientLocalTime': now.toIso8601String(),
-    };
-
     try {
-      final response = await AiAssistantService.sendRequest(
-        message: requestPayload['message'] as String,
-        actionHint: 'meal_recommendation',
-        extraPayload: requestPayload,
+      final rec = await executeMealRecommendationPipeline(
+        recipeMode: 'named_dish_from_inventory',
+        preferredDishName: cleanDishName,
+        context: context,
       );
-
-      RecipeRecommendation? rec;
-      if (response['meal'] != null && response['meal'] is Map) {
-        rec = RecipeRecommendation.fromJson(Map<String, dynamic>.from(response['meal'] as Map));
-      } else if (response['success'] == true && response['data'] != null && response['data']['meal'] is Map) {
-        rec = RecipeRecommendation.fromJson(Map<String, dynamic>.from(response['data']['meal'] as Map));
-      }
-
-      if (rec == null) {
-        if (response['action'] == 'error' || response['ok'] == false) {
-          final errMsg = response['assistantMessage']?.toString() ??
-              response['error']?.toString() ??
-              'Unable to generate recipe for $cleanDishName.';
-          throw Exception(errMsg);
-        }
-
-        // Only in forced unit/widget test environments without real backend
-        if (MockDataRepository.forceInMemoryForTesting) {
-          rec = _synthesizeRecipeFromDishName(cleanDishName, allItems, slot);
-        } else {
-          final errMsg = response['assistantMessage']?.toString() ??
-              'Unable to generate recipe for $cleanDishName.';
-          throw Exception(errMsg);
-        }
-      }
 
       _discoveryMode = MealDiscoveryMode.useMyIngredients;
       discoveryModeNotifier.value = MealDiscoveryMode.useMyIngredients;

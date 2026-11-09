@@ -404,6 +404,9 @@ class SupabaseAiFunctionClient {
         if (testFunctionInvoker != null) {
           response = await testFunctionInvoker!(functionName, body, invocationHeaders);
         } else {
+          debugPrint(
+            '[SupabaseAiFunctionClient] Invoking $functionName (mode: ${body['recipeMode'] ?? 'unspecified'}, action: ${body['actionHint']}, hasAuthToken: ${token.isNotEmpty})',
+          );
           response = await client!.functions
               .invoke(
                 functionName,
@@ -415,7 +418,7 @@ class SupabaseAiFunctionClient {
 
         stopwatch.stop();
         debugPrint(
-          '[SupabaseAiFunctionClient] Edge function returned status ${response.status} in ${stopwatch.elapsedMilliseconds}ms',
+          '[SupabaseAiFunctionClient] Edge function $functionName returned status ${response.status} in ${stopwatch.elapsedMilliseconds}ms',
         );
 
         final dynamic data = response.data;
@@ -468,6 +471,9 @@ class SupabaseAiFunctionClient {
         };
       } catch (e) {
         stopwatch.stop();
+        debugPrint(
+          '[SupabaseAiFunctionClient] Network/transport error on attempt $attempt: $e',
+        );
         final isAuthErr = isAuthenticationFailure(e);
         if (isAuthErr && attempt == 0) {
           debugPrint(
