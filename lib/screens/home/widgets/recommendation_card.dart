@@ -741,8 +741,8 @@ class RecommendationCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Prep time badge if available
-                if (recommendation.prepTimeMinutes > 0)
+                // Total cooking/prep duration badge if available
+                if (recommendation.totalTimeMinutes != null && recommendation.totalTimeMinutes! > 0)
                   Positioned(
                     top: 12,
                     right: 12,
@@ -756,7 +756,7 @@ class RecommendationCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        '${recommendation.prepTimeMinutes} min',
+                        '${recommendation.totalTimeMinutes} min',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,
@@ -804,9 +804,9 @@ class RecommendationCard extends StatelessWidget {
                                       color: AppColors.textSecondary,
                                     ),
                                   ),
-                                  if (recommendation.fridgeItemsUsed > 0)
+                                  if (recommendation.calculatedFridgeItemsUsed > 0)
                                     TextSpan(
-                                      text: ' · ${recommendation.fridgeItemsUsed} in fridge',
+                                      text: ' · ${recommendation.calculatedFridgeItemsUsed} in fridge',
                                       style: AppTypography.subtitle.copyWith(
                                         fontSize: 12,
                                         color: AppColors.freshGreen,

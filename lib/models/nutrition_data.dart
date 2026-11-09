@@ -139,7 +139,7 @@ class RecipeRecommendation {
     required this.proteinGrams,
     this.carbsGrams = 62,
     this.fatGrams = 18,
-    this.prepTimeMinutes = 20,
+    this.prepTimeMinutes = 0,
     required this.fridgeItemsUsed,
     this.tag = 'Picked for your fridge',
     this.mealType = '',
@@ -216,6 +216,28 @@ class RecipeRecommendation {
     );
   }
 
+  /// Total preparation and cooking duration in minutes. Returns null if neither is available.
+  int? get totalTimeMinutes {
+    final p = prepTimeMinutes > 0 ? prepTimeMinutes : 0;
+    final c = (cookingTimeMinutes != null && cookingTimeMinutes! > 0) ? cookingTimeMinutes! : 0;
+    final sum = p + c;
+    return sum > 0 ? sum : null;
+  }
+
+  /// Authoritative count of unique recipe ingredients actually available in fridge inventory.
+  int get calculatedFridgeItemsUsed {
+    final matchedIds = <String>{};
+    for (final req in requiredIngredients) {
+      final parsed = MealTrackingService.parseIngredientQuantity(req);
+      final found = FridgeCategoryRepository.findItemByName(parsed.name);
+      if (found != null && found.decimalAmount > 0) {
+        matchedIds.add(found.id.isNotEmpty ? found.id : found.name.toLowerCase());
+      }
+    }
+    if (matchedIds.isNotEmpty) return matchedIds.length;
+    return fridgeItemsUsed;
+  }
+
   /// Factory constructor to parse structured backend recommendation response
   factory RecipeRecommendation.fromJson(Map<String, dynamic> json) {
     final title = (json['name'] ?? json['title'] ?? 'Chef Special').toString();
@@ -282,6 +304,32 @@ class RecipeRecommendation {
       reasons.add("Helps support today's protein goal");
     }
 
+    final int? rawPrep = (json['preparationTimeMinutes'] as num? ??
+            json['prepTimeMinutes'] as num? ??
+            json['prepTime'] as num?)
+        ?.toInt();
+    final int? rawCook = (json['cookingTimeMinutes'] as num? ??
+            json['cookingTime'] as num? ??
+            json['cookTimeMinutes'] as num? ??
+            json['cookTime'] as num?)
+        ?.toInt();
+    final int? rawTotal = (json['totalTimeMinutes'] as num? ??
+            json['totalTime'] as num? ??
+            json['totalDurationMinutes'] as num? ??
+            json['durationMinutes'] as num? ??
+            json['timeMinutes'] as num?)
+        ?.toInt();
+
+    final int prepTime;
+    final int? cookTime;
+    if (rawPrep == null && rawCook == null && rawTotal != null) {
+      prepTime = 0;
+      cookTime = rawTotal;
+    } else {
+      prepTime = rawPrep ?? 0;
+      cookTime = rawCook;
+    }
+
     return RecipeRecommendation(
       id: (json['id'] ?? '').toString(),
       title: title,
@@ -301,10 +349,7 @@ class RecipeRecommendation {
               json['fat'] as num? ??
               14)
           .toInt(),
-      prepTimeMinutes: (json['preparationTimeMinutes'] as num? ??
-              json['prepTimeMinutes'] as num? ??
-              20)
-          .toInt(),
+      prepTimeMinutes: prepTime,
       fridgeItemsUsed: availableCount > 0 ? availableCount : requiredIngs.length,
       mealType: mealType.isNotEmpty ? mealType.toUpperCase() : '',
       tag: mealType.isNotEmpty ? mealType.toUpperCase() : 'Picked for your fridge',
@@ -315,7 +360,7 @@ class RecipeRecommendation {
       requiredIngredients: requiredIngs,
       missingIngredients: missingIngs,
       explanation: (json['description'] ?? json['explanation'] ?? reasons.firstOrNull)?.toString(),
-      cookingTimeMinutes: (json['cookingTimeMinutes'] as num? ?? json['cookingTime'] as num?)?.toInt(),
+      cookingTimeMinutes: cookTime,
       servingSize: (json['servingSize'] ?? json['servings'] ?? '1 serving').toString(),
       preparationSteps: (() {
         final List<RecipePreparationStep> steps = [];

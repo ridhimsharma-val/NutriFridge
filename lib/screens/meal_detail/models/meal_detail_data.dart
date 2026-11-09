@@ -122,6 +122,14 @@ class MealDetailInfo {
     this.videoUrl,
   });
 
+  /// Authoritative total preparation and cooking duration in minutes.
+  int? get totalTimeMinutes {
+    final p = (prepTimeMinutes != null && prepTimeMinutes! > 0) ? prepTimeMinutes! : 0;
+    final c = (cookingTimeMinutes != null && cookingTimeMinutes! > 0) ? cookingTimeMinutes! : 0;
+    final sum = p + c;
+    return sum > 0 ? sum : null;
+  }
+
   /// Catalog of real recipe definitions with authentic ingredient measurements and instructions.
   static final Map<String, _RecipeCatalogSpec> _catalogSpecs = {
     'paneer rice bowl': const _RecipeCatalogSpec(
@@ -723,9 +731,12 @@ class MealDetailInfo {
     final int? fat = (rec.fatGrams > 0)
         ? rec.fatGrams
         : (spec?.fatGrams);
-    final int prepTime = (rec.prepTimeMinutes > 0)
+    final int? prepTime = (rec.prepTimeMinutes > 0)
         ? rec.prepTimeMinutes
-        : (spec?.prepTimeMinutes ?? 15);
+        : spec?.prepTimeMinutes;
+    final int? cookTime = (rec.cookingTimeMinutes != null && rec.cookingTimeMinutes! > 0)
+        ? rec.cookingTimeMinutes
+        : null;
 
     final String sourceLabel = rec.nutritionIsEstimate ? 'AI estimate' : 'Verified nutrition data';
 
@@ -737,7 +748,7 @@ class MealDetailInfo {
     );
 
     // 5. Resolve Preparation Steps
-    // Priority: AI-generated steps from recommendation -> catalog spec -> empty list (for AI action card)
+    // Priority: AI-generated steps from recommendation -> catalog spec -> empty list
     List<RecipePreparationStep> prepSteps = rec.preparationSteps;
     if (prepSteps.isEmpty && spec != null && spec.steps.isNotEmpty) {
       prepSteps = spec.steps;
@@ -772,7 +783,7 @@ class MealDetailInfo {
       fatGrams: fat,
       fiberGrams: null,
       prepTimeMinutes: prepTime,
-      cookingTimeMinutes: rec.cookingTimeMinutes ?? 15,
+      cookingTimeMinutes: cookTime,
       servingSize: rec.servingSize.isNotEmpty ? rec.servingSize : '1 serving',
       nutritionSourceLabel: sourceLabel,
       nutritionIsEstimate: rec.nutritionIsEstimate,
@@ -795,10 +806,21 @@ class MealDetailInfo {
   }) {
     final List<String> reasons = [];
 
-    // Fact 1: Available ingredients from fridge
-    final availableCount = ingredients.where((i) => i.availability == IngredientAvailability.available).length;
-    if (availableCount > 0) {
-      reasons.add('Uses $availableCount ingredients from your fridge');
+    // Fact 1: Available ingredients from fridge (unique items with quantity > 0)
+    final matchedFridgeItemIds = <String>{};
+    for (final ing in ingredients) {
+      if (ing.availability == IngredientAvailability.available ||
+          ing.availability == IngredientAvailability.partial) {
+        final found = FridgeCategoryRepository.findItemByName(ing.name);
+        if (found != null && found.decimalAmount > 0) {
+          matchedFridgeItemIds.add(found.id.isNotEmpty ? found.id : found.name.toLowerCase());
+        }
+      }
+    }
+    final accurateFridgeCount = matchedFridgeItemIds.length;
+    if (accurateFridgeCount > 0) {
+      final noun = accurateFridgeCount == 1 ? 'ingredient' : 'ingredients';
+      reasons.add('Uses $accurateFridgeCount $noun from your fridge');
     }
 
     // Fact 2: Ingredients nearing expiry
@@ -832,8 +854,13 @@ class MealDetailInfo {
 
     // Fact 5: Append any distinct, non-generic match reasons provided in rec
     for (final r in rec.matchReasons) {
-      if (!r.contains('Uses items from your fridge') &&
-          !r.contains("Helps complete today's protein goal") &&
+      final lower = r.toLowerCase();
+      if (!lower.contains('from your fridge') &&
+          !lower.contains('in your fridge') &&
+          !lower.contains('fridge inventory') &&
+          !lower.contains('uses items') &&
+          !lower.contains('uses ingredients') &&
+          !lower.contains("protein goal") &&
           !reasons.contains(r)) {
         reasons.add(r);
       }
