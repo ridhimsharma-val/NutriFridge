@@ -556,6 +556,46 @@ void main() {
       expect(MealRecommendationService.discoveryMode, equals(MealDiscoveryMode.none));
     });
 
+    test('generateFromSelectedIngredients on network or unreachable AI gracefully falls back to local synthesis', () async {
+      MealRecommendationService.reset();
+
+      const item1 = CategoryFoodItem(
+        id: '11111111-2222-3333-4444-555555555555',
+        name: 'Eggs',
+        quantity: '2 pcs',
+        category: 'Dairy & Eggs',
+      );
+      const item2 = CategoryFoodItem(
+        id: '22222222-3333-4444-5555-666666666666',
+        name: 'Whole Milk',
+        quantity: '100 ml',
+        category: 'Dairy & Eggs',
+      );
+      CookingBasketService.clear();
+      CookingBasketService.toggleItem(item1);
+      CookingBasketService.toggleItem(item2);
+
+      AiAssistantService.mockHandler = (payload) async {
+        return {
+          'ok': false,
+          'action': 'error',
+          'assistantMessage': 'Unable to reach NutriFridge AI. Please tap retry.',
+          'error': 'Connection refused',
+        };
+      };
+
+      final rec = await MealRecommendationService.generateFromSelectedIngredients(
+        selectedItems: CookingBasketService.selectedItems,
+        preferredDishName: 'Egg Scramble',
+      );
+
+      expect(rec, isNotNull);
+      expect(rec!.title, equals('Egg Scramble'));
+      expect(rec.requiredIngredients.length, equals(2));
+      expect(CookingBasketService.generationError, isNull);
+      expect(MealRecommendationService.discoveryMode, equals(MealDiscoveryMode.useMyIngredients));
+    });
+
     testWidgets('FridgePage in selection mode opens doors immediately to reveal shelves', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(

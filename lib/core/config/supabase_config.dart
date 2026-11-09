@@ -1,8 +1,11 @@
 /// Configuration loader for Supabase credentials.
 /// Reads values injected at compile time via `--dart-define-from-file=supabase.dev.json`.
 class SupabaseConfig {
-  static const String supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-  static const String supabasePublishableKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
+  static const String _defaultUrl = 'https://kmwagsheagttauoqbzom.supabase.co';
+  static const String _defaultPublishableKey = 'sb_publishable_VulEz4DcZc5K7dEMZHSceQ_AA8pI4r-';
+
+  static const String supabaseUrl = String.fromEnvironment('SUPABASE_URL', defaultValue: _defaultUrl);
+  static const String supabasePublishableKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY', defaultValue: _defaultPublishableKey);
 
   /// Returns true if valid configuration has been injected.
   static bool get isConfigured {
