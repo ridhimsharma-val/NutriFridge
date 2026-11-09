@@ -57,6 +57,7 @@ class FlyingIngredientHelper {
 
     final double targetTokenSize = CookingPanVisual.getTokenSize(
       CookingPanVisual.getBasinMetrics(targetBox.size).rx,
+      count: targetTotal,
     );
 
     CookingPanCoordinator.addFlyingItem(item.id);
@@ -173,14 +174,15 @@ class _FlyingThumbnailWidgetState extends State<_FlyingThumbnailWidget>
             (2 * oneMinusT * t * yc) +
             (t * t * y2);
 
-        // Size: starts at card size (~46px), expands slightly to ~50px as it lifts, shrinks to endSize on landing
+        // Size: starts at card size (~46px), expands smoothly and settles into enlarged endSize on landing
+        final double peakSize = math.max(startSize + 6.0, (startSize + endSize) / 2);
         double currentSize;
-        if (t < 0.25) {
-          final double subT = t / 0.25;
-          currentSize = startSize + (subT * 4.0);
+        if (t < 0.35) {
+          final double subT = t / 0.35;
+          currentSize = startSize + (subT * (peakSize - startSize));
         } else {
-          final double subT = (t - 0.25) / 0.75;
-          currentSize = 50.0 - (subT * (50.0 - endSize));
+          final double subT = (t - 0.35) / 0.65;
+          currentSize = peakSize + (subT * (endSize - peakSize));
         }
 
         // Gentle rotation: 0 -> 0.18 rad (~10°) -> 0 rad on landing

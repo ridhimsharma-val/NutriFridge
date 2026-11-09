@@ -153,14 +153,37 @@ class CookingPanVisual extends StatefulWidget {
     );
   }
 
-  /// Calculates the proportional token size for the pan
-  static double getTokenSize(double rx, {bool isCompact = false, bool isExpanded = false}) {
-    if (isCompact) {
-      return (rx * 0.40).clamp(15.0, 20.0);
-    } else if (isExpanded) {
-      return (rx * 0.42).clamp(20.0, 26.0);
+  /// Calculates the proportional token size for the pan.
+  /// Scaled to approximately 3.5x for 1-2 items, gracefully adapting for 3..6 items
+  /// to occupy the maximum available cooking basin naturally without clipping.
+  static double getTokenSize(
+    double rx, {
+    bool isCompact = false,
+    bool isExpanded = false,
+    int count = 1,
+  }) {
+    double scale;
+    if (count <= 1) {
+      scale = isExpanded ? 1.55 : (isCompact ? 1.25 : 1.45);
+    } else if (count == 2) {
+      scale = isExpanded ? 1.30 : (isCompact ? 1.05 : 1.20);
+    } else if (count == 3) {
+      scale = isExpanded ? 1.10 : (isCompact ? 0.90 : 1.02);
+    } else if (count == 4) {
+      scale = isExpanded ? 0.98 : (isCompact ? 0.80 : 0.92);
+    } else if (count == 5) {
+      scale = isExpanded ? 0.88 : (isCompact ? 0.72 : 0.82);
     } else {
-      return (rx * 0.40).clamp(18.0, 23.0);
+      scale = isExpanded ? 0.80 : (isCompact ? 0.65 : 0.75);
+    }
+
+    final double base = rx * scale;
+    if (isCompact) {
+      return base.clamp(28.0, 52.0);
+    } else if (isExpanded) {
+      return base.clamp(38.0, 84.0);
+    } else {
+      return base.clamp(32.0, 74.0);
     }
   }
 
@@ -295,6 +318,7 @@ class CookingPanVisualState extends State<CookingPanVisual>
           rx,
           isCompact: widget.isCompact,
           isExpanded: widget.isExpanded,
+          count: count,
         );
 
         return RepaintBoundary(
@@ -367,11 +391,9 @@ class CookingPanVisualState extends State<CookingPanVisual>
                         top: panCenterY - ry,
                         width: rx * 2,
                         height: ry * 2,
-                        child: ClipOval(
-                          child: Opacity(
-                            opacity: widget.contentOpacity.clamp(0.0, 1.0),
-                            child: _buildIngredientsCluster(allItems, rx, ry, tokenSize),
-                          ),
+                        child: Opacity(
+                          opacity: widget.contentOpacity.clamp(0.0, 1.0),
+                          child: _buildIngredientsCluster(allItems, rx, ry, tokenSize),
                         ),
                       ),
 
@@ -597,7 +619,7 @@ class CookingPanVisualState extends State<CookingPanVisual>
     required double ry,
     required double tokenSize,
   }) {
-    final double badgeSize = (tokenSize * 0.84).clamp(16.0, 22.0);
+    final double badgeSize = (tokenSize * 0.74).clamp(24.0, 36.0);
 
     return AnimatedPositioned(
       key: const ValueKey('pan_overflow_badge'),
