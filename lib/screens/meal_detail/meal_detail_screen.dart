@@ -2,12 +2,10 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
-import '../../core/transitions/hero_transition_route.dart';
 import '../../models/nutrition_data.dart';
 import '../../services/auth/auth_service.dart';
 import '../../services/meals/meal_tracking_service.dart';
 import '../../services/meals/models/meal_models.dart';
-import '../ai_assistant/ai_assistant_screen.dart';
 import '../ai_assistant/services/ai_assistant_service.dart';
 import '../fridge/models/category_item.dart';
 import '../fridge/services/cooking_basket_service.dart';
@@ -202,76 +200,6 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
     }
   }
 
-  /// Opens the AI Assistant passing a complete structured meal context
-  void _handleCookWithAi(BuildContext context, MealDetailInfo meal) {
-    final availableFridgeMap = <String, String>{};
-    final detailedIngredients = <Map<String, dynamic>>[];
-    for (final ing in meal.ingredients) {
-      final isAvail = ing.availability == IngredientAvailability.available;
-      if (isAvail && ing.availableQuantityInFridge != null) {
-        availableFridgeMap[ing.name] = ing.availableQuantityInFridge!;
-      }
-      detailedIngredients.add({
-        'name': ing.name,
-        'requiredQuantity': ing.requiredQuantity,
-        'requiredUnit': ing.requiredUnit,
-        'recipeQuantityText': ing.recipeQuantityText,
-        'availableQuantityInFridge': ing.availableQuantityInFridge,
-        'availability': isAvail ? 'available' : 'missing',
-        'statusLabel': ing.statusLabel,
-      });
-    }
-
-    final missingIngList = meal.ingredients
-        .where((i) => i.availability == IngredientAvailability.missing)
-        .map((i) => i.name)
-        .toList();
-
-    final nutritionSummary = (meal.calories != null)
-        ? '${meal.calories} kcal, ${meal.proteinGrams ?? "--"}g protein, ${meal.carbsGrams ?? "--"}g carbs, ${meal.fatGrams ?? "--"}g fat'
-        : 'Nutrition unavailable';
-
-    final detailedSteps = meal.preparationSteps.map((s) => s.toJson()).toList();
-    final stepInstructions = meal.preparationSteps.map((s) => s.instruction).toList();
-
-    final mealContext = MealAiContext(
-      mealId: widget.recommendation.id.isNotEmpty
-          ? widget.recommendation.id
-          : 'meal_${meal.name.toLowerCase().replaceAll(RegExp(r'\s+'), '_')}',
-      mealTitle: meal.name,
-      mealDescription: widget.recommendation.explanation ?? 'Recipe recommendation based on available ingredients.',
-      mealType: meal.tag,
-      nutritionSummary: nutritionSummary,
-      servingSize: meal.servingSize,
-      prepTimeMinutes: meal.prepTimeMinutes,
-      cookingTimeMinutes: meal.cookingTimeMinutes,
-      calories: meal.calories,
-      proteinGrams: meal.proteinGrams,
-      carbsGrams: meal.carbsGrams,
-      fatGrams: meal.fatGrams,
-      requiredIngredients: meal.ingredients.map((i) => '${i.name} (${i.recipeQuantityText})').toList(),
-      availableFridgeQuantities: availableFridgeMap,
-      missingIngredients: missingIngList,
-      preparationSteps: stepInstructions,
-      detailedSteps: detailedSteps,
-      detailedIngredients: detailedIngredients,
-      cookingTips: meal.cookingTips,
-      substitutions: meal.substitutions,
-      recommendationReasons: meal.whyReasons,
-    );
-
-    final prompt =
-        'I want to cook ${meal.name}. Please give me the complete recipe with ingredients from my fridge and step-by-step cooking instructions.';
-
-    Navigator.of(context).push(
-      HeroTransitionRoute(
-        page: AiAssistantScreen(
-          initialPrompt: prompt,
-          mealContext: mealContext,
-        ),
-      ),
-    );
-  }
 
   void _launchVideoSearch(MealDetailInfo meal) async {
     final query = Uri.encodeComponent(meal.videoSearchQuery ?? '${meal.name} recipe');
@@ -1549,62 +1477,31 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
   Widget _buildActionButtons(BuildContext context, MealDetailInfo meal) {
     return SafeArea(
       top: false,
-      child: Row(
-        children: [
-          // Left Action: Cook with AI
-          Expanded(
-            child: SizedBox(
-              height: 50,
-              child: ElevatedButton(
-                onPressed: () => _handleCookWithAi(context, meal),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.vibrantLime,
-                  foregroundColor: AppColors.primaryForest,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                ),
-                child: const Text(
-                  'Cook with AI',
-                  style: TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.2,
-                  ),
-                ),
+      child: Center(
+        child: SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton(
+            onPressed: _isLogging ? null : () => _handleLogMeal(meal),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryForest,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: AppColors.primaryForest.withValues(alpha: 0.6),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(26),
+              ),
+            ),
+            child: Text(
+              _isLogging ? 'Logging...' : 'Log Meal',
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.2,
               ),
             ),
           ),
-          const SizedBox(width: 12),
-
-          // Right Action: Log Meal
-          Expanded(
-            child: SizedBox(
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _isLogging ? null : () => _handleLogMeal(meal),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryForest,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: AppColors.primaryForest.withValues(alpha: 0.6),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                ),
-                child: Text(
-                  _isLogging ? 'Logging...' : 'Log Meal',
-                  style: const TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
