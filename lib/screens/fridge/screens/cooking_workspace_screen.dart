@@ -487,9 +487,9 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen>
                               borderRadius: BorderRadius.circular(16),
                             ),
                           ),
-                          child: Text(
-                            count > 0 ? 'Generate My Meal · $count' : 'Generate My Meal',
-                            style: const TextStyle(
+                          child: const Text(
+                            'Generate My Meal',
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 0.1,

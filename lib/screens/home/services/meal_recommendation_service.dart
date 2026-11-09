@@ -17,6 +17,13 @@ enum MealDiscoveryMode {
   useMyIngredients, // User selected Use My Ingredients: uses only user-selected ingredients
 }
 
+/// Explicit origin tracking for recommendations
+enum RecipeOrigin {
+  none,
+  aiSuggestion,
+  customIngredients,
+}
+
 /// Supported meal time slots for dynamic recommendations.
 enum MealTimeSlot {
   breakfast,
@@ -115,14 +122,37 @@ class MealRecommendationService {
   static final ValueNotifier<MealDiscoveryMode> discoveryModeNotifier =
       ValueNotifier<MealDiscoveryMode>(MealDiscoveryMode.none);
 
+  static final ValueNotifier<RecipeOrigin> recipeOriginNotifier =
+      ValueNotifier<RecipeOrigin>(RecipeOrigin.none);
+
   static MealDiscoveryMode _discoveryMode = MealDiscoveryMode.none;
   static MealDiscoveryMode get discoveryMode => _discoveryMode;
+
+  static RecipeOrigin _recipeOrigin = RecipeOrigin.none;
+  static RecipeOrigin get recipeOrigin => _recipeOrigin;
+
+  static RecipeRecommendation? _pendingCustomRecipe;
+  static RecipeRecommendation? get pendingCustomRecipe => _pendingCustomRecipe;
+
+  /// Clears the pending custom recipe and resets recipe origin if custom
+  static void clearCustomRecipe() {
+    _pendingCustomRecipe = null;
+    if (_recipeOrigin == RecipeOrigin.customIngredients) {
+      _recipeOrigin = RecipeOrigin.none;
+      recipeOriginNotifier.value = RecipeOrigin.none;
+      _currentRecommendation = null;
+      recommendationNotifier.value = null;
+    }
+  }
 
   static void selectDiscoveryMode(MealDiscoveryMode mode, {bool fetch = true}) {
     _discoveryMode = mode;
     discoveryModeNotifier.value = mode;
     if (mode == MealDiscoveryMode.none) {
       _currentRecommendation = null;
+      _pendingCustomRecipe = null;
+      _recipeOrigin = RecipeOrigin.none;
+      recipeOriginNotifier.value = RecipeOrigin.none;
       _currentStatus = RecommendationStatus.empty;
       _errorMessage = null;
       _alternativeMessage = null;
@@ -131,8 +161,22 @@ class MealRecommendationService {
       recommendationNotifier.value = null;
       statusNotifier.value = RecommendationStatus.empty;
       MockDataRepository.setRecommendationForTesting(null);
-    } else if (mode == MealDiscoveryMode.aiSuggestion && fetch) {
-      fetchRecommendation(forceRefresh: true);
+    } else if (mode == MealDiscoveryMode.aiSuggestion) {
+      _recipeOrigin = RecipeOrigin.aiSuggestion;
+      recipeOriginNotifier.value = RecipeOrigin.aiSuggestion;
+      _pendingCustomRecipe = null;
+      if (fetch) {
+        fetchRecommendation(forceRefresh: true);
+      }
+    } else if (mode == MealDiscoveryMode.useMyIngredients) {
+      _recipeOrigin = RecipeOrigin.customIngredients;
+      recipeOriginNotifier.value = RecipeOrigin.customIngredients;
+      if (_pendingCustomRecipe != null) {
+        _currentRecommendation = _pendingCustomRecipe;
+        _currentStatus = RecommendationStatus.loaded;
+        recommendationNotifier.value = _pendingCustomRecipe;
+        statusNotifier.value = RecommendationStatus.loaded;
+      }
     }
   }
 
@@ -223,6 +267,9 @@ class MealRecommendationService {
   static void _wireRepositories() {
     MockDataRepository.recommendationProvider = () {
       if (_discoveryMode == MealDiscoveryMode.none) return null;
+      if (_recipeOrigin == RecipeOrigin.customIngredients && _pendingCustomRecipe != null) {
+        return _pendingCustomRecipe;
+      }
       if (_currentRecommendation != null) return _currentRecommendation;
       if (_currentStatus == RecommendationStatus.loading ||
           _currentStatus == RecommendationStatus.error ||
@@ -240,21 +287,25 @@ class MealRecommendationService {
 
   static void _onInventoryChanged() {
     if (FridgeCategoryRepository.totalFridgeItems == 0) {
-      _currentRecommendation = null;
-      _currentStatus = RecommendationStatus.empty;
-      _cachedInventoryFingerprint = null;
-      _alternativeMessage = null;
-      statusNotifier.value = RecommendationStatus.empty;
-      recommendationNotifier.value = null;
+      if (_recipeOrigin != RecipeOrigin.customIngredients) {
+        _currentRecommendation = null;
+        _currentStatus = RecommendationStatus.empty;
+        _cachedInventoryFingerprint = null;
+        _alternativeMessage = null;
+        statusNotifier.value = RecommendationStatus.empty;
+        recommendationNotifier.value = null;
+      }
       return;
     }
 
     final newFingerprint = _generateInventoryFingerprint();
     if (newFingerprint != _cachedInventoryFingerprint) {
-      // Invalidate cache and re-fetch recommendation if a mode is active
+      // Invalidate cache and re-fetch recommendation ONLY if AI suggestion mode is active.
+      // Custom generated meals must NEVER be replaced by inventory change triggers.
       _cachedInventoryFingerprint = null;
       _alternativeMessage = null;
-      if (_discoveryMode != MealDiscoveryMode.none) {
+      if (_discoveryMode == MealDiscoveryMode.aiSuggestion &&
+          _recipeOrigin == RecipeOrigin.aiSuggestion) {
         fetchRecommendation(forceRefresh: true);
       }
     }
@@ -278,16 +329,18 @@ class MealRecommendationService {
       _lastLoggedMealsCount = currentHistory.length;
       _lastCompletedSlots = Set.from(currentCompleted);
 
-      // Invalidate previous recommendation and slot cache
-      _currentRecommendation = null;
-      _cachedSlot = null;
-      _rejectedRecipeIds.clear();
-      _alternativeMessage = null;
-      recommendationNotifier.value = null;
+      // Invalidate previous recommendation and slot cache for AI suggestion
+      if (_recipeOrigin != RecipeOrigin.customIngredients) {
+        _currentRecommendation = null;
+        _cachedSlot = null;
+        _rejectedRecipeIds.clear();
+        _alternativeMessage = null;
+        recommendationNotifier.value = null;
 
-      // Automatically advance to the next unlogged upcoming slot if a mode is active
-      if (_discoveryMode != MealDiscoveryMode.none) {
-        fetchRecommendation(forceRefresh: true);
+        // Automatically advance to the next unlogged upcoming slot if AI Suggestion mode is active
+        if (_discoveryMode == MealDiscoveryMode.aiSuggestion) {
+          fetchRecommendation(forceRefresh: true);
+        }
       }
       return;
     }
@@ -296,7 +349,8 @@ class MealRecommendationService {
       _cachedProfileFingerprint = null;
       _rejectedRecipeIds.clear();
       _alternativeMessage = null;
-      if (_discoveryMode != MealDiscoveryMode.none) {
+      if (_discoveryMode == MealDiscoveryMode.aiSuggestion &&
+          _recipeOrigin == RecipeOrigin.aiSuggestion) {
         fetchRecommendation(forceRefresh: true);
       }
     }
@@ -925,6 +979,14 @@ class MealRecommendationService {
     if (loggedSlot != null) {
       _sessionCompletedSlots.add(loggedSlot);
     }
+
+    // If logged meal was from custom ingredients, clean up custom state and return to clean chooser
+    if (_recipeOrigin == RecipeOrigin.customIngredients) {
+      clearCustomRecipe();
+      selectDiscoveryMode(MealDiscoveryMode.none, fetch: false);
+      return null;
+    }
+
     _currentRecommendation = null;
     _cachedSlot = null;
     _cachedInventoryFingerprint = null;
@@ -971,6 +1033,9 @@ class MealRecommendationService {
         context: context,
       );
 
+      _recipeOrigin = RecipeOrigin.customIngredients;
+      recipeOriginNotifier.value = RecipeOrigin.customIngredients;
+      _pendingCustomRecipe = rec;
       _discoveryMode = MealDiscoveryMode.useMyIngredients;
       discoveryModeNotifier.value = MealDiscoveryMode.useMyIngredients;
       _currentRecommendation = rec;
@@ -1080,6 +1145,9 @@ class MealRecommendationService {
         context: context,
       );
 
+      _recipeOrigin = RecipeOrigin.customIngredients;
+      recipeOriginNotifier.value = RecipeOrigin.customIngredients;
+      _pendingCustomRecipe = rec;
       _discoveryMode = MealDiscoveryMode.useMyIngredients;
       discoveryModeNotifier.value = MealDiscoveryMode.useMyIngredients;
       _currentRecommendation = rec;
@@ -1180,6 +1248,9 @@ class MealRecommendationService {
   /// Resets recommendation engine back to initial state (for tests)
   static void reset() {
     _currentRecommendation = null;
+    _pendingCustomRecipe = null;
+    _recipeOrigin = RecipeOrigin.none;
+    recipeOriginNotifier.value = RecipeOrigin.none;
     _discoveryMode = MealDiscoveryMode.none;
     discoveryModeNotifier.value = MealDiscoveryMode.none;
     CookingBasketService.clear();

@@ -617,4 +617,153 @@ void main() {
       expect(fridgeWidget.isFreezerOpen, isTrue);
     });
   });
+
+  group('PHASE 6 — Use My Ingredients Navigation & State Fixes', () {
+    testWidgets('Dashboard retains dual-mode chooser when returning from ingredient selection without generating', (tester) async {
+      final item = CategoryFoodItem(
+        id: 'item-egg-1',
+        name: 'Eggs',
+        quantity: '4 pcs',
+        category: 'Dairy & Eggs',
+      );
+      // Simulate selecting an item into basket
+      CookingBasketService.toggleItem(item);
+      expect(CookingBasketService.count, equals(1));
+
+      // In initial state without generating, mode is none
+      expect(MealRecommendationService.discoveryMode, equals(MealDiscoveryMode.none));
+      expect(MealRecommendationService.pendingCustomRecipe, isNull);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: RecommendationCard(
+              discoveryMode: MealRecommendationService.discoveryMode,
+              recipeOrigin: MealRecommendationService.recipeOrigin,
+              recommendation: null,
+            ),
+          ),
+        ),
+      );
+
+      // Verify two-option chooser is rendered cleanly without flash or stale recommendation
+      expect(find.text('Suggested for you'), findsOneWidget);
+      expect(find.text('AI Suggestion'), findsOneWidget);
+      expect(find.text('Use My Ingredients'), findsOneWidget);
+      // Cooking basket is preserved
+      expect(CookingBasketService.count, equals(1));
+    });
+
+    testWidgets('Custom recipe displays on dashboard with custom labeling and controls when not logged', (tester) async {
+      final customRec = RecipeRecommendation(
+        id: 'rec_custom_test_1',
+        title: 'Spinach & Herb Omelette',
+        mealType: 'Breakfast',
+        explanation: 'Crafted from your selected ingredients.',
+        calories: 380,
+        proteinGrams: 24,
+        carbsGrams: 10,
+        fatGrams: 18,
+        prepTimeMinutes: 10,
+        cookingTimeMinutes: 12,
+        servingSize: '1 serving',
+        fridgeItemsUsed: 2,
+        imageUrl: 'assets/images/paneer_rice_bowl.jpg',
+        requiredIngredients: ['Eggs (2)', 'Spinach (50g)'],
+        missingIngredients: const [],
+        preparationSteps: const [],
+      );
+
+      // Set custom meal state as returned from AI generation
+      MealRecommendationService.selectDiscoveryMode(MealDiscoveryMode.useMyIngredients, fetch: false);
+      // Custom origin is active
+      expect(MealRecommendationService.recipeOrigin, equals(RecipeOrigin.customIngredients));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: RecommendationCard(
+              discoveryMode: MealDiscoveryMode.useMyIngredients,
+              recipeOrigin: RecipeOrigin.customIngredients,
+              recommendation: customRec,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Heading shows "Your Custom Meal"
+      expect(find.text('Your Custom Meal'), findsOneWidget);
+      // Title of the custom recipe
+      expect(find.text('Spinach & Herb Omelette'), findsOneWidget);
+      // Badge displays "YOUR INGREDIENTS"
+      expect(find.text('YOUR INGREDIENTS'), findsOneWidget);
+      // Custom action label
+      expect(find.text('Generated from your ingredients'), findsOneWidget);
+      expect(find.text('Tap to view recipe'), findsOneWidget);
+      // "Change suggestion" (AI Suggestion button) must NOT be present
+      expect(find.byKey(const ValueKey('change_suggestion_button')), findsNothing);
+    });
+
+    test('Custom-generated recipe is NOT overwritten by inventory fingerprint changes', () {
+      final customRec = RecipeRecommendation(
+        id: 'rec_custom_persist',
+        title: 'Custom Stir Fry',
+        mealType: 'Dinner',
+        explanation: 'Custom recipe',
+        calories: 400,
+        proteinGrams: 20,
+        carbsGrams: 30,
+        fatGrams: 12,
+        prepTimeMinutes: 15,
+        cookingTimeMinutes: 15,
+        servingSize: '1 serving',
+        fridgeItemsUsed: 2,
+        imageUrl: 'assets/images/paneer_rice_bowl.jpg',
+        requiredIngredients: ['Tofu'],
+        missingIngredients: const [],
+        preparationSteps: const [],
+      );
+
+      MealRecommendationService.selectDiscoveryMode(MealDiscoveryMode.useMyIngredients, fetch: false);
+      expect(MealRecommendationService.recipeOrigin, equals(RecipeOrigin.customIngredients));
+
+      // Simulate inventory change callback
+      FridgeCategoryRepository.deductItemQuantityByName(
+        name: 'Eggs',
+        quantity: 1,
+        unit: 'pcs',
+      );
+
+      // Custom recipe origin and mode remain intact
+      expect(MealRecommendationService.recipeOrigin, equals(RecipeOrigin.customIngredients));
+      expect(MealRecommendationService.discoveryMode, equals(MealDiscoveryMode.useMyIngredients));
+    });
+
+    test('advanceAfterMealLogged for custom recipe cleans up and resets to mode none without AI fetch', () async {
+      final item = CategoryFoodItem(
+        id: 'item-egg-log',
+        name: 'Eggs',
+        quantity: '2 pcs',
+        category: 'Dairy & Eggs',
+      );
+      CookingBasketService.toggleItem(item);
+      expect(CookingBasketService.count, equals(1));
+
+      MealRecommendationService.selectDiscoveryMode(MealDiscoveryMode.useMyIngredients, fetch: false);
+      expect(MealRecommendationService.recipeOrigin, equals(RecipeOrigin.customIngredients));
+
+      // Log meal advancement
+      final result = await MealRecommendationService.advanceAfterMealLogged(
+        loggedSlot: MealTimeSlot.lunch,
+      );
+
+      // Returns null (no AI recommendation fetched)
+      expect(result, isNull);
+      // Origin and mode cleanly reset to none
+      expect(MealRecommendationService.recipeOrigin, equals(RecipeOrigin.none));
+      expect(MealRecommendationService.discoveryMode, equals(MealDiscoveryMode.none));
+      expect(MealRecommendationService.pendingCustomRecipe, isNull);
+    });
+  });
 }

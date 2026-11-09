@@ -10,6 +10,7 @@ import '../../services/meals/models/meal_models.dart';
 import '../ai_assistant/ai_assistant_screen.dart';
 import '../ai_assistant/services/ai_assistant_service.dart';
 import '../fridge/models/category_item.dart';
+import '../fridge/services/cooking_basket_service.dart';
 import '../home/services/meal_recommendation_service.dart';
 import 'models/meal_ai_context.dart';
 import 'models/meal_detail_data.dart';
@@ -116,12 +117,23 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
         }
       }
 
-      // 4. Invalidate recommendation and advance to next unlogged slot (only for new non-duplicate meals)
+      // 4. Invalidate recommendation / reset workspace based on origin
       final isDuplicate = result?.alreadyProcessed == true;
-      if (!isDuplicate) {
-        MealRecommendationService.advanceAfterMealLogged(
-          loggedSlot: MealRecommendationService.parseMealSlot(meal.tag),
-        );
+      final isCustomMeal = MealRecommendationService.recipeOrigin == RecipeOrigin.customIngredients ||
+          CookingBasketService.count > 0 ||
+          MealRecommendationService.pendingCustomRecipe != null;
+
+      if (isCustomMeal) {
+        // Reset cooking workspace only after successful meal logging
+        CookingBasketService.clear();
+        MealRecommendationService.clearCustomRecipe();
+        MealRecommendationService.selectDiscoveryMode(MealDiscoveryMode.none, fetch: false);
+      } else {
+        if (!isDuplicate) {
+          MealRecommendationService.advanceAfterMealLogged(
+            loggedSlot: MealRecommendationService.parseMealSlot(meal.tag),
+          );
+        }
       }
 
       // Clear idempotency key on successful confirmation
@@ -154,8 +166,8 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
         ),
       );
 
-      // 6. Navigate back
-      Navigator.of(context).pop();
+      // 6. Navigate back to dashboard
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (!mounted) return;
       setState(() {

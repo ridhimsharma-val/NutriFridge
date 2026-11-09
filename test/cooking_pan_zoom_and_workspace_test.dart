@@ -333,8 +333,10 @@ void main() {
       await tester.pump();
 
       final buttonWithCountFinder =
-          find.widgetWithText(ElevatedButton, 'Generate My Meal · 1');
+          find.widgetWithText(ElevatedButton, 'Generate My Meal');
       expect(buttonWithCountFinder, findsOneWidget);
+      // Verify count is retained in header badge instead of button
+      expect(find.text('1 in pan'), findsOneWidget);
       btn = tester.widget(buttonWithCountFinder);
       expect(btn.onPressed, isNotNull);
     });

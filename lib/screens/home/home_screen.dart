@@ -119,15 +119,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _handleOpenUseMyIngredients() async {
-    MealRecommendationService.selectDiscoveryMode(
-      MealDiscoveryMode.useMyIngredients,
-      fetch: false,
-    );
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const FridgePage(isSelectionMode: true),
       ),
     );
+    // When returning from ingredient selection without generating,
+    // ensure the dashboard retains the clean two-option selection state.
+    if (MealRecommendationService.pendingCustomRecipe == null) {
+      MealRecommendationService.selectDiscoveryMode(
+        MealDiscoveryMode.none,
+        fetch: false,
+      );
+    }
   }
 
   @override
@@ -141,6 +145,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         MealRecommendationService.recommendationNotifier,
         MealRecommendationService.isChangingSuggestionNotifier,
         MealRecommendationService.discoveryModeNotifier,
+        MealRecommendationService.recipeOriginNotifier,
       ]),
       builder: (context, _) {
         final recommendation = MockDataRepository.recommendation;
@@ -182,6 +187,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     isChangingSuggestion: isChanging,
                     alternativeMessage: alternativeMessage,
                     discoveryMode: MealRecommendationService.discoveryMode,
+                    recipeOrigin: MealRecommendationService.recipeOrigin,
                     onSelectAiSuggestion: () {
                       MealRecommendationService.selectDiscoveryMode(
                         MealDiscoveryMode.aiSuggestion,

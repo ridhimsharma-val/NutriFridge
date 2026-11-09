@@ -17,6 +17,7 @@ class RecommendationCard extends StatelessWidget {
   final bool? isChangingSuggestion;
   final String? alternativeMessage;
   final MealDiscoveryMode? discoveryMode;
+  final RecipeOrigin? recipeOrigin;
   final VoidCallback? onSelectAiSuggestion;
   final VoidCallback? onSelectUseMyIngredients;
   final VoidCallback? onSwitchMode;
@@ -34,6 +35,7 @@ class RecommendationCard extends StatelessWidget {
     this.isChangingSuggestion,
     this.alternativeMessage,
     this.discoveryMode,
+    this.recipeOrigin,
     this.onSelectAiSuggestion,
     this.onSelectUseMyIngredients,
     this.onSwitchMode,
@@ -47,6 +49,8 @@ class RecommendationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final rec = recommendation;
     final mode = discoveryMode ?? MealRecommendationService.discoveryMode;
+    final origin = recipeOrigin ?? MealRecommendationService.recipeOrigin;
+    final isCustom = origin == RecipeOrigin.customIngredients || mode == MealDiscoveryMode.useMyIngredients;
     final effectiveStatus = status ??
         (rec != null
             ? RecommendationStatus.loaded
@@ -54,7 +58,7 @@ class RecommendationCard extends StatelessWidget {
                 ? RecommendationStatus.empty
                 : RecommendationStatus.loading));
 
-    final bool showDualMode = mode == MealDiscoveryMode.none && rec == null;
+    final bool showDualMode = mode == MealDiscoveryMode.none;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -67,7 +71,7 @@ class RecommendationCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Suggested for you',
+                  isCustom && rec != null ? 'Your Custom Meal' : 'Suggested for you',
                   style: AppTypography.sectionTitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -112,7 +116,7 @@ class RecommendationCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
           child: showDualMode
               ? _buildDualModeChoices(context)
-              : _buildStateBody(context, effectiveStatus, rec, mode),
+              : _buildStateBody(context, effectiveStatus, rec, mode, isCustom),
         ),
       ],
     );
@@ -265,6 +269,7 @@ class RecommendationCard extends StatelessWidget {
     RecommendationStatus status,
     RecipeRecommendation? rec,
     MealDiscoveryMode mode,
+    bool isCustom,
   ) {
     switch (status) {
       case RecommendationStatus.empty:
@@ -277,7 +282,7 @@ class RecommendationCard extends StatelessWidget {
         return _buildNoMatchState(context);
       case RecommendationStatus.loaded:
         if (rec != null) {
-          return _buildCardContent(rec, mode);
+          return _buildCardContent(rec, mode, isCustom);
         }
         return _buildEmptyState(context);
     }
@@ -581,6 +586,7 @@ class RecommendationCard extends StatelessWidget {
   Widget _buildCardContent(
     RecipeRecommendation recommendation, [
     MealDiscoveryMode mode = MealDiscoveryMode.none,
+    bool isCustom = false,
   ]) {
     return InkWell(
       onTap: onTap,
@@ -688,7 +694,7 @@ class RecommendationCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      if (mode == MealDiscoveryMode.useMyIngredients) ...[
+                      if (mode == MealDiscoveryMode.useMyIngredients || isCustom) ...[
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -891,73 +897,110 @@ class RecommendationCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  // "Change suggestion" secondary text action
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      InkWell(
-                        key: const ValueKey('change_suggestion_button'),
-                        onTap: (isChangingSuggestion ?? MealRecommendationService.isChangingSuggestion)
-                            ? null
-                            : (onChangeSuggestion ?? () => MealRecommendationService.changeSuggestion()),
-                        borderRadius: BorderRadius.circular(6),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4.0),
-                          child: (isChangingSuggestion ?? MealRecommendationService.isChangingSuggestion)
-                              ? Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const SizedBox(
-                                      width: 12,
-                                      height: 12,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 1.8,
-                                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.freshGreen),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 7),
-                                    Text(
-                                      'Finding alternative...',
-                                      style: AppTypography.subtitle.copyWith(
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : const Text(
-                                  'Change suggestion',
-                                  style: TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.freshGreen,
-                                    decoration: TextDecoration.underline,
-                                    decorationColor: AppColors.freshGreen,
-                                  ),
-                                ),
-                        ),
-                      ),
-                      if ((alternativeMessage ?? MealRecommendationService.alternativeMessage) != null &&
-                          (alternativeMessage ?? MealRecommendationService.alternativeMessage)!.isNotEmpty)
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: 8.0),
-                            child: Text(
-                              (alternativeMessage ?? MealRecommendationService.alternativeMessage)!,
-                              style: const TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.textSecondary,
-                              ),
-                              textAlign: TextAlign.end,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                  if (isCustom)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.soup_kitchen_rounded,
+                              size: 14,
+                              color: Color(0xFFC85A32),
                             ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Generated from your ingredients',
+                              style: AppTypography.subtitle.copyWith(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFFC85A32),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Text(
+                          'Tap to view recipe',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.forestGreen,
+                            decoration: TextDecoration.underline,
+                            decorationColor: AppColors.forestGreen,
                           ),
                         ),
-                    ],
-                  ),
+                      ],
+                    )
+                  else ...[
+                    // "Change suggestion" secondary text action
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        InkWell(
+                          key: const ValueKey('change_suggestion_button'),
+                          onTap: (isChangingSuggestion ?? MealRecommendationService.isChangingSuggestion)
+                              ? null
+                              : (onChangeSuggestion ?? () => MealRecommendationService.changeSuggestion()),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4.0),
+                            child: (isChangingSuggestion ?? MealRecommendationService.isChangingSuggestion)
+                                ? Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const SizedBox(
+                                        width: 12,
+                                        height: 12,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 1.8,
+                                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.freshGreen),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 7),
+                                      Text(
+                                        'Finding alternative...',
+                                        style: AppTypography.subtitle.copyWith(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : const Text(
+                                    'Change suggestion',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.freshGreen,
+                                      decoration: TextDecoration.underline,
+                                      decorationColor: AppColors.freshGreen,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        if ((alternativeMessage ?? MealRecommendationService.alternativeMessage) != null &&
+                            (alternativeMessage ?? MealRecommendationService.alternativeMessage)!.isNotEmpty)
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 8.0),
+                              child: Text(
+                                (alternativeMessage ?? MealRecommendationService.alternativeMessage)!,
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textSecondary,
+                                ),
+                                textAlign: TextAlign.end,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
