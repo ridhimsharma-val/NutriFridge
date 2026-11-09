@@ -748,8 +748,14 @@ class MealDetailInfo {
     );
 
     // 5. Resolve Preparation Steps
-    // Priority: AI-generated steps from recommendation -> catalog spec -> empty list
+    // Priority: AI-generated steps from recommendation -> shared saved steps -> catalog spec -> empty list
     List<RecipePreparationStep> prepSteps = rec.preparationSteps;
+    if (prepSteps.isEmpty) {
+      final saved = MealRecommendationService.getSavedPreparationSteps(rec);
+      if (saved != null && saved.isNotEmpty) {
+        prepSteps = saved;
+      }
+    }
     if (prepSteps.isEmpty && spec != null && spec.steps.isNotEmpty) {
       prepSteps = spec.steps;
     }

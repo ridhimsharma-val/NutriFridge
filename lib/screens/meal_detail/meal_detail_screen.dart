@@ -8,6 +8,7 @@ import '../../services/auth/auth_service.dart';
 import '../../services/meals/meal_tracking_service.dart';
 import '../../services/meals/models/meal_models.dart';
 import '../ai_assistant/ai_assistant_screen.dart';
+import '../ai_assistant/services/ai_assistant_service.dart';
 import '../fridge/models/category_item.dart';
 import '../fridge/services/cooking_basket_service.dart';
 import '../home/services/meal_recommendation_service.dart';
@@ -36,6 +37,8 @@ class MealDetailScreen extends StatefulWidget {
 
 class _MealDetailScreenState extends State<MealDetailScreen> {
   bool _isLogging = false;
+  bool _isLoadingSteps = false;
+  String? _stepsError;
 
   String get _heroTag =>
       widget.heroTag ??
@@ -136,12 +139,13 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
       if (isCustomMeal) {
         // Reset cooking workspace only after successful meal logging
         CookingBasketService.clear();
-        MealRecommendationService.clearCustomRecipe();
+        MealRecommendationService.clearCustomRecipe(loggedRecipe: widget.recommendation);
         MealRecommendationService.selectDiscoveryMode(MealDiscoveryMode.none, fetch: false);
       } else {
         if (!isDuplicate) {
           MealRecommendationService.advanceAfterMealLogged(
             loggedSlot: MealRecommendationService.parseMealSlot(cleanMealType),
+            loggedRecipe: widget.recommendation,
           );
         }
       }
@@ -342,11 +346,10 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
                       // 3. Ingredients Section
                       _buildIngredientsSection(meal),
 
-                      if (meal.preparationSteps.isNotEmpty) ...[
-                        const SizedBox(height: 22),
-                        // 4. Recipe-Specific Preparation Instructions
-                        _buildPreparationSection(meal),
-                      ],
+                      const SizedBox(height: 22),
+
+                      // 4. Recipe-Specific Preparation Instructions
+                      _buildPreparationSection(meal),
 
                       const SizedBox(height: 24),
 
@@ -976,11 +979,160 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
   // ==========================================
   // 4. RECIPE-SPECIFIC PREPARATION SECTION
   // ==========================================
+  Future<void> _fetchPreparationSteps(MealDetailInfo meal) async {
+    if (_isLoadingSteps) return;
+    setState(() {
+      _isLoadingSteps = true;
+      _stepsError = null;
+    });
+
+    try {
+      final availableFridgeMap = <String, String>{};
+      for (final ing in meal.ingredients) {
+        if (ing.availability == IngredientAvailability.available && ing.availableQuantityInFridge != null) {
+          availableFridgeMap[ing.name] = ing.availableQuantityInFridge!;
+        }
+      }
+
+      final missingIngList = meal.ingredients
+          .where((i) => i.availability == IngredientAvailability.missing)
+          .map((i) => i.name)
+          .toList();
+
+      final nutritionSummary = (meal.calories != null)
+          ? '${meal.calories} kcal, ${meal.proteinGrams ?? "--"}g protein, ${meal.carbsGrams ?? "--"}g carbs, ${meal.fatGrams ?? "--"}g fat'
+          : 'Nutrition unavailable';
+
+      final detailedSteps = meal.preparationSteps.map((s) => s.toJson()).toList();
+      final stepInstructions = meal.preparationSteps.map((s) => s.instruction).toList();
+
+      final detailedIngredients = <Map<String, dynamic>>[];
+      for (final ing in meal.ingredients) {
+        detailedIngredients.add({
+          'name': ing.name,
+          'requiredQuantity': ing.requiredQuantity,
+          'requiredUnit': ing.requiredUnit,
+          'availableQuantityInFridge': ing.availableQuantityInFridge,
+          'availability': ing.availability.name,
+          'recipeQuantityText': ing.recipeQuantityText,
+        });
+      }
+
+      final mealContext = MealAiContext(
+        mealId: widget.recommendation.id.isNotEmpty
+            ? widget.recommendation.id
+            : 'meal_${meal.name.toLowerCase().replaceAll(RegExp(r'\s+'), '_')}',
+        mealTitle: meal.name,
+        mealDescription: widget.recommendation.explanation ?? 'Recipe recommendation based on available ingredients.',
+        mealType: meal.tag,
+        nutritionSummary: nutritionSummary,
+        servingSize: meal.servingSize,
+        prepTimeMinutes: meal.prepTimeMinutes,
+        cookingTimeMinutes: meal.cookingTimeMinutes,
+        calories: meal.calories,
+        proteinGrams: meal.proteinGrams,
+        carbsGrams: meal.carbsGrams,
+        fatGrams: meal.fatGrams,
+        requiredIngredients: meal.ingredients.map((i) => '${i.name} (${i.recipeQuantityText})').toList(),
+        availableFridgeQuantities: availableFridgeMap,
+        missingIngredients: missingIngList,
+        preparationSteps: stepInstructions,
+        detailedSteps: detailedSteps,
+        detailedIngredients: detailedIngredients,
+        cookingTips: meal.cookingTips,
+        substitutions: meal.substitutions,
+        recommendationReasons: meal.whyReasons,
+      );
+
+      final response = await AiAssistantService.sendRequest(
+        message: 'Give me the complete step-by-step recipe instructions and cooking steps for ${meal.name}.',
+        actionHint: 'assistant',
+        extraPayload: {
+          'mealContext': mealContext.toJson(),
+        },
+      );
+
+      final steps = <RecipePreparationStep>[];
+      if (response['meal'] is Map && response['meal']['preparationSteps'] is List) {
+        final raw = response['meal']['preparationSteps'] as List;
+        for (int i = 0; i < raw.length; i++) {
+          final s = raw[i];
+          if (s is Map) {
+            steps.add(RecipePreparationStep.fromJson(Map<String, dynamic>.from(s), i + 1));
+          } else if (s != null && s.toString().trim().isNotEmpty) {
+            steps.add(RecipePreparationStep(stepNumber: i + 1, instruction: s.toString().trim()));
+          }
+        }
+      }
+
+      if (steps.isEmpty) {
+        final text = (response['assistantMessage'] as String?) ?? '';
+        final parsed = _parseStepsFromAiText(text);
+        if (parsed.isNotEmpty) {
+          steps.addAll(parsed);
+        }
+      }
+
+      if (steps.isEmpty) {
+        throw Exception('Could not extract preparation steps from AI response.');
+      }
+
+      // Persist generated steps to shared pending recipe state
+      MealRecommendationService.savePreparationSteps(
+        recipe: widget.recommendation,
+        steps: steps,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isLoadingSteps = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingSteps = false;
+          _stepsError = 'Unable to generate preparation steps. Tap retry to try again.';
+        });
+      }
+    }
+  }
+
+  static List<RecipePreparationStep> _parseStepsFromAiText(String text) {
+    final List<RecipePreparationStep> result = [];
+    final lines = text.split('\n');
+    final stepRegex = RegExp(
+      r'^\s*(?:\d+[\.\)]|\*\s*\*\*Step\s*\d+:?\*\*|\*\*Step\s*\d+:?\*\*)\s*(.+)$',
+      caseSensitive: false,
+    );
+
+    int currentStep = 1;
+    for (final line in lines) {
+      final match = stepRegex.firstMatch(line);
+      if (match != null) {
+        final instruction = match.group(1)!.trim().replaceAll(RegExp(r'^\*+|\*+$'), '').trim();
+        if (instruction.isNotEmpty) {
+          String? time;
+          final timeMatch = RegExp(
+            r'\(?(\d+(?:-\d+)?\s*(?:min|mins|minutes|sec|secs|seconds|hours?))\)?',
+            caseSensitive: false,
+          ).firstMatch(instruction);
+          if (timeMatch != null) {
+            time = timeMatch.group(1);
+          }
+          result.add(RecipePreparationStep(
+            stepNumber: currentStep++,
+            instruction: instruction,
+            time: time,
+          ));
+        }
+      }
+    }
+    return result;
+  }
+
   Widget _buildPreparationSection(MealDetailInfo meal) {
     final steps = meal.preparationSteps;
-    if (steps.isEmpty) {
-      return const SizedBox.shrink();
-    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -996,152 +1148,288 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
                 color: AppColors.darkText,
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-              decoration: BoxDecoration(
-                color: AppColors.paleMint,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFD4E7D9), width: 0.8),
-              ),
-              child: Text(
-                '${steps.length} ${steps.length == 1 ? "step" : "steps"}',
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primaryForest,
+            if (steps.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: AppColors.paleMint,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFD4E7D9), width: 0.8),
+                ),
+                child: Text(
+                  '${steps.length} ${steps.length == 1 ? "step" : "steps"}',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primaryForest,
+                  ),
                 ),
               ),
-            ),
           ],
         ),
-        const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.pureWhite,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: const Color(0xFFE2EBE5),
-              width: 1.0,
+        const SizedBox(height: 8),
+
+        if (_isLoadingSteps)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            decoration: BoxDecoration(
+              color: AppColors.pureWhite,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE2EBE5), width: 1.0),
+              boxShadow: const [AppColors.softShadow],
             ),
-            boxShadow: const [AppColors.softShadow],
-          ),
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: steps.length,
-            separatorBuilder: (context, index) => const Divider(
-              color: Color(0xFFF4F7F5),
-              height: 1,
-              indent: 16,
-              endIndent: 16,
+            child: const Column(
+              children: [
+                SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: AppColors.primaryForest,
+                  ),
+                ),
+                SizedBox(height: 14),
+                Text(
+                  'Generating recipe steps from your fridge ingredients...',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.darkText,
+                  ),
+                ),
+              ],
             ),
-            itemBuilder: (context, index) {
-              final step = steps[index];
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                child: Row(
+          )
+        else if (_stepsError != null)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFFCA5A5), width: 1.0),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _stepsError!,
+                    style: const TextStyle(fontSize: 12.5, color: Color(0xFF991B1B)),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _fetchPreparationSteps(meal),
+                  child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+          )
+        else if (steps.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              color: AppColors.pureWhite,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE2EBE5), width: 1.0),
+              boxShadow: const [AppColors.softShadow],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Step Number Circle
                     Container(
-                      width: 24,
-                      height: 24,
-                      margin: const EdgeInsets.only(top: 1),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: AppColors.paleMint,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: const Color(0xFFC8E6C9),
-                          width: 1,
-                        ),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Center(
-                        child: Text(
-                          '${step.stepNumber}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.primaryForest,
-                          ),
-                        ),
+                      child: const Icon(
+                        Icons.auto_awesome_rounded,
+                        color: AppColors.primaryForest,
+                        size: 20,
                       ),
                     ),
                     const SizedBox(width: 12),
-
-                    // Step Instruction & Metadata
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            step.instruction,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              height: 1.4,
-                              fontWeight: FontWeight.w500,
+                            'Step-by-step instructions available via AI',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
                               color: AppColors.darkText,
                             ),
                           ),
-                          if (step.time != null || step.tip != null || step.temperature != null) ...[
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: [
-                                if (step.time != null)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF3F7F4),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      '⏱ ${step.time}',
-                                      style: const TextStyle(
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.primaryForest,
-                                      ),
-                                    ),
-                                  ),
-                                if (step.temperature != null)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF3F7F4),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      '🔥 ${step.temperature}',
-                                      style: const TextStyle(
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.coralPeach,
-                                      ),
-                                    ),
-                                  ),
-                                if (step.tip != null)
-                                  Text(
-                                    'Tip: ${step.tip}',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontStyle: FontStyle.italic,
-                                      color: AppColors.mutedText,
-                                    ),
-                                  ),
-                              ],
+                          SizedBox(height: 2),
+                          Text(
+                            'Tap "Generate Steps" to create full preparation steps, timings, and heat levels tailored to your fridge.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.mutedText,
+                              height: 1.35,
                             ),
-                          ],
+                          ),
                         ],
                       ),
                     ),
                   ],
                 ),
-              );
-            },
+                const SizedBox(height: 14),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _fetchPreparationSteps(meal),
+                    icon: const Icon(Icons.auto_awesome_rounded, size: 15),
+                    label: const Text('Generate Steps'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primaryForest,
+                      side: const BorderSide(color: Color(0xFFD4E7D9)),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.pureWhite,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: const Color(0xFFE2EBE5),
+                width: 1.0,
+              ),
+              boxShadow: const [AppColors.softShadow],
+            ),
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: steps.length,
+              separatorBuilder: (context, index) => const Divider(
+                color: Color(0xFFF4F7F5),
+                height: 1,
+                indent: 16,
+                endIndent: 16,
+              ),
+              itemBuilder: (context, index) {
+                final step = steps[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Step Number Circle
+                      Container(
+                        width: 24,
+                        height: 24,
+                        margin: const EdgeInsets.only(top: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.paleMint,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFFC8E6C9),
+                            width: 1,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${step.stepNumber}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primaryForest,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+
+                      // Step Instruction & Metadata
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              step.instruction,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                height: 1.4,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.darkText,
+                              ),
+                            ),
+                            if (step.time != null || step.tip != null || step.temperature != null) ...[
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [
+                                  if (step.time != null)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF3F7F4),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        '⏱ ${step.time}',
+                                        style: const TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.primaryForest,
+                                        ),
+                                      ),
+                                    ),
+                                  if (step.temperature != null)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF3F7F4),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        '🔥 ${step.temperature}',
+                                        style: const TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.coralPeach,
+                                        ),
+                                      ),
+                                    ),
+                                  if (step.tip != null)
+                                    Text(
+                                      'Tip: ${step.tip}',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontStyle: FontStyle.italic,
+                                        color: AppColors.mutedText,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
-        ),
       ],
     );
   }

@@ -134,8 +134,81 @@ class MealRecommendationService {
   static RecipeRecommendation? _pendingCustomRecipe;
   static RecipeRecommendation? get pendingCustomRecipe => _pendingCustomRecipe;
 
+  // --- Persistent Generated Preparation Steps State ---
+  static final Map<String, List<RecipePreparationStep>> _savedPreparationSteps = {};
+
+  static String _recipeTitleKey(String title) => title.trim().toLowerCase();
+
+  /// Resolves saved preparation steps for a given recipe, matching by ID or title key.
+  static List<RecipePreparationStep>? getSavedPreparationSteps(RecipeRecommendation rec) {
+    if (rec.id.isNotEmpty && _savedPreparationSteps.containsKey(rec.id)) {
+      return _savedPreparationSteps[rec.id];
+    }
+    final titleKey = _recipeTitleKey(rec.title);
+    if (titleKey.isNotEmpty && _savedPreparationSteps.containsKey(titleKey)) {
+      return _savedPreparationSteps[titleKey];
+    }
+    if (rec.preparationSteps.isNotEmpty) {
+      return rec.preparationSteps;
+    }
+    return null;
+  }
+
+  /// Saves generated preparation steps against the current recipe and updates the
+  /// shared pending recipe state and identity cache.
+  static void savePreparationSteps({
+    required RecipeRecommendation recipe,
+    required List<RecipePreparationStep> steps,
+  }) {
+    if (steps.isEmpty) return;
+    final unmodifiableSteps = List<RecipePreparationStep>.unmodifiable(steps);
+    if (recipe.id.isNotEmpty) {
+      _savedPreparationSteps[recipe.id] = unmodifiableSteps;
+    }
+    final titleKey = _recipeTitleKey(recipe.title);
+    if (titleKey.isNotEmpty) {
+      _savedPreparationSteps[titleKey] = unmodifiableSteps;
+    }
+
+    // Update _currentRecommendation if it matches this recipe
+    if (_currentRecommendation != null &&
+        ((recipe.id.isNotEmpty && _currentRecommendation!.id == recipe.id) ||
+            _recipeTitleKey(_currentRecommendation!.title) == titleKey)) {
+      _currentRecommendation = _currentRecommendation!.copyWith(preparationSteps: steps);
+      recommendationNotifier.value = _currentRecommendation;
+    }
+
+    // Update _pendingCustomRecipe if it matches this recipe
+    if (_pendingCustomRecipe != null &&
+        ((recipe.id.isNotEmpty && _pendingCustomRecipe!.id == recipe.id) ||
+            _recipeTitleKey(_pendingCustomRecipe!.title) == titleKey)) {
+      _pendingCustomRecipe = _pendingCustomRecipe!.copyWith(preparationSteps: steps);
+    }
+  }
+
+  /// Clears saved preparation steps for a specific recipe or all if null
+  static void clearSavedPreparationSteps({RecipeRecommendation? recipe}) {
+    if (recipe != null) {
+      if (recipe.id.isNotEmpty) {
+        _savedPreparationSteps.remove(recipe.id);
+      }
+      final titleKey = _recipeTitleKey(recipe.title);
+      if (titleKey.isNotEmpty) {
+        _savedPreparationSteps.remove(titleKey);
+      }
+    } else {
+      _savedPreparationSteps.clear();
+    }
+  }
+
   /// Clears the pending custom recipe and resets recipe origin if custom
-  static void clearCustomRecipe() {
+  static void clearCustomRecipe({RecipeRecommendation? loggedRecipe}) {
+    if (loggedRecipe != null) {
+      clearSavedPreparationSteps(recipe: loggedRecipe);
+    }
+    if (_pendingCustomRecipe != null) {
+      clearSavedPreparationSteps(recipe: _pendingCustomRecipe);
+    }
     _pendingCustomRecipe = null;
     if (_recipeOrigin == RecipeOrigin.customIngredients) {
       _recipeOrigin = RecipeOrigin.none;
@@ -956,7 +1029,11 @@ class MealRecommendationService {
   static Future<RecipeRecommendation?> advanceAfterMealLogged({
     MealTimeSlot? loggedSlot,
     DateTime? time,
+    RecipeRecommendation? loggedRecipe,
   }) async {
+    if (loggedRecipe != null) {
+      clearSavedPreparationSteps(recipe: loggedRecipe);
+    }
     ensureInitialized();
     if (loggedSlot != null) {
       _sessionCompletedSlots.add(loggedSlot);
@@ -969,6 +1046,9 @@ class MealRecommendationService {
       return null;
     }
 
+    if (_currentRecommendation != null) {
+      clearSavedPreparationSteps(recipe: _currentRecommendation);
+    }
     _currentRecommendation = null;
     _cachedSlot = null;
     _cachedInventoryFingerprint = null;
@@ -1234,6 +1314,7 @@ class MealRecommendationService {
 
   /// Resets recommendation engine back to initial state (for tests)
   static void reset() {
+    _savedPreparationSteps.clear();
     _currentRecommendation = null;
     _pendingCustomRecipe = null;
     _recipeOrigin = RecipeOrigin.none;
