@@ -531,6 +531,73 @@ class DailyNutritionData {
       fat: fat ?? this.fat,
     );
   }
+
+  /// Authoritative calculation of daily nutrition totals for a specific local calendar date.
+  /// Reuses the exact same local date-matching and aggregation contract as the Progress page.
+  static DailyNutritionCalculation calculateDailyTotals({
+    required DateTime date,
+    required List<Map<String, dynamic>> loggedMealsHistory,
+  }) {
+    final localTarget = date.toLocal();
+    final targetYear = localTarget.year;
+    final targetMonth = localTarget.month;
+    final targetDay = localTarget.day;
+
+    int totalCalories = 0;
+    int totalProtein = 0;
+    int totalCarbs = 0;
+    int totalFat = 0;
+    int totalMealsCount = 0;
+
+    for (final m in loggedMealsHistory) {
+      final rawTs = m['timestamp'];
+      final DateTime? t = rawTs is DateTime
+          ? rawTs.toLocal()
+          : (rawTs is String && rawTs.isNotEmpty
+              ? DateTime.tryParse(rawTs)?.toLocal()
+              : null);
+      if (t != null && t.year == targetYear && t.month == targetMonth && t.day == targetDay) {
+        totalCalories += (m['calories'] as num? ?? 0).toInt();
+        totalProtein += (m['protein'] as num? ?? 0).toInt();
+        totalCarbs += (m['carbs'] as num? ?? 0).toInt();
+        totalFat += (m['fat'] as num? ?? 0).toInt();
+        totalMealsCount++;
+      }
+    }
+
+    return DailyNutritionCalculation(
+      calories: totalCalories,
+      protein: totalProtein,
+      carbs: totalCarbs,
+      fat: totalFat,
+      mealsCount: totalMealsCount,
+    );
+  }
+}
+
+/// Represents the authoritative daily nutrition aggregation result.
+class DailyNutritionCalculation {
+  final int calories;
+  final int protein;
+  final int carbs;
+  final int fat;
+  final int mealsCount;
+
+  const DailyNutritionCalculation({
+    required this.calories,
+    required this.protein,
+    required this.carbs,
+    required this.fat,
+    required this.mealsCount,
+  });
+
+  static const DailyNutritionCalculation zero = DailyNutritionCalculation(
+    calories: 0,
+    protein: 0,
+    carbs: 0,
+    fat: 0,
+    mealsCount: 0,
+  );
 }
 
 enum MealStatus { completed, upcoming }
@@ -623,8 +690,10 @@ class MockDataRepository {
 
     return _loggedMealsHistory.where((m) {
       final ts = m['timestamp'];
-      if (ts is DateTime) {
-        final local = ts.toLocal();
+      final DateTime? local = ts is DateTime
+          ? ts.toLocal()
+          : (ts is String && ts.isNotEmpty ? DateTime.tryParse(ts)?.toLocal() : null);
+      if (local != null) {
         return !local.isBefore(start) && local.isBefore(end);
       }
       return false;
@@ -638,8 +707,10 @@ class MockDataRepository {
 
     return _loggedMealsHistory.where((m) {
       final ts = m['timestamp'];
-      if (ts is DateTime) {
-        final local = ts.toLocal();
+      final DateTime? local = ts is DateTime
+          ? ts.toLocal()
+          : (ts is String && ts.isNotEmpty ? DateTime.tryParse(ts)?.toLocal() : null);
+      if (local != null) {
         return !local.isBefore(start) && local.isBefore(end);
       }
       return false;
@@ -880,39 +951,11 @@ class MockDataRepository {
       }
       final targetCal = savedProfile?.dailyCalorieTarget ?? _currentNutrition.targetCalories;
 
-      // 2. Daily nutrition snapshot from public.daily_nutrition_snapshots
+      // 2. Daily nutrition snapshot from public.daily_nutrition_snapshots (if available)
       final snapshot = await MealTrackingService.instance.fetchDailyNutritionSnapshot(
         userId: effectiveUserId,
-        date: DateTime.now(),
+        date: currentTimeProvider(),
       );
-
-      if (snapshot != null) {
-        _isCompleteSnapshot = snapshot.isComplete;
-        _mealsWithUnknownNutrition = snapshot.mealsWithUnknownNutrition;
-        _currentNutrition = DailyNutritionData(
-          consumedCalories: snapshot.totalCalories ?? 0,
-          targetCalories: snapshot.targetCalories > 0 ? snapshot.targetCalories : targetCal,
-          protein: _currentNutrition.protein.copyWith(
-            amountGrams: snapshot.proteinG ?? 0,
-          ),
-          carbs: _currentNutrition.carbs.copyWith(
-            amountGrams: snapshot.carbsG ?? 0,
-          ),
-          fat: _currentNutrition.fat.copyWith(
-            amountGrams: snapshot.fatG ?? 0,
-          ),
-        );
-      } else {
-        _isCompleteSnapshot = true;
-        _mealsWithUnknownNutrition = 0;
-        _currentNutrition = DailyNutritionData(
-          consumedCalories: 0,
-          targetCalories: targetCal,
-          protein: _currentNutrition.protein.copyWith(amountGrams: 0),
-          carbs: _currentNutrition.carbs.copyWith(amountGrams: 0),
-          fat: _currentNutrition.fat.copyWith(amountGrams: 0),
-        );
-      }
 
       // 3. Genuine meals logged today from public.meals
       final todayMealRecords = await MealTrackingService.instance.fetchTodayMeals(
@@ -949,13 +992,83 @@ class MockDataRepository {
       );
 
       _loggedMealsHistory.clear();
+      final seenMealIds = <String>{};
       if (historyRecords.isNotEmpty) {
-        _loggedMealsHistory.addAll(historyRecords.map((m) => m.toMap()));
+        for (final m in historyRecords) {
+          if (m.id.isNotEmpty) seenMealIds.add(m.id);
+          _loggedMealsHistory.add(m.toMap());
+        }
+      }
+      for (final tm in todayMealRecords) {
+        if (!seenMealIds.contains(tm.id)) {
+          seenMealIds.add(tm.id);
+          _loggedMealsHistory.add(tm.toMap());
+        }
+      }
+
+      // 5. Authoritative Daily Nutrition Calculation
+      // Derived from genuine meal records using the shared Progress calculation.
+      final todayTotals = DailyNutritionData.calculateDailyTotals(
+        date: localStartOfToday,
+        loggedMealsHistory: _loggedMealsHistory,
+      );
+
+      if (todayTotals.mealsCount > 0 || todayMealRecords.isNotEmpty) {
+        // Authoritative: actual logged meal records produce the nutrition totals
+        _currentNutrition = DailyNutritionData(
+          consumedCalories: todayTotals.calories,
+          targetCalories: targetCal,
+          protein: _currentNutrition.protein.copyWith(amountGrams: todayTotals.protein),
+          carbs: _currentNutrition.carbs.copyWith(amountGrams: todayTotals.carbs),
+          fat: _currentNutrition.fat.copyWith(amountGrams: todayTotals.fat),
+        );
+        _isCompleteSnapshot = true;
+        _mealsWithUnknownNutrition = todayMealRecords.where((m) => m.calories == null).length;
+      } else if (snapshot != null && (snapshot.totalCalories ?? 0) > 0) {
+        // Fallback to snapshot if table row exists with recorded calories
+        _isCompleteSnapshot = snapshot.isComplete;
+        _mealsWithUnknownNutrition = snapshot.mealsWithUnknownNutrition;
+        _currentNutrition = DailyNutritionData(
+          consumedCalories: snapshot.totalCalories ?? 0,
+          targetCalories: snapshot.targetCalories > 0 ? snapshot.targetCalories : targetCal,
+          protein: _currentNutrition.protein.copyWith(amountGrams: snapshot.proteinG ?? 0),
+          carbs: _currentNutrition.carbs.copyWith(amountGrams: snapshot.carbsG ?? 0),
+          fat: _currentNutrition.fat.copyWith(amountGrams: snapshot.fatG ?? 0),
+        );
+      } else {
+        // Genuine day with no meals logged: cleanly reset to zero
+        _isCompleteSnapshot = true;
+        _mealsWithUnknownNutrition = 0;
+        _currentNutrition = DailyNutritionData(
+          consumedCalories: 0,
+          targetCalories: targetCal,
+          protein: _currentNutrition.protein.copyWith(amountGrams: 0),
+          carbs: _currentNutrition.carbs.copyWith(amountGrams: 0),
+          fat: _currentNutrition.fat.copyWith(amountGrams: 0),
+        );
       }
 
       _notify();
     } catch (e) {
       debugPrint('[MockDataRepository] loadFromSupabase error: $e');
+    }
+  }
+
+  /// Synchronizes `_currentNutrition` from `_loggedMealsHistory` for `localStartOfToday`.
+  static void syncTodayNutritionFromMeals() {
+    final todayTotals = DailyNutritionData.calculateDailyTotals(
+      date: localStartOfToday,
+      loggedMealsHistory: _loggedMealsHistory,
+    );
+    if (todayTotals.mealsCount > 0) {
+      _currentNutrition = DailyNutritionData(
+        consumedCalories: todayTotals.calories,
+        targetCalories: _currentNutrition.targetCalories,
+        protein: _currentNutrition.protein.copyWith(amountGrams: todayTotals.protein),
+        carbs: _currentNutrition.carbs.copyWith(amountGrams: todayTotals.carbs),
+        fat: _currentNutrition.fat.copyWith(amountGrams: todayTotals.fat),
+      );
+      _notify();
     }
   }
 

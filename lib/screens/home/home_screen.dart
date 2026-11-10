@@ -225,21 +225,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ),
                       );
                     },
-                    onTap: () {
+                    onTap: () async {
                       if (recommendation != null) {
-                        Navigator.of(context).push(
+                        await Navigator.of(context).push(
                           HeroTransitionRoute(
                             page: MealDetailScreen(
                               recommendation: recommendation,
                             ),
                           ),
                         );
+                        if (mounted) {
+                          if (AuthService.instance.isAuthenticated && AuthService.instance.currentUser != null) {
+                            MockDataRepository.loadFromSupabase();
+                          } else {
+                            MockDataRepository.syncTodayNutritionFromMeals();
+                          }
+                        }
                       } else {
-                        Navigator.of(context).push(
+                        await Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (context) => const AiAssistantScreen(),
                           ),
                         );
+                        if (mounted) {
+                          if (AuthService.instance.isAuthenticated && AuthService.instance.currentUser != null) {
+                            MockDataRepository.loadFromSupabase();
+                          } else {
+                            MockDataRepository.syncTodayNutritionFromMeals();
+                          }
+                        }
                       }
                     },
                   ),

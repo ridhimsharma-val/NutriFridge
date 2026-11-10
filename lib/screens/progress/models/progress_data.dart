@@ -130,6 +130,17 @@ class ProgressAnalyticsData {
 
 /// Helper service to generate progress analytics from genuine user nutrition data.
 class ProgressDataService {
+  /// Authoritative calculation of daily nutrition totals for a specific local calendar date.
+  /// Used consistently by both Dashboard and Progress page.
+  static DailyNutritionCalculation calculateDailyTotals({
+    required DateTime date,
+    required List<Map<String, dynamic>> loggedMealsHistory,
+  }) =>
+      DailyNutritionData.calculateDailyTotals(
+        date: date,
+        loggedMealsHistory: loggedMealsHistory,
+      );
+
   static String _monthAbbr(int month) {
     return DateRangeUtils.getMonthAbbr(month);
   }
@@ -207,23 +218,16 @@ class ProgressDataService {
       final date = weekRange.days[i];
       final isToday = date.day == now.day && date.month == now.month && date.year == now.year;
 
-      int dayCals = 0;
-      int dayProtein = 0;
-      int dayCarbs = 0;
-      int dayFat = 0;
-      int dayMealCount = 0;
+      final totals = DailyNutritionData.calculateDailyTotals(
+        date: date,
+        loggedMealsHistory: loggedMealsHistory,
+      );
 
-      for (final m in loggedMealsHistory) {
-        final rawTs = m['timestamp'];
-        final t = rawTs is DateTime ? rawTs.toLocal() : null;
-        if (t != null && t.day == date.day && t.month == date.month && t.year == date.year) {
-          dayCals += (m['calories'] as num? ?? 0).toInt();
-          dayProtein += (m['protein'] as num? ?? 0).toInt();
-          dayCarbs += (m['carbs'] as num? ?? 0).toInt();
-          dayFat += (m['fat'] as num? ?? 0).toInt();
-          dayMealCount++;
-        }
-      }
+      int dayCals = totals.calories;
+      int dayProtein = totals.protein;
+      int dayCarbs = totals.carbs;
+      int dayFat = totals.fat;
+      int dayMealCount = totals.mealsCount;
 
       // If today has live snapshot data and no history records matched yet
       if (isToday && dayMealCount == 0 && liveNutrition.consumedCalories > 0) {
@@ -332,7 +336,11 @@ class ProgressDataService {
       if (!isFuture) {
         for (final m in loggedMealsHistory) {
           final rawTs = m['timestamp'];
-          final t = rawTs is DateTime ? rawTs.toLocal() : null;
+          final DateTime? t = rawTs is DateTime
+              ? rawTs.toLocal()
+              : (rawTs is String && rawTs.isNotEmpty
+                  ? DateTime.tryParse(rawTs)?.toLocal()
+                  : null);
           if (t != null &&
               t.year == monthRange.year &&
               t.month == monthRange.month &&
@@ -411,14 +419,11 @@ class ProgressDataService {
             monthRange.year == now.year &&
             monthRange.month == now.month;
 
-        int count = 0;
-        for (final m in loggedMealsHistory) {
-          final rawTs = m['timestamp'];
-          final t = rawTs is DateTime ? rawTs.toLocal() : null;
-          if (t != null && t.day == date.day && t.month == date.month && t.year == date.year) {
-            count++;
-          }
-        }
+        final dayTotals = DailyNutritionData.calculateDailyTotals(
+          date: date,
+          loggedMealsHistory: loggedMealsHistory,
+        );
+        int count = dayTotals.mealsCount;
 
         if (isToday && count == 0 && liveNutrition.consumedCalories > 0) {
           final todayDone = liveMeals.where((m) => m.status == MealStatus.completed).length;
