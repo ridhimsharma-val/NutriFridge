@@ -131,8 +131,24 @@ class CategoryFoodItem {
   }
 
   /// Returns the item's specific food image asset path or resolved network URL.
-  /// Checks centralized FoodImageService for user overrides or previously mapped photographs.
+  /// Checks centralized FoodImageService first for user overrides or mapped photographs.
   String? get effectiveImageAsset {
+    // 1. Authoritative check: User overrides & centralized resolved mappings
+    final serviceImage = FoodImageService.instance.getImageSync(
+      name: name,
+      type: FoodEntityType.ingredient,
+      category: category,
+    );
+    if (!serviceImage.isPlaceholder) {
+      return serviceImage.imageUrl;
+    }
+
+    // 2. Storage image path if present
+    if (storageImagePath != null && storageImagePath!.isNotEmpty) {
+      return storageImagePath;
+    }
+
+    // 3. Fallback to specific local asset if provided (and not a generic category thumbnail)
     if (imageAsset != null &&
         imageAsset!.isNotEmpty &&
         !imageAsset!.contains('categories/vegetables') &&
@@ -149,16 +165,7 @@ class CategoryFoodItem {
       return imageAsset;
     }
 
-    final serviceImage = FoodImageService.instance.getImageSync(
-      name: name,
-      type: FoodEntityType.ingredient,
-      category: category,
-    );
-    if (!serviceImage.isPlaceholder) {
-      return serviceImage.imageUrl;
-    }
-
-    return FoodItemAssetRegistry.getAssetForItem(name, category);
+    return serviceImage.imageUrl;
   }
 
   /// Returns the dedicated transparent cutout asset or URL specifically for the Interactive Cooking Pan.

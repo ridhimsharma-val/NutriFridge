@@ -471,6 +471,30 @@ class FoodImageResolver {
     return const [];
   }
 
+  /// Mirrors a selected Pixabay image to permanent Supabase Storage via Edge Function to prevent hotlinking.
+  Future<String> mirrorToStorage({
+    required String photoId,
+    required String imageUrl,
+    required FoodEntityType type,
+    required String entityKey,
+  }) async {
+    try {
+      final res = await _invokeEdgeFunction({
+        'action': 'mirror',
+        'query': entityKey,
+        'entityType': type.toDbString(),
+        'photoId': photoId,
+        'imageUrl': imageUrl,
+      });
+      if (res['ok'] == true && res['persistentUrl'] != null && (res['persistentUrl'] as String).isNotEmpty) {
+        return res['persistentUrl'] as String;
+      }
+    } catch (e) {
+      debugPrint('[FoodImageResolver] mirrorToStorage error: $e');
+    }
+    return imageUrl;
+  }
+
   /// Dispatches the request to the `food-image` Edge Function with auth credentials or mock override.
   Future<Map<String, dynamic>> _invokeEdgeFunction(Map<String, dynamic> body) async {
     if (mockHandler != null) {

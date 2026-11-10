@@ -1,7 +1,7 @@
 -- =============================================================================
 -- NUTRIFRIDGE — CENTRALIZED FOOD IMAGE MAPPINGS MIGRATION
--- Migration Version: 20261111_food_image_mappings
--- Technology Stack: PostgreSQL 15+ (Supabase) · Flutter Mobile Client · Pexels API
+-- Migration Version: 2026111101_food_image_mappings
+-- Technology Stack: PostgreSQL 15+ (Supabase) · Flutter Mobile Client · Pixabay API
 -- Architecture: Normalized image mappings supporting shared catalog entries and
 --                isolated user overrides with strict Row-Level Security (RLS).
 -- =============================================================================
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.food_image_mappings (
     entity_key TEXT NOT NULL, -- Canonical normalized search key (e.g., 'paneer', 'shahi paneer')
     display_name TEXT NOT NULL,
     image_url TEXT NOT NULL,
-    provider TEXT NOT NULL DEFAULT 'pexels',
+    provider TEXT NOT NULL DEFAULT 'pixabay',
     provider_photo_id TEXT,
     photographer_name TEXT,
     photographer_url TEXT,
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS public.food_image_mappings (
 
 -- Unique constraint ensuring exactly one shared mapping per entity, and at most one override per user
 CREATE UNIQUE INDEX IF NOT EXISTS idx_food_image_mappings_unique_entity
-    ON public.food_image_mappings (entity_type, entity_key, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::UUID));
+    ON public.food_image_mappings (entity_type, entity_key, user_id) NULLS NOT DISTINCT;
 
 CREATE INDEX IF NOT EXISTS idx_food_image_mappings_lookup
     ON public.food_image_mappings (entity_type, entity_key);

@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/nutrition_data.dart';
 import '../auth/auth_service.dart';
 import 'food_image_model.dart';
+import 'food_image_resolver.dart';
 
 class _CachedSearchResults {
   final List<FoodImageCandidate> candidates;
@@ -185,16 +187,49 @@ class FoodImageRepository {
         !MockDataRepository.forceInMemoryForTesting &&
         AuthService.instance.isAuthenticated &&
         effectiveUserId != 'local_user') {
-      try {
-        await client.from('food_image_mappings').upsert(
-          {
-            ...model.toDbMap(),
-            'updated_at': DateTime.now().toIso8601String(),
-          },
-          onConflict: 'entity_type,entity_key,user_id',
+      // Storage compliance check:
+      // Do not write raw unmirrored Pixabay CDN URLs to the persistent database
+      final isUnmirroredPixabay = model.provider == 'pixabay' && model.imageUrl.contains('pixabay.com');
+      if (!isUnmirroredPixabay) {
+        try {
+          await client.from('food_image_mappings').upsert(
+            {
+              ...model.toDbMap(),
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+            onConflict: 'entity_type,entity_key,user_id',
+          );
+        } catch (e) {
+          debugPrint('[FoodImageRepository] saveUserOverride db error: $e');
+        }
+      }
+
+      // Comply with Pixabay hotlinking policies by mirroring selection to Supabase Storage
+      if (candidate.provider == 'pixabay' && candidate.photoId.isNotEmpty) {
+        unawaited(
+          FoodImageResolver.instance
+              .mirrorToStorage(
+                photoId: candidate.photoId,
+                imageUrl: candidate.imageUrl,
+                type: type,
+                entityKey: entityKey,
+              )
+              .then((persistentUrl) async {
+            if (persistentUrl.isNotEmpty && !persistentUrl.contains('pixabay.com')) {
+              final persistentModel = model.copyWith(imageUrl: persistentUrl);
+              putInMemoryCache(persistentModel);
+              try {
+                await client.from('food_image_mappings').upsert(
+                  {
+                    ...persistentModel.toDbMap(),
+                    'updated_at': DateTime.now().toIso8601String(),
+                  },
+                  onConflict: 'entity_type,entity_key,user_id',
+                );
+              } catch (_) {}
+            }
+          }),
         );
-      } catch (e) {
-        debugPrint('[FoodImageRepository] saveUserOverride db error: $e');
       }
     }
 

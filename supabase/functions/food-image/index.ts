@@ -61,15 +61,18 @@ function calculateMatchScore(query: string, alt: string, urlSlug: string, entity
 
   if (!text.trim()) return 10;
 
+  // Penalize wallpapers, desktop backgrounds, vectors, and cool backgrounds
+  const isWallpaper = text.includes('wallpaper') || text.includes('cool backgrounds') || text.includes('desktop background');
+  const penalty = isWallpaper ? 35 : 0;
+
+  // Exact phrase match (e.g. "shahi paneer", "vegetable biryani")
+  if (text.includes(normQuery)) {
+    return Math.max(10, 100 - penalty);
+  }
+
   const queryTokens = normQuery.split(' ').filter((t) => t.length > 2);
   if (queryTokens.length === 0) return 20;
 
-  // Exact phrase match
-  if (text.includes(normQuery)) {
-    return 100;
-  }
-
-  // Token matches
   let matched = 0;
   for (const token of queryTokens) {
     if (text.includes(token)) {
@@ -79,18 +82,113 @@ function calculateMatchScore(query: string, alt: string, urlSlug: string, entity
 
   const matchRatio = matched / queryTokens.length;
 
-  // Specific check for ingredient false-friends (e.g. paneer vs tofu)
+  if (entityType === 'recipe') {
+    // For recipes, dish nouns are critical
+    // Identify primary dish anchor (usually the last word or distinct noun, e.g. "biryani", "paneer", "soup", "curry", "pizza", "salad")
+    const mainDishNoun = queryTokens[queryTokens.length - 1];
+    const hasMainNoun = text.includes(mainDishNoun);
+
+    // If all tokens matched:
+    if (matched === queryTokens.length) {
+      return Math.max(10, 90 - penalty);
+    }
+
+    // If the main dish noun didn't match at all (e.g. "biryani" missing in "vegetable biryani"):
+    if (!hasMainNoun) {
+      return Math.max(0, 15 - penalty); // Reject irrelevant images (e.g. wallpaper with 'vegetables' but no 'biryani')
+    }
+
+    // If main dish noun matched, but modifier (e.g. "shahi") didn't:
+    // Check if food/dish/recipe is present
+    const hasRecipeContext = text.includes('dish') || text.includes('recipe') || text.includes('curry') || text.includes('cooked');
+    if (hasRecipeContext && matchRatio >= 0.5) {
+      // Partial match (e.g. generic paneer for shahi paneer): ~35-45
+      return Math.max(10, Math.round(matchRatio * 70) - penalty);
+    }
+
+    return Math.max(10, Math.round(matchRatio * 50) - penalty);
+  }
+
+  // Ingredient scoring
   if (normQuery.includes('paneer') && text.includes('tofu') && !text.includes('paneer')) {
     return 0; // Reject tofu when looking for paneer
   }
   if (normQuery.includes('apple') && text.includes('pineapple') && !text.includes('red apple') && !text.includes('fresh apple')) {
-    // Pineapple isn't apple
     if (!text.includes('apple fruit') && !text.includes('green apple')) {
       matched = Math.max(0, matched - 1);
     }
   }
 
-  return Math.round(matchRatio * 80);
+  return Math.max(10, Math.round(matchRatio * 85) - penalty);
+}
+
+// Configurable confidence thresholds
+const INGREDIENT_SCORE_THRESHOLD = 35;
+const RECIPE_SCORE_THRESHOLD = 65; // Recipes require high confidence to avoid mismatched dishes
+
+async function mirrorImageToStorage(
+  supabaseAdmin: any,
+  photoId: string,
+  sourceImageUrl: string,
+  entityType: string
+): Promise<string | null> {
+  const bucketName = 'food-photos';
+  const targetPath = `${entityType}s/${photoId}.jpg`;
+
+  // 1. Check if already stored in Supabase Storage
+  try {
+    const { data: existingList } = await supabaseAdmin.storage
+      .from(bucketName)
+      .list(`${entityType}s`, { search: `${photoId}.jpg`, limit: 1 });
+
+    if (Array.isArray(existingList) && existingList.some((f: any) => f.name === `${photoId}.jpg`)) {
+      const { data: { publicUrl } } = supabaseAdmin.storage
+        .from(bucketName)
+        .getPublicUrl(targetPath);
+      if (publicUrl) return publicUrl;
+    }
+  } catch (_) {}
+
+  // 2. Fetch from Pixabay server-side
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    const imgRes = await fetch(sourceImageUrl, { signal: controller.signal }).finally(() => clearTimeout(timeout));
+    if (!imgRes.ok) {
+      console.warn(`Failed to fetch image from Pixabay: status ${imgRes.status}`);
+      return null;
+    }
+
+    const arrayBuffer = await imgRes.arrayBuffer();
+    const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+
+    // 3. Ensure bucket exists
+    try {
+      await supabaseAdmin.storage.createBucket(bucketName, { public: true });
+    } catch (_) {}
+
+    // 4. Upload to bucket
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from(bucketName)
+      .upload(targetPath, arrayBuffer, {
+        contentType,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.warn(`Storage upload warning for ${targetPath}:`, uploadError);
+      return null;
+    }
+
+    const { data: { publicUrl } } = supabaseAdmin.storage
+      .from(bucketName)
+      .getPublicUrl(targetPath);
+
+    return publicUrl || null;
+  } catch (err) {
+    console.warn(`Storage mirroring warning for photo ${photoId}:`, err);
+    return null;
+  }
 }
 
 serve(async (req: Request) => {
@@ -264,7 +362,33 @@ serve(async (req: Request) => {
       );
     }
 
-    // 4. Check Pixabay API Key
+    // 4. Dedicated Image Mirror Action for User Overrides or Client Caching
+    if (action === 'mirror') {
+      const photoId = String(body.photoId || '').trim();
+      const sourceUrl = String(body.imageUrl || '').trim();
+      if (!photoId || !sourceUrl) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'MISSING_PARAMS', message: 'photoId and imageUrl are required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (supabaseServiceKey) {
+        const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });
+        const persistentUrl = await mirrorImageToStorage(supabaseAdmin, photoId, sourceUrl, entityType);
+        return new Response(
+          JSON.stringify({ ok: true, action, photoId, originalUrl: sourceUrl, persistentUrl }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ ok: true, action, photoId, persistentUrl: sourceUrl }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 5. Check Pixabay API Key
     const pixabayApiKey = Deno.env.get('PIXABAY_API_KEY');
     if (!pixabayApiKey) {
       return new Response(
@@ -380,8 +504,9 @@ serve(async (req: Request) => {
     // Sort descending by score
     candidates.sort((a, b) => b.score - a.score);
 
-    // Filter acceptable matches for automatic resolution (threshold >= 35)
-    const bestMatch = candidates.length > 0 && candidates[0].score >= 35
+    // Filter acceptable matches for automatic resolution (threshold is entity-specific)
+    const threshold = entityType === 'recipe' ? RECIPE_SCORE_THRESHOLD : INGREDIENT_SCORE_THRESHOLD;
+    const bestMatch = candidates.length > 0 && candidates[0].score >= threshold
       ? candidates[0]
       : null;
 
@@ -400,34 +525,48 @@ serve(async (req: Request) => {
       }
     } catch (_) {}
 
-    // 7. If action is resolve and bestMatch found, optionally persist to shared catalog using service role
+    // 7. If action is resolve and high-confidence bestMatch found, mirror to Supabase Storage and persist to shared catalog
     if (action === 'resolve' && bestMatch && supabaseServiceKey) {
       try {
         const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
           auth: { persistSession: false },
         });
 
-        await supabaseAdmin.from('food_image_mappings').upsert(
-          {
-            entity_type: entityType,
-            entity_key: canonicalKey,
-            display_name: query,
-            image_url: bestMatch.imageUrl,
-            pan_cutout_url: panCutoutUrl,
-            provider: 'pixabay',
-            provider_photo_id: bestMatch.photoId,
-            photographer_name: bestMatch.photographerName,
-            photographer_url: bestMatch.photographerUrl,
-            source_page_url: bestMatch.sourcePageUrl,
-            alt_description: bestMatch.altDescription,
-            is_user_override: false,
-            user_id: null, // Shared catalog
-          },
-          {
-            onConflict: 'entity_type,entity_key,user_id',
-            ignoreDuplicates: false,
-          }
+        // Download server-side and mirror to Supabase Storage to comply with Pixabay hotlinking policies
+        const persistentUrl = await mirrorImageToStorage(
+          supabaseAdmin,
+          bestMatch.photoId,
+          bestMatch.imageUrl,
+          entityType
         );
+
+        if (persistentUrl) {
+          bestMatch.imageUrl = persistentUrl;
+          await supabaseAdmin.from('food_image_mappings').upsert(
+            {
+              entity_type: entityType,
+              entity_key: canonicalKey,
+              display_name: query,
+              image_url: persistentUrl,
+              pan_cutout_url: panCutoutUrl,
+              provider: 'pixabay',
+              provider_photo_id: bestMatch.photoId,
+              photographer_name: bestMatch.photographerName,
+              photographer_url: bestMatch.photographerUrl,
+              source_page_url: bestMatch.sourcePageUrl,
+              alt_description: bestMatch.altDescription,
+              is_user_override: false,
+              user_id: null, // Shared catalog
+            },
+            {
+              onConflict: 'entity_type,entity_key,user_id',
+              ignoreDuplicates: false,
+            }
+          );
+        } else {
+          // Hotlinking compliance: do NOT persist Pixabay CDN URL to DB if storage mirroring is unavailable
+          console.warn(`Storage mirror unavailable for photo ${bestMatch.photoId}. Skipping database persistence to prevent permanent hotlinking.`);
+        }
       } catch (dbErr) {
         // Non-blocking: even if DB save fails, we still return the candidate
         console.warn('Could not save shared mapping to DB:', dbErr);
