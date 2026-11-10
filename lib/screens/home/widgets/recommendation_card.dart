@@ -132,11 +132,13 @@ class RecommendationCard extends StatelessWidget {
           key: const ValueKey('choice_ai_suggestion'),
           title: 'AI Suggestion',
           description:
-              'Let NutriFridge choose a meal using your fridge ingredients.',
-          icon: Icons.auto_awesome_rounded,
-          iconColor: AppColors.forestGreen,
-          iconBgColor: AppColors.paleMint,
+              'Let NutriFridge pick a meal using the ingredients you have.',
+          cardBgColor: const Color(0xFFF8FBF9),
+          borderColor: const Color(0xFFDDEEE3),
           buttonText: 'Suggest Meal',
+          buttonTextColor: AppColors.forestGreen,
+          buttonBgColor: const Color(0xFFE8F5EC),
+          buttonBorderColor: const Color(0xFFCCE6D5),
           onTap: onSelectAiSuggestion,
         ),
         const SizedBox(height: 12),
@@ -147,11 +149,13 @@ class RecommendationCard extends StatelessWidget {
           key: const ValueKey('choice_use_my_ingredients'),
           title: 'Use My Ingredients',
           description:
-              'Pick your ingredients and create something delicious with AI.',
-          icon: Icons.soup_kitchen_rounded,
-          iconColor: const Color(0xFFC85A32),
-          iconBgColor: const Color(0xFFFFF2EB),
+              'Choose what you have in your fridge and create something delicious.',
+          cardBgColor: const Color(0xFFFDFBF8),
+          borderColor: const Color(0xFFF0E5DC),
           buttonText: 'Select Items',
+          buttonTextColor: const Color(0xFFB34C24),
+          buttonBgColor: const Color(0xFFFEEFE6),
+          buttonBorderColor: const Color(0xFFF5D6C5),
           onTap: onSelectUseMyIngredients,
         ),
       ],
@@ -163,10 +167,12 @@ class RecommendationCard extends StatelessWidget {
     Key? key,
     required String title,
     required String description,
-    required IconData icon,
-    required Color iconColor,
-    required Color iconBgColor,
+    required Color cardBgColor,
+    required Color borderColor,
     required String buttonText,
+    required Color buttonTextColor,
+    required Color buttonBgColor,
+    required Color buttonBorderColor,
     required VoidCallback? onTap,
   }) {
     return Material(
@@ -178,32 +184,18 @@ class RecommendationCard extends StatelessWidget {
         child: Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: AppColors.pureWhite,
+            color: cardBgColor,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: AppColors.cardBorder,
+              color: borderColor,
               width: 1.2,
             ),
             boxShadow: const [AppColors.softShadow],
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: iconBgColor,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  icon,
-                  size: 22,
-                  color: iconColor,
-                ),
-              ),
-              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -215,9 +207,10 @@ class RecommendationCard extends StatelessWidget {
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: AppColors.neutralCharcoal,
+                        letterSpacing: -0.2,
                       ),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 4),
                     Text(
                       description,
                       style: const TextStyle(
@@ -230,12 +223,16 @@ class RecommendationCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 14),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6.5),
                 decoration: BoxDecoration(
-                  color: iconBgColor,
+                  color: buttonBgColor,
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: buttonBorderColor,
+                    width: 0.8,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -245,14 +242,15 @@ class RecommendationCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: iconColor,
+                        color: buttonTextColor,
+                        letterSpacing: -0.1,
                       ),
                     ),
-                    const SizedBox(width: 3),
+                    const SizedBox(width: 4),
                     Icon(
                       Icons.arrow_forward_rounded,
                       size: 13,
-                      color: iconColor,
+                      color: buttonTextColor,
                     ),
                   ],
                 ),

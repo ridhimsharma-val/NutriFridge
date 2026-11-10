@@ -97,7 +97,7 @@ void main() {
       // Initially, empty placeholder with Generate Steps button is displayed
       expect(find.text('Preparation'), findsOneWidget);
       expect(find.text('Generate Steps'), findsOneWidget);
-      expect(find.text('Step-by-step instructions available via AI'), findsOneWidget);
+      expect(find.text('Step-by-step preparation'), findsOneWidget);
 
       // Tap Generate Steps
       await tester.tap(find.text('Generate Steps'));
@@ -113,7 +113,7 @@ void main() {
 
       // Empty placeholder and Generate Steps button must be gone
       expect(find.text('Generate Steps'), findsNothing);
-      expect(find.text('Step-by-step instructions available via AI'), findsNothing);
+      expect(find.text('Step-by-step preparation'), findsNothing);
 
       // Verify stored in MealRecommendationService
       final saved = MealRecommendationService.getSavedPreparationSteps(rec);

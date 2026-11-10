@@ -321,7 +321,7 @@ void main() {
 
       // Redundant AI generation triggers/buttons from the preparation section MUST NOT exist
       expect(find.text('Generate Steps'), findsNothing);
-      expect(find.text('Step-by-step instructions available via AI'), findsNothing);
+      expect(find.text('Step-by-step preparation'), findsNothing);
       expect(find.textContaining('Tap "Cook with AI" to generate full preparation steps'), findsNothing);
 
       // Case B: Recipe with NO preparation steps initially renders Generate Steps placeholder
@@ -347,7 +347,7 @@ void main() {
       // Preparation section renders Generate Steps button for empty steps
       expect(find.text('Preparation'), findsOneWidget);
       expect(find.text('Generate Steps'), findsOneWidget);
-      expect(find.text('Step-by-step instructions available via AI'), findsOneWidget);
+      expect(find.text('Step-by-step preparation'), findsOneWidget);
     });
 
     // -------------------------------------------------------------------------

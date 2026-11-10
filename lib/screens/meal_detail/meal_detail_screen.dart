@@ -1159,7 +1159,7 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
         else if (steps.isEmpty)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               color: AppColors.pureWhite,
               borderRadius: BorderRadius.circular(18),
@@ -1169,61 +1169,41 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.paleMint,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.auto_awesome_rounded,
-                        color: AppColors.primaryForest,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Step-by-step instructions available via AI',
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.darkText,
-                            ),
-                          ),
-                          SizedBox(height: 2),
-                          Text(
-                            'Tap "Generate Steps" to create full preparation steps, timings, and heat levels tailored to your fridge.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.mutedText,
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                const Text(
+                  'Step-by-step preparation',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.darkText,
+                    letterSpacing: -0.2,
+                  ),
                 ),
-                const SizedBox(height: 14),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _fetchPreparationSteps(meal),
-                    icon: const Icon(Icons.auto_awesome_rounded, size: 15),
-                    label: const Text('Generate Steps'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primaryForest,
-                      side: const BorderSide(color: Color(0xFFD4E7D9)),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                const SizedBox(height: 6),
+                const Text(
+                  'Get clear cooking instructions with timings and heat levels for this recipe.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.mutedText,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton(
+                  onPressed: () => _fetchPreparationSteps(meal),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primaryForest,
+                    side: const BorderSide(color: Color(0xFFD4E7D9), width: 1.2),
+                    backgroundColor: const Color(0xFFF6FAF7),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text(
+                    'Generate Steps',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.1,
                     ),
                   ),
                 ),
