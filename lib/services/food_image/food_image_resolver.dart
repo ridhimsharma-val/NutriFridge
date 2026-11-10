@@ -249,7 +249,7 @@ class FoodImageResolver {
   /// 1. User-selected image override
   /// 2. Curated / local asset mapping
   /// 3. Previously saved automatic mapping
-  /// 4. Pexels search & matching via Supabase Edge Function
+  /// 4. Pixabay search & matching via Supabase Edge Function
   /// 5. Existing category placeholder
   Future<FoodImageModel> resolve({
     required String name,
@@ -284,14 +284,14 @@ class FoodImageResolver {
         return savedMapping;
       }
 
-      // Priority 4: Search real food photography via Supabase Edge Function (Pexels)
+      // Priority 4: Search real food photography via Supabase Edge Function (Pixabay)
       final searchResult = await _invokeEdgeFunction({
         'action': 'resolve',
         'query': canonicalKey,
         'entityType': type.toDbString(),
         'category': category,
         'cuisine': cuisine,
-        'orientation': type == FoodEntityType.ingredient ? 'square' : 'landscape',
+        'orientation': type == FoodEntityType.ingredient ? 'all' : 'horizontal',
       });
 
       if (searchResult['ok'] == true && searchResult['bestMatch'] != null) {

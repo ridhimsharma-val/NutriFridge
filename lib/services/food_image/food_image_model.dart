@@ -13,7 +13,7 @@ enum FoodEntityType {
   }
 }
 
-/// A search candidate returned by an image provider (e.g., Pexels)
+/// A search candidate returned by an image provider (e.g., Pixabay)
 @immutable
 class FoodImageCandidate {
   final String photoId;
@@ -34,20 +34,21 @@ class FoodImageCandidate {
     required this.photographerUrl,
     required this.sourcePageUrl,
     required this.altDescription,
-    this.provider = 'pexels',
+    this.provider = 'pixabay',
     this.score = 0,
   });
 
   factory FoodImageCandidate.fromJson(Map<String, dynamic> json) {
+    final prov = (json['provider'] ?? 'pixabay').toString();
     return FoodImageCandidate(
       photoId: (json['photoId'] ?? json['id'] ?? '').toString(),
       imageUrl: (json['imageUrl'] ?? '').toString(),
       thumbnailUrl: (json['thumbnailUrl'] ?? json['imageUrl'] ?? '').toString(),
-      photographerName: (json['photographerName'] ?? json['photographer'] ?? 'Pexels Photographer').toString(),
-      photographerUrl: (json['photographerUrl'] ?? json['photographer_url'] ?? 'https://www.pexels.com').toString(),
-      sourcePageUrl: (json['sourcePageUrl'] ?? json['url'] ?? 'https://www.pexels.com').toString(),
-      altDescription: (json['altDescription'] ?? json['alt'] ?? '').toString(),
-      provider: (json['provider'] ?? 'pexels').toString(),
+      photographerName: (json['photographerName'] ?? json['photographer'] ?? json['user'] ?? 'Pixabay Contributor').toString(),
+      photographerUrl: (json['photographerUrl'] ?? json['photographer_url'] ?? 'https://pixabay.com').toString(),
+      sourcePageUrl: (json['sourcePageUrl'] ?? json['url'] ?? json['pageURL'] ?? 'https://pixabay.com').toString(),
+      altDescription: (json['altDescription'] ?? json['alt'] ?? json['tags'] ?? '').toString(),
+      provider: prov,
       score: (json['score'] as num? ?? 0).toInt(),
     );
   }
@@ -75,7 +76,7 @@ class FoodImageModel {
   final String entityKey;
   final String displayName;
   final String imageUrl;
-  final String provider; // 'pexels', 'curated', 'user_override', 'placeholder'
+  final String provider; // 'pixabay', 'curated', 'user_override', 'placeholder'
   final String? providerPhotoId;
   final String? photographerName;
   final String? photographerUrl;
@@ -94,7 +95,7 @@ class FoodImageModel {
     required this.entityKey,
     required this.displayName,
     required this.imageUrl,
-    this.provider = 'pexels',
+    this.provider = 'pixabay',
     this.providerPhotoId,
     this.photographerName,
     this.photographerUrl,
@@ -118,11 +119,12 @@ class FoodImageModel {
   bool get hasAttribution =>
       photographerName != null &&
       photographerName!.isNotEmpty &&
-      provider == 'pexels';
+      (provider == 'pixabay' || provider == 'pexels');
 
   String get attributionText {
     if (!hasAttribution) return '';
-    return 'Photo by $photographerName on Pexels';
+    final provName = provider == 'pexels' ? 'Pexels' : 'Pixabay';
+    return 'Photo by $photographerName on $provName';
   }
 
   FoodImageModel copyWith({
@@ -172,7 +174,7 @@ class FoodImageModel {
       entityKey: (json['entity_key'] ?? json['entityKey'] ?? '').toString(),
       displayName: (json['display_name'] ?? json['displayName'] ?? '').toString(),
       imageUrl: (json['image_url'] ?? json['imageUrl'] ?? '').toString(),
-      provider: (json['provider'] ?? 'pexels').toString(),
+      provider: (json['provider'] ?? 'pixabay').toString(),
       providerPhotoId: json['provider_photo_id']?.toString() ?? json['providerPhotoId']?.toString(),
       photographerName: json['photographer_name']?.toString() ?? json['photographerName']?.toString(),
       photographerUrl: json['photographer_url']?.toString() ?? json['photographerUrl']?.toString(),

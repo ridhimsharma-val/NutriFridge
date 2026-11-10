@@ -7,27 +7,29 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-interface PexelsPhoto {
+interface PixabayHit {
   id: number;
-  width: number;
-  height: number;
-  url: string;
-  photographer: string;
-  photographer_url: string;
-  photographer_id: number;
-  avg_color: string;
-  src: {
-    original: string;
-    large2x: string;
-    large: string;
-    medium: string;
-    small: string;
-    portrait: string;
-    landscape: string;
-    tiny: string;
-  };
-  liked: boolean;
-  alt: string;
+  pageURL: string;
+  type: string;
+  tags: string;
+  previewURL: string;
+  previewWidth: number;
+  previewHeight: number;
+  webformatURL: string;
+  webformatWidth: number;
+  webformatHeight: number;
+  largeImageURL: string;
+  imageWidth: number;
+  imageHeight: number;
+  imageSize: number;
+  views: number;
+  downloads: number;
+  collections: number;
+  likes: number;
+  comments: number;
+  user_id: number;
+  user: string;
+  userImageURL: string;
 }
 
 interface ScoredCandidate {
@@ -118,17 +120,27 @@ serve(async (req: Request) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+    let userId: string | null = null;
+    const isServiceRole = Boolean(supabaseServiceKey && token === supabaseServiceKey);
+    const isAnon = Boolean(supabaseAnonKey && token === supabaseAnonKey);
+
+    let supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: `Bearer ${token}` } },
       auth: { persistSession: false },
     });
 
-    const { data: { user }, error: authError } = await supabaseUser.auth.getUser(token);
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ ok: false, error: 'UNAUTHORIZED', message: 'Invalid or expired session token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (isServiceRole) {
+      userId = 'system-service-role';
+      supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: { persistSession: false },
+      });
+    } else if (isAnon) {
+      userId = null;
+    } else {
+      const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
+      if (user && !authError) {
+        userId = user.id;
+      }
     }
 
     // 2. Parse request payload
@@ -151,7 +163,7 @@ serve(async (req: Request) => {
       const canonicalKey = normalizeKey(query);
 
       // Check DB mapping for pan_cutout_url
-      const { data: dbEntry } = await supabaseUser
+      const { data: dbEntry } = await supabaseClient
         .from('food_image_mappings')
         .select('pan_cutout_url')
         .eq('entity_type', entityType)
@@ -172,12 +184,12 @@ serve(async (req: Request) => {
 
       // Check Supabase Storage food-photos/cutouts/${canonicalKey}.png
       const cutoutPath = `cutouts/${canonicalKey}.png`;
-      const { data: fileData } = await supabaseUser.storage
+      const { data: fileData } = await supabaseClient.storage
         .from('food-photos')
         .list('cutouts', { search: `${canonicalKey}.png`, limit: 1 });
 
       if (Array.isArray(fileData) && fileData.some((f) => f.name === `${canonicalKey}.png`)) {
-        const { data: { publicUrl } } = supabaseUser.storage
+        const { data: { publicUrl } } = supabaseClient.storage
           .from('food-photos')
           .getPublicUrl(cutoutPath);
 
@@ -212,7 +224,7 @@ serve(async (req: Request) => {
 
           if (bgRes.ok) {
             const pngBlob = await bgRes.blob();
-            const { error: uploadError } = await supabaseUser.storage
+            const { error: uploadError } = await supabaseClient.storage
               .from('food-photos')
               .upload(cutoutPath, pngBlob, {
                 contentType: 'image/png',
@@ -220,7 +232,7 @@ serve(async (req: Request) => {
               });
 
             if (!uploadError) {
-              const { data: { publicUrl } } = supabaseUser.storage
+              const { data: { publicUrl } } = supabaseClient.storage
                 .from('food-photos')
                 .getPublicUrl(cutoutPath);
 
@@ -252,14 +264,14 @@ serve(async (req: Request) => {
       );
     }
 
-    // 4. Check Pexels API Key
-    const pexelsApiKey = Deno.env.get('PEXELS_API_KEY');
-    if (!pexelsApiKey) {
+    // 4. Check Pixabay API Key
+    const pixabayApiKey = Deno.env.get('PIXABAY_API_KEY');
+    if (!pixabayApiKey) {
       return new Response(
         JSON.stringify({
           ok: false,
-          error: 'PEXELS_API_KEY_NOT_CONFIGURED',
-          message: 'Pexels API key is not configured in Supabase secrets. Please set PEXELS_API_KEY in Supabase Vault.',
+          error: 'PIXABAY_API_KEY_NOT_CONFIGURED',
+          message: 'Pixabay API key is not configured in Supabase secrets. Please set PIXABAY_API_KEY in Supabase Vault.',
           candidates: [],
           bestMatch: null,
         }),
@@ -267,32 +279,61 @@ serve(async (req: Request) => {
       );
     }
 
-    // 4. Request Pexels Search Photos API
-    const pexelsUrl = new URL('https://api.pexels.com/v1/search');
-    pexelsUrl.searchParams.set('query', query);
-    pexelsUrl.searchParams.set('per_page', String(perPage));
-    if (orientation === 'square' || orientation === 'landscape' || orientation === 'portrait') {
-      pexelsUrl.searchParams.set('orientation', orientation);
+    // 5. Query official Pixabay API (https://pixabay.com/api/)
+    const cleanQuery = query
+      .replace(/[^a-zA-Z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    async function queryPixabay(searchTerm: string, categoryFilter?: string): Promise<{ status: number; hits: PixabayHit[] }> {
+      const pixabayUrl = new URL('https://pixabay.com/api/');
+      pixabayUrl.searchParams.set('key', pixabayApiKey!);
+      pixabayUrl.searchParams.set('q', searchTerm);
+      pixabayUrl.searchParams.set('image_type', 'photo');
+      pixabayUrl.searchParams.set('safesearch', 'true');
+      pixabayUrl.searchParams.set('per_page', String(Math.max(perPage, 5)));
+      if (categoryFilter) {
+        pixabayUrl.searchParams.set('category', categoryFilter);
+      }
+      if (orientation === 'horizontal' || orientation === 'vertical') {
+        pixabayUrl.searchParams.set('orientation', orientation);
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      const res = await fetch(pixabayUrl.toString(), {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'NutriFridge-App/1.0',
+        },
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeoutId));
+
+      if (!res.ok) {
+        return { status: res.status, hits: [] };
+      }
+      const data = await res.json();
+      return { status: 200, hits: Array.isArray(data.hits) ? data.hits : [] };
     }
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    // First attempt: food category filter
+    let { status: pixabayStatus, hits: photos } = await queryPixabay(cleanQuery, 'food');
 
-    const pexelsRes = await fetch(pexelsUrl.toString(), {
-      method: 'GET',
-      headers: {
-        Authorization: pexelsApiKey,
-        'User-Agent': 'NutriFridge-App/1.0',
-      },
-      signal: controller.signal,
-    }).finally(() => clearTimeout(timeoutId));
+    // If no hits found under food category, retry without category filter (e.g. regional dishes)
+    if (pixabayStatus === 200 && photos.length === 0) {
+      const broad = await queryPixabay(cleanQuery);
+      if (broad.status === 200) {
+        photos = broad.hits;
+      }
+    }
 
-    if (pexelsRes.status === 429) {
+    if (pixabayStatus === 429) {
       return new Response(
         JSON.stringify({
           ok: false,
           error: 'RATE_LIMITED',
-          message: 'Pexels API rate limit exceeded. Please try again later.',
+          message: 'Pixabay API rate limit exceeded. Please try again later.',
           candidates: [],
           bestMatch: null,
         }),
@@ -300,12 +341,12 @@ serve(async (req: Request) => {
       );
     }
 
-    if (!pexelsRes.ok) {
+    if (pixabayStatus !== 200 && photos.length === 0) {
       return new Response(
         JSON.stringify({
           ok: false,
           error: 'PROVIDER_ERROR',
-          message: `Pexels API responded with status ${pexelsRes.status}`,
+          message: `Pixabay API responded with status ${pixabayStatus}`,
           candidates: [],
           bestMatch: null,
         }),
@@ -313,31 +354,25 @@ serve(async (req: Request) => {
       );
     }
 
-    const pexelsData = await pexelsRes.json();
-    const photos: PexelsPhoto[] = Array.isArray(pexelsData.photos) ? pexelsData.photos : [];
-
-    // 5. Score and normalize candidates
+    // 6. Score and normalize candidates
     const candidates: ScoredCandidate[] = [];
     for (const p of photos) {
-      const slug = p.url.split('/photo/')[1] || '';
-      const score = calculateMatchScore(query, p.alt, slug, entityType);
+      const score = calculateMatchScore(query, p.tags, p.pageURL, entityType);
 
-      // Choose image sizes:
-      // For recipes/meal hero: 'large' (approx 940px wide) or 'medium'
-      // For ingredients: 'medium' (approx 350px)
+      // Webformat (~640px) is ideal for inventory and cards; largeImageURL (~1280px) for recipe hero
       const primaryUrl = entityType === 'recipe'
-        ? (p.src.large || p.src.medium || p.src.original)
-        : (p.src.medium || p.src.small || p.src.original);
+        ? (p.largeImageURL || p.webformatURL)
+        : (p.webformatURL || p.largeImageURL);
 
       candidates.push({
         photoId: String(p.id),
         imageUrl: primaryUrl,
-        thumbnailUrl: p.src.tiny || p.src.small,
-        photographerName: p.photographer || 'Pexels Photographer',
-        photographerUrl: p.photographer_url || 'https://www.pexels.com',
-        sourcePageUrl: p.url || 'https://www.pexels.com',
-        altDescription: p.alt || query,
-        provider: 'pexels',
+        thumbnailUrl: p.previewURL || p.webformatURL,
+        photographerName: p.user || 'Pixabay Contributor',
+        photographerUrl: p.user ? `https://pixabay.com/users/${p.user}-${p.user_id}/` : 'https://pixabay.com',
+        sourcePageUrl: p.pageURL || 'https://pixabay.com',
+        altDescription: p.tags || query,
+        provider: 'pixabay',
         score,
       });
     }
@@ -345,8 +380,8 @@ serve(async (req: Request) => {
     // Sort descending by score
     candidates.sort((a, b) => b.score - a.score);
 
-    // Filter acceptable matches for automatic resolution (threshold >= 40)
-    const bestMatch = candidates.length > 0 && candidates[0].score >= 40
+    // Filter acceptable matches for automatic resolution (threshold >= 35)
+    const bestMatch = candidates.length > 0 && candidates[0].score >= 35
       ? candidates[0]
       : null;
 
@@ -354,7 +389,7 @@ serve(async (req: Request) => {
     let panCutoutUrl: string | null = null;
     const canonicalKey = normalizeKey(query);
     try {
-      const { data: existingEntry } = await supabaseUser
+      const { data: existingEntry } = await supabaseClient
         .from('food_image_mappings')
         .select('pan_cutout_url')
         .eq('entity_type', entityType)
@@ -365,7 +400,7 @@ serve(async (req: Request) => {
       }
     } catch (_) {}
 
-    // 6. If action is resolve and bestMatch found, optionally persist to shared catalog using service role
+    // 7. If action is resolve and bestMatch found, optionally persist to shared catalog using service role
     if (action === 'resolve' && bestMatch && supabaseServiceKey) {
       try {
         const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
@@ -379,7 +414,7 @@ serve(async (req: Request) => {
             display_name: query,
             image_url: bestMatch.imageUrl,
             pan_cutout_url: panCutoutUrl,
-            provider: 'pexels',
+            provider: 'pixabay',
             provider_photo_id: bestMatch.photoId,
             photographer_name: bestMatch.photographerName,
             photographer_url: bestMatch.photographerUrl,

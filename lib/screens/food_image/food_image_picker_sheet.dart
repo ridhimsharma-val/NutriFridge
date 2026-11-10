@@ -319,10 +319,10 @@ class _FoodImagePickerSheetState extends State<FoodImagePickerSheet> {
 
           const SizedBox(height: 8),
 
-          // Pexels Attribution
+          // Pixabay Attribution
           Center(
             child: Text(
-              'Photography provided by Pexels',
+              'Photography provided by Pixabay',
               style: TextStyle(
                 fontSize: 11,
                 color: AppColors.textSecondary.withValues(alpha: 0.8),

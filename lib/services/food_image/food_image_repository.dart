@@ -270,7 +270,7 @@ class FoodImageRepository {
       final updated = existing.copyWith(
         imageUrl: shared?.imageUrl,
         isUserOverride: false,
-        provider: shared?.provider ?? 'pexels',
+        provider: shared?.provider ?? 'pixabay',
         photographerName: shared?.photographerName,
         photographerUrl: shared?.photographerUrl,
         sourcePageUrl: shared?.sourcePageUrl,

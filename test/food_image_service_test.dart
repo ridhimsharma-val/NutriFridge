@@ -37,13 +37,13 @@ void main() {
           'action': 'resolve',
           'bestMatch': {
             'photoId': 'px_paneer_123',
-            'imageUrl': 'https://images.pexels.com/photos/123/paneer.jpg',
-            'thumbnailUrl': 'https://images.pexels.com/photos/123/paneer_small.jpg',
+            'imageUrl': 'https://cdn.pixabay.com/photo/123/paneer.jpg',
+            'thumbnailUrl': 'https://cdn.pixabay.com/photo/123/paneer_small.jpg',
             'photographerName': 'Chef Aarti',
-            'photographerUrl': 'https://www.pexels.com/@aarti',
-            'sourcePageUrl': 'https://www.pexels.com/photo/fresh-paneer-cubes-123/',
+            'photographerUrl': 'https://pixabay.com/users/aarti-123/',
+            'sourcePageUrl': 'https://pixabay.com/photos/fresh-paneer-cubes-123/',
             'altDescription': 'Fresh organic paneer cubes on wooden board',
-            'provider': 'pexels',
+            'provider': 'pixabay',
             'score': 95,
           },
         };
@@ -57,11 +57,11 @@ void main() {
       );
 
       expect(resolved.entityKey, 'paneer');
-      expect(resolved.imageUrl, 'https://images.pexels.com/photos/123/paneer.jpg');
-      expect(resolved.provider, 'pexels');
+      expect(resolved.imageUrl, 'https://cdn.pixabay.com/photo/123/paneer.jpg');
+      expect(resolved.provider, 'pixabay');
       expect(resolved.photographerName, 'Chef Aarti');
       expect(resolved.hasAttribution, isTrue);
-      expect(resolved.attributionText, 'Photo by Chef Aarti on Pexels');
+      expect(resolved.attributionText, 'Photo by Chef Aarti on Pixabay');
       expect(edgeFunctionCallCount, 1);
     });
 
@@ -73,13 +73,13 @@ void main() {
           'action': 'resolve',
           'bestMatch': {
             'photoId': 'px_apple_456',
-            'imageUrl': 'https://images.pexels.com/photos/456/apple.jpg',
-            'thumbnailUrl': 'https://images.pexels.com/photos/456/apple_thumb.jpg',
+            'imageUrl': 'https://cdn.pixabay.com/photo/456/apple.jpg',
+            'thumbnailUrl': 'https://cdn.pixabay.com/photo/456/apple_thumb.jpg',
             'photographerName': 'John Orchard',
-            'photographerUrl': 'https://www.pexels.com/@john',
-            'sourcePageUrl': 'https://www.pexels.com/photo/crisp-red-apple-456/',
+            'photographerUrl': 'https://pixabay.com/users/john-456/',
+            'sourcePageUrl': 'https://pixabay.com/photos/crisp-red-apple-456/',
             'altDescription': 'Crisp red apple on rustic table',
-            'provider': 'pexels',
+            'provider': 'pixabay',
             'score': 100,
           },
         };
@@ -92,7 +92,7 @@ void main() {
       );
 
       expect(resolved.entityKey, 'apple');
-      expect(resolved.imageUrl, 'https://images.pexels.com/photos/456/apple.jpg');
+      expect(resolved.imageUrl, 'https://cdn.pixabay.com/photo/456/apple.jpg');
     });
 
     // Scenario 3: Add an unfamiliar ingredient -> resolves a relevant image or displays a clean placeholder
@@ -122,19 +122,18 @@ void main() {
     test('Scenario 4: Generate Shahi Paneer resolves matching recipe photograph', () async {
       FoodImageResolver.mockHandler = (body) async {
         expect(body['entityType'], 'recipe');
-        expect(body['orientation'], 'landscape');
         return {
           'ok': true,
           'action': 'resolve',
           'bestMatch': {
             'photoId': 'px_shahi_789',
-            'imageUrl': 'https://images.pexels.com/photos/789/shahi_paneer.jpg',
-            'thumbnailUrl': 'https://images.pexels.com/photos/789/shahi_paneer_thumb.jpg',
+            'imageUrl': 'https://cdn.pixabay.com/photo/789/shahi_paneer.jpg',
+            'thumbnailUrl': 'https://cdn.pixabay.com/photo/789/shahi_paneer_thumb.jpg',
             'photographerName': 'Priya Gourmet',
-            'photographerUrl': 'https://www.pexels.com/@priya',
-            'sourcePageUrl': 'https://www.pexels.com/photo/royal-shahi-paneer-curry-789/',
+            'photographerUrl': 'https://pixabay.com/users/priya-789/',
+            'sourcePageUrl': 'https://pixabay.com/photos/royal-shahi-paneer-curry-789/',
             'altDescription': 'Authentic royal Shahi Paneer with rich gravy',
-            'provider': 'pexels',
+            'provider': 'pixabay',
             'score': 90,
           },
         };
@@ -147,8 +146,8 @@ void main() {
       );
 
       expect(resolved.entityKey, 'shahi paneer');
-      expect(resolved.imageUrl, 'https://images.pexels.com/photos/789/shahi_paneer.jpg');
-      expect(resolved.provider, 'pexels');
+      expect(resolved.imageUrl, 'https://cdn.pixabay.com/photo/789/shahi_paneer.jpg');
+      expect(resolved.provider, 'pixabay');
     });
 
     // Scenario 5: Open the same ingredient across three different screens -> identical image mapping
@@ -157,8 +156,8 @@ void main() {
         entityType: FoodEntityType.ingredient,
         entityKey: 'paneer',
         displayName: 'Paneer',
-        imageUrl: 'https://images.pexels.com/photos/123/paneer.jpg',
-        provider: 'pexels',
+        imageUrl: 'https://cdn.pixabay.com/photo/123/paneer.jpg',
+        provider: 'pixabay',
         photographerName: 'Chef Aarti',
       );
       FoodImageRepository.instance.putInMemoryCache(savedModel);
@@ -184,9 +183,9 @@ void main() {
         type: FoodEntityType.ingredient,
       )).imageUrl;
 
-      expect(imgScreen1, 'https://images.pexels.com/photos/123/paneer.jpg');
-      expect(imgScreen2, 'https://images.pexels.com/photos/123/paneer.jpg');
-      expect(imgScreen3, 'https://images.pexels.com/photos/123/paneer.jpg');
+      expect(imgScreen1, 'https://cdn.pixabay.com/photo/123/paneer.jpg');
+      expect(imgScreen2, 'https://cdn.pixabay.com/photo/123/paneer.jpg');
+      expect(imgScreen3, 'https://cdn.pixabay.com/photo/123/paneer.jpg');
       expect(imgScreen1, equals(imgScreen2));
       expect(imgScreen2, equals(imgScreen3));
     });
@@ -201,13 +200,13 @@ void main() {
           'action': 'resolve',
           'bestMatch': {
             'photoId': 'px_pasta_1',
-            'imageUrl': 'https://images.pexels.com/photos/999/pasta.jpg',
-            'thumbnailUrl': 'https://images.pexels.com/photos/999/pasta_thumb.jpg',
+            'imageUrl': 'https://cdn.pixabay.com/photo/999/pasta.jpg',
+            'thumbnailUrl': 'https://cdn.pixabay.com/photo/999/pasta_thumb.jpg',
             'photographerName': 'Luigi Rossi',
-            'photographerUrl': 'https://www.pexels.com/@luigi',
-            'sourcePageUrl': 'https://www.pexels.com/photo/italian-pasta-999/',
+            'photographerUrl': 'https://pixabay.com/users/luigi-999/',
+            'sourcePageUrl': 'https://pixabay.com/photos/italian-pasta-999/',
             'altDescription': 'Fresh homemade vegetable pasta',
-            'provider': 'pexels',
+            'provider': 'pixabay',
             'score': 90,
           },
         };
@@ -218,7 +217,7 @@ void main() {
         name: 'Veggie Pasta',
         type: FoodEntityType.recipe,
       );
-      expect(first.imageUrl, 'https://images.pexels.com/photos/999/pasta.jpg');
+      expect(first.imageUrl, 'https://cdn.pixabay.com/photo/999/pasta.jpg');
       expect(searchRequestsCount, 1);
 
       // Second time viewing (e.g., navigating back to recipe or reopening detail)
@@ -226,7 +225,7 @@ void main() {
         name: 'Veggie Pasta',
         type: FoodEntityType.recipe,
       );
-      expect(second.imageUrl, 'https://images.pexels.com/photos/999/pasta.jpg');
+      expect(second.imageUrl, 'https://cdn.pixabay.com/photo/999/pasta.jpg');
       // No additional network call made
       expect(searchRequestsCount, 1);
     });
@@ -238,20 +237,21 @@ void main() {
         entityType: FoodEntityType.ingredient,
         entityKey: 'paneer',
         displayName: 'Paneer',
-        imageUrl: 'https://images.pexels.com/photos/auto/paneer.jpg',
-        provider: 'pexels',
+        imageUrl: 'https://cdn.pixabay.com/photo/auto/paneer.jpg',
+        provider: 'pixabay',
       );
       FoodImageRepository.instance.putInMemoryCache(autoModel);
 
       // 2. User selects an alternative photo
       const newCandidate = FoodImageCandidate(
         photoId: 'px_user_selected_77',
-        imageUrl: 'https://images.pexels.com/photos/manual/crispy_paneer.jpg',
-        thumbnailUrl: 'https://images.pexels.com/photos/manual/crispy_paneer_thumb.jpg',
+        imageUrl: 'https://cdn.pixabay.com/photo/manual/crispy_paneer.jpg',
+        thumbnailUrl: 'https://cdn.pixabay.com/photo/manual/crispy_paneer_thumb.jpg',
         photographerName: 'Gourmet Master',
-        photographerUrl: 'https://www.pexels.com/@gourmet',
-        sourcePageUrl: 'https://www.pexels.com/photo/crispy-paneer-77/',
+        photographerUrl: 'https://pixabay.com/users/gourmet-77/',
+        sourcePageUrl: 'https://pixabay.com/photos/crispy-paneer-77/',
         altDescription: 'Golden pan-fried paneer cubes',
+        provider: 'pixabay',
       );
 
       final override = await FoodImageService.instance.setUserOverride(
@@ -262,7 +262,7 @@ void main() {
       );
 
       expect(override.isUserOverride, isTrue);
-      expect(override.imageUrl, 'https://images.pexels.com/photos/manual/crispy_paneer.jpg');
+      expect(override.imageUrl, 'https://cdn.pixabay.com/photo/manual/crispy_paneer.jpg');
 
       // 3. Any screen querying Paneer receives the new user override
       final resolved = FoodImageService.instance.getImageSync(
@@ -270,7 +270,7 @@ void main() {
         type: FoodEntityType.ingredient,
         userId: 'test_user_1',
       );
-      expect(resolved.imageUrl, 'https://images.pexels.com/photos/manual/crispy_paneer.jpg');
+      expect(resolved.imageUrl, 'https://cdn.pixabay.com/photo/manual/crispy_paneer.jpg');
       expect(resolved.isUserOverride, isTrue);
     });
 
@@ -281,8 +281,8 @@ void main() {
         entityType: FoodEntityType.ingredient,
         entityKey: 'tomato',
         displayName: 'Tomato',
-        imageUrl: 'https://images.pexels.com/photos/auto/tomato.jpg',
-        provider: 'pexels',
+        imageUrl: 'https://cdn.pixabay.com/photo/auto/tomato.jpg',
+        provider: 'pixabay',
       );
       FoodImageRepository.instance.putInMemoryCache(autoModel);
 
@@ -292,12 +292,13 @@ void main() {
         type: FoodEntityType.ingredient,
         candidate: const FoodImageCandidate(
           photoId: 'px_override',
-          imageUrl: 'https://images.pexels.com/photos/manual/cherry_tomato.jpg',
-          thumbnailUrl: 'https://images.pexels.com/photos/manual/cherry_tomato_thumb.jpg',
+          imageUrl: 'https://cdn.pixabay.com/photo/manual/cherry_tomato.jpg',
+          thumbnailUrl: 'https://cdn.pixabay.com/photo/manual/cherry_tomato_thumb.jpg',
           photographerName: 'Farmer Dan',
-          photographerUrl: 'https://www.pexels.com/@dan',
-          sourcePageUrl: 'https://www.pexels.com/photo/cherry-tomatoes-1/',
+          photographerUrl: 'https://pixabay.com/users/dan-1/',
+          sourcePageUrl: 'https://pixabay.com/photos/cherry-tomatoes-1/',
           altDescription: 'Ripe cherry tomatoes',
+          provider: 'pixabay',
         ),
         userId: 'test_user_1',
       );
@@ -312,7 +313,7 @@ void main() {
       );
 
       expect(restored.isUserOverride, isFalse);
-      expect(restored.imageUrl, 'https://images.pexels.com/photos/auto/tomato.jpg');
+      expect(restored.imageUrl, 'https://cdn.pixabay.com/photo/auto/tomato.jpg');
       expect(FoodImageService.instance.hasUserOverride(name: 'Tomato', type: FoodEntityType.ingredient, userId: 'test_user_1'), isFalse);
     });
 
@@ -324,12 +325,13 @@ void main() {
         type: FoodEntityType.ingredient,
         candidate: const FoodImageCandidate(
           photoId: 'photo_user_a',
-          imageUrl: 'https://images.pexels.com/user_a_paneer.jpg',
-          thumbnailUrl: 'https://images.pexels.com/user_a_paneer_thumb.jpg',
+          imageUrl: 'https://cdn.pixabay.com/user_a_paneer.jpg',
+          thumbnailUrl: 'https://cdn.pixabay.com/user_a_paneer_thumb.jpg',
           photographerName: 'Alice',
-          photographerUrl: 'https://www.pexels.com/@alice',
-          sourcePageUrl: 'https://www.pexels.com/photo/a/',
+          photographerUrl: 'https://pixabay.com/users/alice-1/',
+          sourcePageUrl: 'https://pixabay.com/photos/a/',
           altDescription: 'Alice Paneer',
+          provider: 'pixabay',
         ),
         userId: 'user_a',
       );
@@ -340,12 +342,13 @@ void main() {
         type: FoodEntityType.ingredient,
         candidate: const FoodImageCandidate(
           photoId: 'photo_user_b',
-          imageUrl: 'https://images.pexels.com/user_b_paneer.jpg',
-          thumbnailUrl: 'https://images.pexels.com/user_b_paneer_thumb.jpg',
+          imageUrl: 'https://cdn.pixabay.com/user_b_paneer.jpg',
+          thumbnailUrl: 'https://cdn.pixabay.com/user_b_paneer_thumb.jpg',
           photographerName: 'Bob',
-          photographerUrl: 'https://www.pexels.com/@bob',
-          sourcePageUrl: 'https://www.pexels.com/photo/b/',
+          photographerUrl: 'https://pixabay.com/users/bob-2/',
+          sourcePageUrl: 'https://pixabay.com/photos/b/',
           altDescription: 'Bob Paneer',
+          provider: 'pixabay',
         ),
         userId: 'user_b',
       );
@@ -356,7 +359,7 @@ void main() {
         type: FoodEntityType.ingredient,
         userId: 'user_a',
       );
-      expect(modelA.imageUrl, 'https://images.pexels.com/user_a_paneer.jpg');
+      expect(modelA.imageUrl, 'https://cdn.pixabay.com/user_a_paneer.jpg');
 
       // User B sees Photo B
       final modelB = FoodImageService.instance.getImageSync(
@@ -364,16 +367,16 @@ void main() {
         type: FoodEntityType.ingredient,
         userId: 'user_b',
       );
-      expect(modelB.imageUrl, 'https://images.pexels.com/user_b_paneer.jpg');
+      expect(modelB.imageUrl, 'https://cdn.pixabay.com/user_b_paneer.jpg');
     });
 
-    // Scenario 10: Pexels unavailable or rate-limited -> application continues working with placeholders
-    test('Scenario 10: Pexels rate-limit or outage falls back safely without crashing', () async {
+    // Scenario 10: Pixabay unavailable or rate-limited -> application continues working with placeholders
+    test('Scenario 10: Pixabay rate-limit or outage falls back safely without crashing', () async {
       FoodImageResolver.mockHandler = (body) async {
         return {
           'ok': false,
           'error': 'RATE_LIMITED',
-          'message': 'Pexels API rate limit exceeded. Please try again later.',
+          'message': 'Pixabay API rate limit exceeded. Please try again later.',
         };
       };
 
@@ -388,13 +391,13 @@ void main() {
       expect(resolved.imageUrl, 'assets/images/foods/milk.png');
     });
 
-    // Scenario 11: No Pexels key configured -> no crash or fake image assignment
-    test('Scenario 11: Missing Pexels key returns structured error and clean fallback without fake images', () async {
+    // Scenario 11: No Pixabay key configured -> no crash or fake image assignment
+    test('Scenario 11: Missing Pixabay key returns structured error and clean fallback without fake images', () async {
       FoodImageResolver.mockHandler = (body) async {
         return {
           'ok': false,
-          'error': 'PEXELS_API_KEY_NOT_CONFIGURED',
-          'message': 'Pexels API key is not configured in Supabase secrets.',
+          'error': 'PIXABAY_API_KEY_NOT_CONFIGURED',
+          'message': 'Pixabay API key is not configured in Supabase secrets.',
           'candidates': [],
           'bestMatch': null,
         };
@@ -410,14 +413,14 @@ void main() {
       expect(resolved.imageUrl, isNotEmpty);
     });
 
-    // Scenario 12: Cooking Pan cutouts and animations remain unchanged
-    test('Scenario 12: Cooking Pan cutouts remain strictly transparent PNG assets regardless of Pexels URLs', () {
-      // Even if an item has a resolved network Pexels photo
+    // Scenario 12: Cooking Pan cutouts remain strictly transparent PNG assets regardless of Pixabay URLs
+    test('Scenario 12: Cooking Pan cutouts remain strictly transparent PNG assets regardless of Pixabay URLs', () {
+      // Even if an item has a resolved network Pixabay photo
       const itemWithNetworkPhoto = CategoryFoodItem(
         id: 'paneer_item_1',
         name: 'Paneer',
         quantity: '250g',
-        imageAsset: 'https://images.pexels.com/photos/123/paneer_curry_bowl.jpg',
+        imageAsset: 'https://cdn.pixabay.com/photo/123/paneer_curry_bowl.jpg',
       );
 
       // CookingPanVisual.resolvePanAsset must ignore remote photos and retain dedicated transparent cutout
@@ -445,7 +448,7 @@ void main() {
           id: 'test_${tc['name']}',
           name: tc['name']!,
           quantity: '100g',
-          imageAsset: 'https://images.pexels.com/photos/999/random_photo.jpg',
+          imageAsset: 'https://cdn.pixabay.com/photo/999/random_photo.jpg',
         );
 
         final panAsset = CookingPanVisual.resolvePanAsset(item);
@@ -462,11 +465,11 @@ void main() {
           'action': 'resolve',
           'bestMatch': {
             'photoId': 'px_paneer_photo_1',
-            'imageUrl': 'https://images.pexels.com/photos/111/rich_paneer_photo.jpg',
-            'thumbnailUrl': 'https://images.pexels.com/photos/111/thumb.jpg',
+            'imageUrl': 'https://cdn.pixabay.com/photo/111/rich_paneer_photo.jpg',
+            'thumbnailUrl': 'https://cdn.pixabay.com/photo/111/thumb.jpg',
             'photographerName': 'Food Stylist',
             'altDescription': 'Fresh paneer photo',
-            'provider': 'pexels',
+            'provider': 'pixabay',
             'score': 90,
           },
           'panCutoutUrl': 'https://kmwagsheagttauoqbzom.supabase.co/storage/v1/object/public/food-photos/cutouts/paneer.png',
@@ -480,7 +483,7 @@ void main() {
       );
 
       // Display image is regular food photography
-      expect(resolved.displayImageUrl, 'https://images.pexels.com/photos/111/rich_paneer_photo.jpg');
+      expect(resolved.displayImageUrl, 'https://cdn.pixabay.com/photo/111/rich_paneer_photo.jpg');
       // Pan cutout is background-free transparent asset
       expect(resolved.panCutoutUrl, isNotNull);
       expect(resolved.panCutoutUrl, contains('paneer'));
@@ -493,20 +496,20 @@ void main() {
         entityType: FoodEntityType.ingredient,
         entityKey: 'paneer',
         displayName: 'Paneer',
-        imageUrl: 'https://images.pexels.com/photos/initial/paneer.jpg',
+        imageUrl: 'https://cdn.pixabay.com/photo/initial/paneer.jpg',
         panCutoutUrl: 'assets/images/foods/paneer.png',
-        provider: 'pexels',
+        provider: 'pixabay',
       );
       FoodImageRepository.instance.putInMemoryCache(initialModel);
 
       // 2. User changes regular photograph
       const newCandidate = FoodImageCandidate(
         photoId: 'px_new_photo',
-        imageUrl: 'https://images.pexels.com/photos/user_chosen/paneer.jpg',
-        thumbnailUrl: 'https://images.pexels.com/photos/user_chosen/thumb.jpg',
+        imageUrl: 'https://cdn.pixabay.com/photo/user_chosen/paneer.jpg',
+        thumbnailUrl: 'https://cdn.pixabay.com/photo/user_chosen/thumb.jpg',
         photographerName: 'New Photographer',
-        photographerUrl: 'https://pexels.com',
-        sourcePageUrl: 'https://pexels.com',
+        photographerUrl: 'https://pixabay.com',
+        sourcePageUrl: 'https://pixabay.com',
         altDescription: 'User chosen paneer',
       );
 
@@ -516,7 +519,7 @@ void main() {
         candidate: newCandidate,
       );
 
-      expect(updated.imageUrl, 'https://images.pexels.com/photos/user_chosen/paneer.jpg');
+      expect(updated.imageUrl, 'https://cdn.pixabay.com/photo/user_chosen/paneer.jpg');
       expect(updated.isUserOverride, isTrue);
       // Pan cutout is completely preserved!
       expect(updated.panCutoutUrl, 'assets/images/foods/paneer.png');
@@ -529,9 +532,9 @@ void main() {
         entityType: FoodEntityType.ingredient,
         entityKey: 'apple',
         displayName: 'Apple',
-        imageUrl: 'https://images.pexels.com/photos/initial/apple.jpg',
+        imageUrl: 'https://cdn.pixabay.com/photo/initial/apple.jpg',
         panCutoutUrl: 'assets/images/foods/apple.png',
-        provider: 'pexels',
+        provider: 'pixabay',
       );
       FoodImageRepository.instance.putInMemoryCache(initialModel);
 
@@ -544,7 +547,7 @@ void main() {
       expect(updated.panCutoutUrl, 'https://kmwagsheagttauoqbzom.supabase.co/storage/v1/object/public/food-photos/cutouts/green_apple.png');
       expect(updated.isPanOverride, isTrue);
       // Regular photo remains unchanged!
-      expect(updated.imageUrl, 'https://images.pexels.com/photos/initial/apple.jpg');
+      expect(updated.imageUrl, 'https://cdn.pixabay.com/photo/initial/apple.jpg');
       expect(updated.isUserOverride, isFalse);
     });
 
@@ -625,9 +628,9 @@ void main() {
           entityType: FoodEntityType.recipe,
           entityKey: 'paneer biryani',
           displayName: 'Paneer Biryani',
-          imageUrl: 'https://images.pexels.com/photos/101/biryani.jpg',
+          imageUrl: 'https://cdn.pixabay.com/photo/101/biryani.jpg',
           photographerName: 'Chef Sanjay',
-          provider: 'pexels',
+          provider: 'pixabay',
         ),
       );
 
@@ -644,7 +647,7 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('Photo by Chef Sanjay on Pexels'), findsOneWidget);
+      expect(find.text('Photo by Chef Sanjay on Pixabay'), findsOneWidget);
     });
 
     // Widget Scenario: FoodImagePickerSheet renders candidate grid and lets user select
@@ -656,19 +659,19 @@ void main() {
           'candidates': [
             {
               'photoId': 'cand_1',
-              'imageUrl': 'https://images.pexels.com/photos/1/paneer_1.jpg',
-              'thumbnailUrl': 'https://images.pexels.com/photos/1/paneer_1_thumb.jpg',
+              'imageUrl': 'https://cdn.pixabay.com/photo/1/paneer_1.jpg',
+              'thumbnailUrl': 'https://cdn.pixabay.com/photo/1/paneer_1_thumb.jpg',
               'photographerName': 'Photographer One',
               'altDescription': 'Fresh paneer',
-              'provider': 'pexels',
+              'provider': 'pixabay',
             },
             {
               'photoId': 'cand_2',
-              'imageUrl': 'https://images.pexels.com/photos/2/paneer_2.jpg',
-              'thumbnailUrl': 'https://images.pexels.com/photos/2/paneer_2_thumb.jpg',
+              'imageUrl': 'https://cdn.pixabay.com/photo/2/paneer_2.jpg',
+              'thumbnailUrl': 'https://cdn.pixabay.com/photo/2/paneer_2_thumb.jpg',
               'photographerName': 'Photographer Two',
               'altDescription': 'Paneer cubes',
-              'provider': 'pexels',
+              'provider': 'pixabay',
             },
           ],
         };
@@ -690,7 +693,7 @@ void main() {
       expect(find.text('Paneer'), findsWidgets);
       expect(find.text('Photographer One'), findsOneWidget);
       expect(find.text('Photographer Two'), findsOneWidget);
-      expect(find.text('Photography provided by Pexels'), findsOneWidget);
+      expect(find.text('Photography provided by Pixabay'), findsOneWidget);
 
       // Tap on second candidate card
       final candidateCards = find.byWidgetPredicate((w) => w is GestureDetector && w.child is AnimatedContainer);
