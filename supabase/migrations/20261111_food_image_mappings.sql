@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS public.food_image_mappings (
     photographer_url TEXT,
     source_page_url TEXT,
     alt_description TEXT,
+    pan_cutout_url TEXT,
+    is_pan_override BOOLEAN NOT NULL DEFAULT false,
     is_user_override BOOLEAN NOT NULL DEFAULT false,
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE, -- NULL for shared catalog entries, populated for user overrides
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

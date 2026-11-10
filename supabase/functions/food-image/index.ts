@@ -146,7 +146,113 @@ serve(async (req: Request) => {
       );
     }
 
-    // 3. Check Pexels API Key
+    // 3. Dedicated Transparent Pan Cutout Resolution Action
+    if (action === 'resolve-cutout') {
+      const canonicalKey = normalizeKey(query);
+
+      // Check DB mapping for pan_cutout_url
+      const { data: dbEntry } = await supabaseUser
+        .from('food_image_mappings')
+        .select('pan_cutout_url')
+        .eq('entity_type', entityType)
+        .eq('entity_key', canonicalKey)
+        .maybeSingle();
+
+      if (dbEntry?.pan_cutout_url) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            action,
+            query,
+            panCutoutUrl: dbEntry.pan_cutout_url,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Check Supabase Storage food-photos/cutouts/${canonicalKey}.png
+      const cutoutPath = `cutouts/${canonicalKey}.png`;
+      const { data: fileData } = await supabaseUser.storage
+        .from('food-photos')
+        .list('cutouts', { search: `${canonicalKey}.png`, limit: 1 });
+
+      if (Array.isArray(fileData) && fileData.some((f) => f.name === `${canonicalKey}.png`)) {
+        const { data: { publicUrl } } = supabaseUser.storage
+          .from('food-photos')
+          .getPublicUrl(cutoutPath);
+
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            action,
+            query,
+            panCutoutUrl: publicUrl,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Optional background removal pipeline (remove.bg or similar)
+      const removeBgKey = Deno.env.get('REMOVE_BG_API_KEY');
+      const inputImageUrl = body.imageUrl;
+      if (removeBgKey && inputImageUrl) {
+        try {
+          const bgRes = await fetch('https://api.remove.bg/v1.0/removebg', {
+            method: 'POST',
+            headers: {
+              'X-Api-Key': removeBgKey,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              image_url: inputImageUrl,
+              size: 'auto',
+              format: 'png',
+            }),
+          });
+
+          if (bgRes.ok) {
+            const pngBlob = await bgRes.blob();
+            const { error: uploadError } = await supabaseUser.storage
+              .from('food-photos')
+              .upload(cutoutPath, pngBlob, {
+                contentType: 'image/png',
+                upsert: true,
+              });
+
+            if (!uploadError) {
+              const { data: { publicUrl } } = supabaseUser.storage
+                .from('food-photos')
+                .getPublicUrl(cutoutPath);
+
+              return new Response(
+                JSON.stringify({
+                  ok: true,
+                  action,
+                  query,
+                  panCutoutUrl: publicUrl,
+                }),
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            }
+          }
+        } catch (bgErr) {
+          console.warn('Background removal pipeline error:', bgErr);
+        }
+      }
+
+      // Return null so client falls back to clean transparent asset/placeholder
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          action,
+          query,
+          panCutoutUrl: null,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 4. Check Pexels API Key
     const pexelsApiKey = Deno.env.get('PEXELS_API_KEY');
     if (!pexelsApiKey) {
       return new Response(
@@ -244,13 +350,27 @@ serve(async (req: Request) => {
       ? candidates[0]
       : null;
 
+    // Check existing pan cutout for this entity
+    let panCutoutUrl: string | null = null;
+    const canonicalKey = normalizeKey(query);
+    try {
+      const { data: existingEntry } = await supabaseUser
+        .from('food_image_mappings')
+        .select('pan_cutout_url')
+        .eq('entity_type', entityType)
+        .eq('entity_key', canonicalKey)
+        .maybeSingle();
+      if (existingEntry?.pan_cutout_url) {
+        panCutoutUrl = existingEntry.pan_cutout_url;
+      }
+    } catch (_) {}
+
     // 6. If action is resolve and bestMatch found, optionally persist to shared catalog using service role
     if (action === 'resolve' && bestMatch && supabaseServiceKey) {
       try {
         const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
           auth: { persistSession: false },
         });
-        const canonicalKey = normalizeKey(query);
 
         await supabaseAdmin.from('food_image_mappings').upsert(
           {
@@ -258,6 +378,7 @@ serve(async (req: Request) => {
             entity_key: canonicalKey,
             display_name: query,
             image_url: bestMatch.imageUrl,
+            pan_cutout_url: panCutoutUrl,
             provider: 'pexels',
             provider_photo_id: bestMatch.photoId,
             photographer_name: bestMatch.photographerName,
@@ -287,6 +408,7 @@ serve(async (req: Request) => {
         totalFound: photos.length,
         candidates,
         bestMatch,
+        panCutoutUrl,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nutrifridge/models/nutrition_data.dart';
 import 'package:nutrifridge/screens/food_image/food_image_picker_sheet.dart';
+import 'package:nutrifridge/screens/food_image/pan_cutout_picker_sheet.dart';
 import 'package:nutrifridge/screens/food_image/widgets/food_image_view.dart';
 import 'package:nutrifridge/screens/fridge/models/category_item.dart';
 import 'package:nutrifridge/screens/fridge/widgets/cooking_pan_visual.dart';
@@ -426,6 +427,195 @@ void main() {
       expect(panAsset, startsWith('assets/images/foods/'));
       expect(panAsset, endsWith('.png'));
       expect(panAsset, 'assets/images/foods/paneer.png');
+    });
+
+    // Scenario 13: Dedicated transparent cutout resolution for Paneer, Apple, Broccoli, Eggs, Milk, Chicken
+    test('Scenario 13: Dedicated transparent cutout resolution for Paneer, Apple, Broccoli, Eggs, Milk, Chicken', () {
+      final testCases = [
+        {'name': 'Paneer', 'expected': 'assets/images/foods/paneer.png'},
+        {'name': 'Fresh Apples', 'expected': 'assets/images/foods/apple.png'},
+        {'name': 'Broccoli Florets', 'expected': 'assets/images/foods/broccoli.png'},
+        {'name': 'Organic Eggs', 'expected': 'assets/images/foods/eggs.png'},
+        {'name': 'Whole Milk', 'expected': 'assets/images/foods/milk.png'},
+        {'name': 'Chicken Breast', 'expected': 'assets/images/foods/chicken.png'},
+      ];
+
+      for (final tc in testCases) {
+        final item = CategoryFoodItem(
+          id: 'test_${tc['name']}',
+          name: tc['name']!,
+          quantity: '100g',
+          imageAsset: 'https://images.pexels.com/photos/999/random_photo.jpg',
+        );
+
+        final panAsset = CookingPanVisual.resolvePanAsset(item);
+        expect(panAsset, tc['expected']);
+        expect(item.effectivePanAsset, tc['expected']);
+      }
+    });
+
+    // Scenario 14: FoodImageModel stores separate displayImageUrl and panCutoutUrl
+    test('Scenario 14: FoodImageModel maintains two separate image variants for ingredients', () async {
+      FoodImageResolver.mockHandler = (body) async {
+        return {
+          'ok': true,
+          'action': 'resolve',
+          'bestMatch': {
+            'photoId': 'px_paneer_photo_1',
+            'imageUrl': 'https://images.pexels.com/photos/111/rich_paneer_photo.jpg',
+            'thumbnailUrl': 'https://images.pexels.com/photos/111/thumb.jpg',
+            'photographerName': 'Food Stylist',
+            'altDescription': 'Fresh paneer photo',
+            'provider': 'pexels',
+            'score': 90,
+          },
+          'panCutoutUrl': 'https://kmwagsheagttauoqbzom.supabase.co/storage/v1/object/public/food-photos/cutouts/paneer.png',
+        };
+      };
+
+      final resolved = await FoodImageService.instance.resolveImage(
+        name: 'Paneer Block',
+        type: FoodEntityType.ingredient,
+        category: 'Dairy Products',
+      );
+
+      // Display image is regular food photography
+      expect(resolved.displayImageUrl, 'https://images.pexels.com/photos/111/rich_paneer_photo.jpg');
+      // Pan cutout is background-free transparent asset
+      expect(resolved.panCutoutUrl, isNotNull);
+      expect(resolved.panCutoutUrl, contains('paneer'));
+    });
+
+    // Scenario 15: Changing regular photo does NOT overwrite pan cutout
+    test('Scenario 15: Changing regular photograph does not overwrite existing pan cutout', () async {
+      // 1. Initial mapping with both display photo and pan cutout
+      final initialModel = FoodImageModel(
+        entityType: FoodEntityType.ingredient,
+        entityKey: 'paneer',
+        displayName: 'Paneer',
+        imageUrl: 'https://images.pexels.com/photos/initial/paneer.jpg',
+        panCutoutUrl: 'assets/images/foods/paneer.png',
+        provider: 'pexels',
+      );
+      FoodImageRepository.instance.putInMemoryCache(initialModel);
+
+      // 2. User changes regular photograph
+      const newCandidate = FoodImageCandidate(
+        photoId: 'px_new_photo',
+        imageUrl: 'https://images.pexels.com/photos/user_chosen/paneer.jpg',
+        thumbnailUrl: 'https://images.pexels.com/photos/user_chosen/thumb.jpg',
+        photographerName: 'New Photographer',
+        photographerUrl: 'https://pexels.com',
+        sourcePageUrl: 'https://pexels.com',
+        altDescription: 'User chosen paneer',
+      );
+
+      final updated = await FoodImageService.instance.setUserOverride(
+        name: 'Paneer',
+        type: FoodEntityType.ingredient,
+        candidate: newCandidate,
+      );
+
+      expect(updated.imageUrl, 'https://images.pexels.com/photos/user_chosen/paneer.jpg');
+      expect(updated.isUserOverride, isTrue);
+      // Pan cutout is completely preserved!
+      expect(updated.panCutoutUrl, 'assets/images/foods/paneer.png');
+    });
+
+    // Scenario 16: Changing pan cutout does NOT overwrite regular photograph
+    test('Scenario 16: Changing pan cutout does not overwrite regular photograph', () async {
+      // 1. Initial mapping
+      final initialModel = FoodImageModel(
+        entityType: FoodEntityType.ingredient,
+        entityKey: 'apple',
+        displayName: 'Apple',
+        imageUrl: 'https://images.pexels.com/photos/initial/apple.jpg',
+        panCutoutUrl: 'assets/images/foods/apple.png',
+        provider: 'pexels',
+      );
+      FoodImageRepository.instance.putInMemoryCache(initialModel);
+
+      // 2. User sets a custom pan cutout
+      final updated = await FoodImageService.instance.setPanOverride(
+        name: 'Apple',
+        panCutoutUrl: 'https://kmwagsheagttauoqbzom.supabase.co/storage/v1/object/public/food-photos/cutouts/green_apple.png',
+      );
+
+      expect(updated.panCutoutUrl, 'https://kmwagsheagttauoqbzom.supabase.co/storage/v1/object/public/food-photos/cutouts/green_apple.png');
+      expect(updated.isPanOverride, isTrue);
+      // Regular photo remains unchanged!
+      expect(updated.imageUrl, 'https://images.pexels.com/photos/initial/apple.jpg');
+      expect(updated.isUserOverride, isFalse);
+    });
+
+    // Scenario 17: Flying animation asset is 100% identical to CookingPanVisual asset
+    test('Scenario 17: FlyingIngredientOverlay and CookingPanVisual resolve identical cutout asset', () {
+      final items = [
+        const CategoryFoodItem(id: 'p1', name: 'Paneer', quantity: '100g'),
+        const CategoryFoodItem(id: 'a1', name: 'Apple', quantity: '2 pcs'),
+        const CategoryFoodItem(id: 'b1', name: 'Broccoli', quantity: '150g'),
+        const CategoryFoodItem(id: 'e1', name: 'Eggs', quantity: '6 pcs'),
+        const CategoryFoodItem(id: 'm1', name: 'Milk', quantity: '500ml'),
+        const CategoryFoodItem(id: 'c1', name: 'Chicken', quantity: '200g'),
+      ];
+
+      for (final item in items) {
+        final panAsset = CookingPanVisual.resolvePanAsset(item);
+        final itemPanAsset = item.effectivePanAsset;
+
+        expect(panAsset, isNotNull);
+        expect(panAsset, equals(itemPanAsset));
+        expect(panAsset!.endsWith('.png') || panAsset.endsWith('.webp'), isTrue);
+      }
+    });
+
+    // Scenario 18: Fallback when background removal fails uses clean transparent placeholder
+    test('Scenario 18: Remote background removal failure falls back to clean transparent asset rather than rectangular photo', () async {
+      FoodImageResolver.mockHandler = (body) async {
+        return {
+          'ok': true,
+          'action': 'resolve-cutout',
+          'panCutoutUrl': null, // background removal failed or unavailable
+        };
+      };
+
+      final cutout = await FoodImageService.instance.resolvePanCutout(
+        name: 'Exotic Starfruit',
+        category: 'Fruits',
+      );
+
+      expect(cutout, isNotNull);
+      expect(cutout.endsWith('.png') || cutout.endsWith('.webp'), isTrue);
+      expect(cutout, 'assets/images/foods/apple.png'); // clean transparent fruit fallback
+    });
+
+    // Scenario 19: PanCutoutPickerSheet renders skillet canvas and allows selecting cutout
+    testWidgets('Scenario 19: PanCutoutPickerSheet displays skillet preview and selects cutout', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: PanCutoutPickerSheet(
+              entityName: 'Paneer',
+              category: 'Dairy Products',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cooking Pan Cutout'), findsOneWidget);
+      expect(find.text('Transparent cutout for Paneer'), findsOneWidget);
+      expect(find.text('Dark skillet surface preview'), findsOneWidget);
+      expect(find.text('Set for Cooking Pan'), findsOneWidget);
+
+      // Tap on Broccoli cutout option (index 2: Paneer, Apple, Broccoli)
+      final cutoutCards = find.byWidgetPredicate((w) => w is GestureDetector && w.child is Container);
+      await tester.tap(cutoutCards.at(2));
+      await tester.pumpAndSettle();
+
+      // Button is enabled
+      final elevatedBtn = tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Set for Cooking Pan'));
+      expect(elevatedBtn.onPressed, isNotNull);
     });
 
     // Widget Scenario: FoodImageView renders network image with attribution pill

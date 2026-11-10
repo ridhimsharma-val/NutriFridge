@@ -81,6 +81,8 @@ class FoodImageModel {
   final String? photographerUrl;
   final String? sourcePageUrl;
   final String? altDescription;
+  final String? panCutoutUrl;
+  final bool isPanOverride;
   final bool isUserOverride;
   final String? userId;
   final DateTime? createdAt;
@@ -98,11 +100,16 @@ class FoodImageModel {
     this.photographerUrl,
     this.sourcePageUrl,
     this.altDescription,
+    this.panCutoutUrl,
+    this.isPanOverride = false,
     this.isUserOverride = false,
     this.userId,
     this.createdAt,
     this.updatedAt,
   });
+
+  String get displayImageUrl => imageUrl;
+  bool get hasPanCutout => panCutoutUrl != null && panCutoutUrl!.isNotEmpty;
 
   bool get isNetwork => imageUrl.startsWith('http://') || imageUrl.startsWith('https://');
   bool get isAsset => imageUrl.startsWith('assets/');
@@ -130,6 +137,8 @@ class FoodImageModel {
     String? photographerUrl,
     String? sourcePageUrl,
     String? altDescription,
+    String? panCutoutUrl,
+    bool? isPanOverride,
     bool? isUserOverride,
     String? userId,
     DateTime? createdAt,
@@ -147,6 +156,8 @@ class FoodImageModel {
       photographerUrl: photographerUrl ?? this.photographerUrl,
       sourcePageUrl: sourcePageUrl ?? this.sourcePageUrl,
       altDescription: altDescription ?? this.altDescription,
+      panCutoutUrl: panCutoutUrl ?? this.panCutoutUrl,
+      isPanOverride: isPanOverride ?? this.isPanOverride,
       isUserOverride: isUserOverride ?? this.isUserOverride,
       userId: userId ?? this.userId,
       createdAt: createdAt ?? this.createdAt,
@@ -167,6 +178,8 @@ class FoodImageModel {
       photographerUrl: json['photographer_url']?.toString() ?? json['photographerUrl']?.toString(),
       sourcePageUrl: json['source_page_url']?.toString() ?? json['sourcePageUrl']?.toString(),
       altDescription: json['alt_description']?.toString() ?? json['altDescription']?.toString(),
+      panCutoutUrl: json['pan_cutout_url']?.toString() ?? json['panCutoutUrl']?.toString(),
+      isPanOverride: json['is_pan_override'] == true || json['isPanOverride'] == true,
       isUserOverride: json['is_user_override'] == true || json['isUserOverride'] == true,
       userId: json['user_id']?.toString() ?? json['userId']?.toString(),
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
@@ -186,6 +199,8 @@ class FoodImageModel {
       'photographer_url': photographerUrl,
       'source_page_url': sourcePageUrl,
       'alt_description': altDescription,
+      'pan_cutout_url': panCutoutUrl,
+      'is_pan_override': isPanOverride,
       'is_user_override': isUserOverride,
       'user_id': userId,
     };

@@ -193,8 +193,13 @@ class _FlyingThumbnailWidgetState extends State<_FlyingThumbnailWidget>
 
         final String? imgAsset = CookingPanVisual.resolvePanAsset(widget.item);
         final bool hasValidImage = (imgAsset != null && imgAsset.isNotEmpty);
+        final bool isNetwork = hasValidImage && (imgAsset.startsWith('http://') || imgAsset.startsWith('https://'));
         final bool isCutout = hasValidImage &&
-            (imgAsset.toLowerCase().endsWith('.png') || imgAsset.toLowerCase().endsWith('.webp'));
+            (imgAsset.toLowerCase().endsWith('.png') ||
+                imgAsset.toLowerCase().endsWith('.webp') ||
+                imgAsset.contains('.png') ||
+                imgAsset.contains('.webp') ||
+                imgAsset.contains('food-photos/cutouts'));
 
         return Positioned(
           left: x - (currentSize / 2),
@@ -232,16 +237,27 @@ class _FlyingThumbnailWidgetState extends State<_FlyingThumbnailWidget>
                               ),
                             ),
                           ),
-                          Image.asset(
-                            imgAsset,
-                            width: currentSize,
-                            height: currentSize,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) => Text(
-                              widget.item.iconEmoji ?? '🥗',
-                              style: TextStyle(fontSize: currentSize * 0.52),
-                            ),
-                          ),
+                          isNetwork
+                              ? Image.network(
+                                  imgAsset,
+                                  width: currentSize,
+                                  height: currentSize,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) => Text(
+                                    widget.item.iconEmoji ?? '🥗',
+                                    style: TextStyle(fontSize: currentSize * 0.52),
+                                  ),
+                                )
+                              : Image.asset(
+                                  imgAsset,
+                                  width: currentSize,
+                                  height: currentSize,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) => Text(
+                                    widget.item.iconEmoji ?? '🥗',
+                                    style: TextStyle(fontSize: currentSize * 0.52),
+                                  ),
+                                ),
                         ],
                       ),
                     )
@@ -264,18 +280,31 @@ class _FlyingThumbnailWidgetState extends State<_FlyingThumbnailWidget>
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(currentSize * 0.28),
                         child: hasValidImage
-                            ? Image.asset(
-                                imgAsset,
-                                width: currentSize,
-                                height: currentSize,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => Center(
-                                  child: Text(
-                                    widget.item.iconEmoji ?? '🥗',
-                                    style: TextStyle(fontSize: currentSize * 0.52),
-                                  ),
-                                ),
-                              )
+                            ? (isNetwork
+                                ? Image.network(
+                                    imgAsset,
+                                    width: currentSize,
+                                    height: currentSize,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => Center(
+                                      child: Text(
+                                        widget.item.iconEmoji ?? '🥗',
+                                        style: TextStyle(fontSize: currentSize * 0.52),
+                                      ),
+                                    ),
+                                  )
+                                : Image.asset(
+                                    imgAsset,
+                                    width: currentSize,
+                                    height: currentSize,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => Center(
+                                      child: Text(
+                                        widget.item.iconEmoji ?? '🥗',
+                                        style: TextStyle(fontSize: currentSize * 0.52),
+                                      ),
+                                    ),
+                                  ))
                             : Center(
                                 child: Text(
                                   widget.item.iconEmoji ?? '🥗',

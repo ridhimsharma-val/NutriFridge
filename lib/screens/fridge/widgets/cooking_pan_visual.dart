@@ -190,18 +190,23 @@ class CookingPanVisual extends StatefulWidget {
   /// Resolves the dedicated transparent food cutout asset for cooking pan rendering.
   /// Prioritizes clean transparent PNG cutouts over JPGs with baked-in backgrounds.
   static String? resolvePanAsset(CategoryFoodItem item) {
-    // 1. If item points to a local transparent PNG/WebP cutout, use it directly
+    // 1. Dedicated transparent cutout from item's effectivePanAsset
+    final pan = item.effectivePanAsset;
+    if (pan != null && pan.isNotEmpty) {
+      return pan;
+    }
+
+    // 2. If explicit item points to a transparent PNG/WebP cutout, use it directly
     final explicit = item.imageAsset;
     if (explicit != null &&
         explicit.isNotEmpty &&
-        explicit.startsWith('assets/') &&
         (explicit.toLowerCase().endsWith('.png') || explicit.toLowerCase().endsWith('.webp'))) {
       return explicit;
     }
 
     final cleanName = item.name.trim().toLowerCase();
 
-    // 2. Map food name to dedicated transparent cutout in assets/images/foods/
+    // 3. Map food name to dedicated transparent cutout in assets/images/foods/
     if (cleanName.contains('egg')) return 'assets/images/foods/eggs.png';
     if (cleanName.contains('chicken')) return 'assets/images/foods/chicken.png';
     if (cleanName.contains('apple') && !cleanName.contains('juice')) return 'assets/images/foods/apple.png';
@@ -228,7 +233,7 @@ class CookingPanVisual extends StatefulWidget {
     if (cleanName.contains('avocado')) return 'assets/images/foods/avocado.png';
     if (cleanName.contains('lemon')) return 'assets/images/foods/lemon.png';
 
-    // 3. Fallback: if explicit asset has a .png sibling in foods, use it
+    // 4. Fallback: if explicit asset has a .png sibling in foods, use it
     if (explicit != null && explicit.isNotEmpty) {
       if (explicit.endsWith('.jpg')) {
         return explicit.replaceAll('.jpg', '.png');
@@ -236,7 +241,7 @@ class CookingPanVisual extends StatefulWidget {
       return explicit;
     }
 
-    return null;
+    return 'assets/images/foods/apple.png';
   }
 
   @override
@@ -512,8 +517,13 @@ class CookingPanVisualState extends State<CookingPanVisual>
   Widget _buildTokenCard(CategoryFoodItem item, double tokenSize) {
     final String? imgAsset = CookingPanVisual.resolvePanAsset(item);
     final bool hasValidImage = (imgAsset != null && imgAsset.isNotEmpty);
+    final bool isNetwork = hasValidImage && (imgAsset.startsWith('http://') || imgAsset.startsWith('https://'));
     final bool isCutout = hasValidImage &&
-        (imgAsset.toLowerCase().endsWith('.png') || imgAsset.toLowerCase().endsWith('.webp'));
+        (imgAsset.toLowerCase().endsWith('.png') ||
+            imgAsset.toLowerCase().endsWith('.webp') ||
+            imgAsset.contains('.png') ||
+            imgAsset.contains('.webp') ||
+            imgAsset.contains('food-photos/cutouts'));
 
     if (isCutout) {
       // Natural transparent food cutout resting directly on the dark cooking surface
@@ -546,13 +556,21 @@ class CookingPanVisualState extends State<CookingPanVisual>
               ),
             ),
             // Transparent food cutout asset directly over dark skillet
-            Image.asset(
-              imgAsset,
-              width: tokenSize,
-              height: tokenSize,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => _buildEmojiFallback(item, tokenSize),
-            ),
+            isNetwork
+                ? Image.network(
+                    imgAsset,
+                    width: tokenSize,
+                    height: tokenSize,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => _buildEmojiFallback(item, tokenSize),
+                  )
+                : Image.asset(
+                    imgAsset,
+                    width: tokenSize,
+                    height: tokenSize,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => _buildEmojiFallback(item, tokenSize),
+                  ),
           ],
         ),
       );
@@ -573,13 +591,21 @@ class CookingPanVisualState extends State<CookingPanVisual>
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(tokenSize * 0.28),
-          child: Image.asset(
-            imgAsset,
-            width: tokenSize,
-            height: tokenSize,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => _buildEmojiFallback(item, tokenSize),
-          ),
+          child: isNetwork
+              ? Image.network(
+                  imgAsset,
+                  width: tokenSize,
+                  height: tokenSize,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => _buildEmojiFallback(item, tokenSize),
+                )
+              : Image.asset(
+                  imgAsset,
+                  width: tokenSize,
+                  height: tokenSize,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => _buildEmojiFallback(item, tokenSize),
+                ),
         ),
       );
     } else {

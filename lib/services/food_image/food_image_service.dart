@@ -137,6 +137,87 @@ class FoodImageService {
     return cached?.isUserOverride == true;
   }
 
+  /// Synchronous retrieval of dedicated background-free transparent cutout for cooking pan.
+  String getPanCutoutSync({
+    required String name,
+    String? category,
+    String? userId,
+  }) {
+    return FoodImageResolver.instance.getPanCutoutSync(
+      name: name,
+      category: category,
+      userId: userId,
+    );
+  }
+
+  /// Asynchronous resolution of dedicated background-free transparent cutout for cooking pan.
+  Future<String> resolvePanCutout({
+    required String name,
+    String? category,
+    String? userId,
+  }) async {
+    final cutout = await FoodImageResolver.instance.resolvePanCutout(
+      name: name,
+      category: category,
+      userId: userId,
+    );
+    _notify();
+    return cutout;
+  }
+
+  /// Sets a manual cooking pan cutout override without modifying regular photography.
+  Future<FoodImageModel> setPanOverride({
+    required String name,
+    required String panCutoutUrl,
+    String? userId,
+  }) async {
+    final canonicalKey = FoodImageResolver.normalizeKey(name);
+    final model = await FoodImageRepository.instance.savePanOverride(
+      type: FoodEntityType.ingredient,
+      entityKey: canonicalKey,
+      displayName: name,
+      panCutoutUrl: panCutoutUrl,
+      userId: userId,
+    );
+    _notify();
+    return model;
+  }
+
+  /// Restores the automatic cooking pan cutout selection by removing user pan override.
+  Future<String> restoreAutomaticPanCutout({
+    required String name,
+    String? category,
+    String? userId,
+  }) async {
+    final canonicalKey = FoodImageResolver.normalizeKey(name);
+    await FoodImageRepository.instance.removePanOverride(
+      type: FoodEntityType.ingredient,
+      entityKey: canonicalKey,
+      userId: userId,
+    );
+    _notify();
+
+    return await resolvePanCutout(
+      name: name,
+      category: category,
+      userId: userId,
+    );
+  }
+
+  /// Checks if the current entity has an active user pan cutout override.
+  bool hasPanOverride({
+    required String name,
+    String? userId,
+  }) {
+    final canonicalKey = FoodImageResolver.normalizeKey(name);
+    final cached = FoodImageRepository.instance.getCachedMapping(
+      type: FoodEntityType.ingredient,
+      entityKey: canonicalKey,
+      userId: userId,
+    );
+    return cached?.isPanOverride == true;
+  }
+
   /// Clears caches for testing.
   @visibleForTesting
   void resetForTesting() {

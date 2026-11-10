@@ -161,6 +161,23 @@ class CategoryFoodItem {
     return FoodItemAssetRegistry.getAssetForItem(name, category);
   }
 
+  /// Returns the dedicated transparent cutout asset or URL specifically for the Interactive Cooking Pan.
+  /// Never returns a non-transparent rectangular JPG photograph with a baked-in background.
+  String? get effectivePanAsset {
+    // 1. If explicit imageAsset is already a transparent PNG/WebP (local or network), use it
+    if (imageAsset != null &&
+        imageAsset!.isNotEmpty &&
+        (imageAsset!.toLowerCase().endsWith('.png') || imageAsset!.toLowerCase().endsWith('.webp'))) {
+      return imageAsset;
+    }
+
+    // 2. Lookup dedicated transparent cutout from centralized FoodImageService
+    return FoodImageService.instance.getPanCutoutSync(
+      name: name,
+      category: category,
+    );
+  }
+
   /// Soft background color for status tag
   Color get statusBackgroundColor {
     switch (status) {

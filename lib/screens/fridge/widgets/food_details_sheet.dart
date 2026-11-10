@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../models/notification_data.dart';
 import '../../food_image/food_image_picker_sheet.dart';
+import '../../food_image/pan_cutout_picker_sheet.dart';
 import '../../../../services/food_image/food_image_model.dart';
 import '../models/category_item.dart';
 import 'animated_quantity_text.dart';
@@ -352,24 +353,49 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
 
               const SizedBox(height: 8),
 
-              // Change Photo Action
-              Center(
-                child: TextButton.icon(
-                  onPressed: _handleChangePhoto,
-                  icon: const Icon(Icons.photo_library_outlined, size: 15, color: AppColors.forestGreen),
-                  label: const Text(
-                    'Change photo',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.forestGreen,
+              // Image Customization Actions (Regular Photo & Cooking Pan Cutout)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TextButton.icon(
+                    onPressed: _handleChangePhoto,
+                    icon: const Icon(Icons.photo_library_outlined, size: 14, color: AppColors.forestGreen),
+                    label: const Text(
+                      'Change photo',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.forestGreen,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     ),
                   ),
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  Container(
+                    width: 1,
+                    height: 14,
+                    color: const Color(0xFFD6DDD8),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
                   ),
-                ),
+                  TextButton.icon(
+                    onPressed: _handleChangePanCutout,
+                    icon: const Icon(Icons.palette_outlined, size: 14, color: AppColors.forestGreen),
+                    label: const Text(
+                      'Pan cutout',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.forestGreen,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    ),
+                  ),
+                ],
               ),
 
               const SizedBox(height: 8),
@@ -679,6 +705,18 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
         _item.category ?? widget.categoryName,
         newItem,
       );
+    }
+  }
+
+  Future<void> _handleChangePanCutout() async {
+    final updatedCutout = await PanCutoutPickerSheet.show(
+      context,
+      entityName: _item.name,
+      category: _item.category,
+    );
+    if (updatedCutout != null && mounted) {
+      setState(() {});
+      widget.onInventoryChanged?.call();
     }
   }
 }

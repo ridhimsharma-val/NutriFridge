@@ -155,6 +155,8 @@ class FoodImageRepository {
     String? userId,
   }) async {
     final effectiveUserId = userId ?? AuthService.instance.currentUser?.id ?? 'local_user';
+    final existing = getCachedMapping(type: type, entityKey: entityKey, userId: effectiveUserId) ??
+        getCachedMapping(type: type, entityKey: entityKey);
 
     final model = FoodImageModel(
       entityType: type,
@@ -167,9 +169,11 @@ class FoodImageRepository {
       photographerUrl: candidate.photographerUrl,
       sourcePageUrl: candidate.sourcePageUrl,
       altDescription: candidate.altDescription,
+      panCutoutUrl: existing?.panCutoutUrl,
+      isPanOverride: existing?.isPanOverride ?? false,
       isUserOverride: true,
       userId: effectiveUserId,
-      createdAt: DateTime.now(),
+      createdAt: existing?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
     );
 
@@ -197,14 +201,39 @@ class FoodImageRepository {
     return model;
   }
 
-  /// Reverts a user-specific image override back to the automatic / shared mapping.
-  Future<void> removeUserOverride({
+  /// Persists a user-specific cooking pan cutout override without modifying regular photography.
+  Future<FoodImageModel> savePanOverride({
     required FoodEntityType type,
     required String entityKey,
+    required String displayName,
+    required String panCutoutUrl,
     String? userId,
   }) async {
     final effectiveUserId = userId ?? AuthService.instance.currentUser?.id ?? 'local_user';
-    removeOverrideFromMemory(type: type, entityKey: entityKey, userId: effectiveUserId);
+    final existing = getCachedMapping(type: type, entityKey: entityKey, userId: effectiveUserId) ??
+        getCachedMapping(type: type, entityKey: entityKey);
+
+    final model = FoodImageModel(
+      entityType: type,
+      entityKey: entityKey,
+      displayName: displayName,
+      imageUrl: existing?.imageUrl ?? panCutoutUrl,
+      provider: existing?.provider ?? 'curated',
+      providerPhotoId: existing?.providerPhotoId,
+      photographerName: existing?.photographerName,
+      photographerUrl: existing?.photographerUrl,
+      sourcePageUrl: existing?.sourcePageUrl,
+      altDescription: existing?.altDescription,
+      panCutoutUrl: panCutoutUrl,
+      isPanOverride: true,
+      isUserOverride: existing?.isUserOverride ?? false,
+      userId: effectiveUserId,
+      createdAt: existing?.createdAt ?? DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    // Save in memory
+    putInMemoryCache(model);
 
     final client = _client;
     if (client != null &&
@@ -212,15 +241,129 @@ class FoodImageRepository {
         AuthService.instance.isAuthenticated &&
         effectiveUserId != 'local_user') {
       try {
-        await client
-            .from('food_image_mappings')
-            .delete()
-            .eq('entity_type', type.toDbString())
-            .eq('entity_key', entityKey)
-            .eq('user_id', effectiveUserId)
-            .eq('is_user_override', true);
+        await client.from('food_image_mappings').upsert(
+          {
+            ...model.toDbMap(),
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+          onConflict: 'entity_type,entity_key,user_id',
+        );
       } catch (e) {
-        debugPrint('[FoodImageRepository] removeUserOverride db error: $e');
+        debugPrint('[FoodImageRepository] savePanOverride db error: $e');
+      }
+    }
+
+    return model;
+  }
+
+  /// Reverts a user-specific image override back to the automatic / shared mapping.
+  Future<void> removeUserOverride({
+    required FoodEntityType type,
+    required String entityKey,
+    String? userId,
+  }) async {
+    final effectiveUserId = userId ?? AuthService.instance.currentUser?.id ?? 'local_user';
+    final existing = getCachedMapping(type: type, entityKey: entityKey, userId: effectiveUserId);
+
+    if (existing != null && existing.isPanOverride) {
+      final shared = getCachedMapping(type: type, entityKey: entityKey);
+      final updated = existing.copyWith(
+        imageUrl: shared?.imageUrl,
+        isUserOverride: false,
+        provider: shared?.provider ?? 'pexels',
+        photographerName: shared?.photographerName,
+        photographerUrl: shared?.photographerUrl,
+        sourcePageUrl: shared?.sourcePageUrl,
+      );
+      putInMemoryCache(updated);
+
+      final client = _client;
+      if (client != null &&
+          !MockDataRepository.forceInMemoryForTesting &&
+          AuthService.instance.isAuthenticated &&
+          effectiveUserId != 'local_user') {
+        try {
+          await client.from('food_image_mappings').upsert(
+            {
+              ...updated.toDbMap(),
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+            onConflict: 'entity_type,entity_key,user_id',
+          );
+        } catch (_) {}
+      }
+    } else {
+      removeOverrideFromMemory(type: type, entityKey: entityKey, userId: effectiveUserId);
+
+      final client = _client;
+      if (client != null &&
+          !MockDataRepository.forceInMemoryForTesting &&
+          AuthService.instance.isAuthenticated &&
+          effectiveUserId != 'local_user') {
+        try {
+          await client
+              .from('food_image_mappings')
+              .delete()
+              .eq('entity_type', type.toDbString())
+              .eq('entity_key', entityKey)
+              .eq('user_id', effectiveUserId);
+        } catch (e) {
+          debugPrint('[FoodImageRepository] removeUserOverride db error: $e');
+        }
+      }
+    }
+  }
+
+  /// Reverts a user-specific cooking pan cutout override back to automatic mapping.
+  Future<void> removePanOverride({
+    required FoodEntityType type,
+    required String entityKey,
+    String? userId,
+  }) async {
+    final effectiveUserId = userId ?? AuthService.instance.currentUser?.id ?? 'local_user';
+    final existing = getCachedMapping(type: type, entityKey: entityKey, userId: effectiveUserId);
+
+    if (existing != null && existing.isUserOverride) {
+      final shared = getCachedMapping(type: type, entityKey: entityKey);
+      final updated = existing.copyWith(
+        panCutoutUrl: shared?.panCutoutUrl,
+        isPanOverride: false,
+      );
+      putInMemoryCache(updated);
+
+      final client = _client;
+      if (client != null &&
+          !MockDataRepository.forceInMemoryForTesting &&
+          AuthService.instance.isAuthenticated &&
+          effectiveUserId != 'local_user') {
+        try {
+          await client.from('food_image_mappings').upsert(
+            {
+              ...updated.toDbMap(),
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+            onConflict: 'entity_type,entity_key,user_id',
+          );
+        } catch (_) {}
+      }
+    } else {
+      removeOverrideFromMemory(type: type, entityKey: entityKey, userId: effectiveUserId);
+
+      final client = _client;
+      if (client != null &&
+          !MockDataRepository.forceInMemoryForTesting &&
+          AuthService.instance.isAuthenticated &&
+          effectiveUserId != 'local_user') {
+        try {
+          await client
+              .from('food_image_mappings')
+              .delete()
+              .eq('entity_type', type.toDbString())
+              .eq('entity_key', entityKey)
+              .eq('user_id', effectiveUserId);
+        } catch (e) {
+          debugPrint('[FoodImageRepository] removePanOverride db error: $e');
+        }
       }
     }
   }

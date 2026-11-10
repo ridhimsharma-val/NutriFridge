@@ -61,6 +61,67 @@ class FoodImageResolver {
     return clean.isEmpty ? rawName.trim().toLowerCase() : clean;
   }
 
+  /// Curated local transparent food cutouts for the interactive cooking pan
+  static const Map<String, String> curatedCutouts = {
+    'paneer': 'assets/images/foods/paneer.png',
+    'apple': 'assets/images/foods/apple.png',
+    'broccoli': 'assets/images/foods/broccoli.png',
+    'egg': 'assets/images/foods/eggs.png',
+    'milk': 'assets/images/foods/milk.png',
+    'chicken': 'assets/images/foods/chicken.png',
+    'tomato': 'assets/images/foods/tomato.png',
+    'carrot': 'assets/images/foods/carrot.png',
+    'banana': 'assets/images/foods/banana.png',
+    'orange': 'assets/images/foods/orange.png',
+    'grape': 'assets/images/foods/grapes.png',
+    'capsicum': 'assets/images/foods/capsicum.png',
+    'bell pepper': 'assets/images/foods/capsicum.png',
+    'pepper': 'assets/images/foods/capsicum.png',
+    'butter': 'assets/images/foods/butter.png',
+    'curd': 'assets/images/foods/curd.png',
+    'yogurt': 'assets/images/foods/curd.png',
+    'fish': 'assets/images/foods/fish.png',
+    'salmon': 'assets/images/foods/fish.png',
+    'bread': 'assets/images/foods/bread.png',
+    'peanut butter': 'assets/images/foods/peanut_butter.png',
+    'juice': 'assets/images/foods/juice.png',
+    'pea': 'assets/images/foods/frozen_peas.png',
+    'peas': 'assets/images/foods/frozen_peas.png',
+    'corn': 'assets/images/foods/frozen_corn.png',
+    'almond': 'assets/images/foods/almonds.png',
+    'cashew': 'assets/images/foods/cashews.png',
+    'dry fruit': 'assets/images/foods/dry_fruits_mix.png',
+    'avocado': 'assets/images/foods/avocado.png',
+    'lemon': 'assets/images/foods/lemon.png',
+  };
+
+  /// Finds matching curated transparent cutout if one exists
+  static String? findCuratedCutout(String rawName) {
+    final canonical = normalizeKey(rawName);
+    if (curatedCutouts.containsKey(canonical)) {
+      return curatedCutouts[canonical];
+    }
+    for (final entry in curatedCutouts.entries) {
+      if (canonical.contains(entry.key)) {
+        return entry.value;
+      }
+    }
+    return null;
+  }
+
+  /// Clean transparent PNG placeholder fallback. Never returns a non-transparent photographic JPG.
+  static String getCleanTransparentPlaceholder([String? category]) {
+    if (category != null) {
+      final cat = category.toLowerCase();
+      if (cat.contains('dairy')) return 'assets/images/foods/milk.png';
+      if (cat.contains('veg')) return 'assets/images/foods/broccoli.png';
+      if (cat.contains('fruit')) return 'assets/images/foods/apple.png';
+      if (cat.contains('non-veg')) return 'assets/images/foods/chicken.png';
+      if (cat.contains('juice') || cat.contains('drink')) return 'assets/images/foods/juice.png';
+    }
+    return 'assets/images/foods/apple.png';
+  }
+
   /// Checks if an exact local curated asset mapping exists.
   FoodImageModel? _checkCuratedAsset(String canonicalKey, String displayName, FoodEntityType type) {
     if (type == FoodEntityType.ingredient) {
@@ -97,11 +158,14 @@ class FoodImageResolver {
       };
 
       if (localAssets.containsKey(canonicalKey)) {
+        final path = localAssets[canonicalKey]!;
+        final cutout = (path.endsWith('.png') || path.endsWith('.webp')) ? path : findCuratedCutout(displayName);
         return FoodImageModel(
           entityType: FoodEntityType.ingredient,
           entityKey: canonicalKey,
           displayName: displayName,
-          imageUrl: localAssets[canonicalKey]!,
+          imageUrl: path,
+          panCutoutUrl: cutout,
           provider: 'curated',
           altDescription: displayName,
         );
@@ -166,11 +230,16 @@ class FoodImageResolver {
       placeholderUrl = MealImageRegistry.getFallbackAsset(name);
     }
 
+    final panCutout = type == FoodEntityType.ingredient
+        ? (findCuratedCutout(name) ?? ((placeholderUrl.endsWith('.png') || placeholderUrl.endsWith('.webp')) ? placeholderUrl : getCleanTransparentPlaceholder(category)))
+        : null;
+
     return FoodImageModel(
       entityType: type,
       entityKey: canonicalKey,
       displayName: name,
       imageUrl: placeholderUrl,
+      panCutoutUrl: panCutout,
       provider: 'placeholder',
       altDescription: name,
     );
@@ -230,6 +299,12 @@ class FoodImageResolver {
           Map<String, dynamic>.from(searchResult['bestMatch'] as Map),
         );
 
+        final curatedCutout = findCuratedCutout(name);
+        final serverCutout = searchResult['panCutoutUrl'] as String?;
+        final panCutout = type == FoodEntityType.ingredient
+            ? (curatedCutout ?? serverCutout ?? getCleanTransparentPlaceholder(category))
+            : null;
+
         final resolvedModel = FoodImageModel(
           entityType: type,
           entityKey: canonicalKey,
@@ -241,6 +316,7 @@ class FoodImageResolver {
           photographerUrl: candidate.photographerUrl,
           sourcePageUrl: candidate.sourcePageUrl,
           altDescription: candidate.altDescription,
+          panCutoutUrl: panCutout,
           isUserOverride: false,
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
@@ -271,6 +347,89 @@ class FoodImageResolver {
     } finally {
       _inFlight.remove(inFlightKey);
     }
+  }
+
+  /// Fast synchronous lookup for transparent pan cutout asset / URL.
+  /// If not cached, immediately returns clean transparent placeholder and resolves asynchronously.
+  String getPanCutoutSync({
+    required String name,
+    String? category,
+    String? userId,
+  }) {
+    final canonicalKey = normalizeKey(name);
+    final cached = FoodImageRepository.instance.getCachedMapping(
+      type: FoodEntityType.ingredient,
+      entityKey: canonicalKey,
+      userId: userId,
+    );
+    if (cached?.panCutoutUrl != null && cached!.panCutoutUrl!.isNotEmpty) {
+      return cached.panCutoutUrl!;
+    }
+
+    // Curated local transparent asset
+    final curated = findCuratedCutout(name);
+    if (curated != null) {
+      return curated;
+    }
+
+    // Trigger async cutout resolution
+    resolvePanCutout(name: name, category: category, userId: userId);
+
+    return getCleanTransparentPlaceholder(category);
+  }
+
+  /// Dedicated resolution for cooking pan transparent cutouts.
+  Future<String> resolvePanCutout({
+    required String name,
+    String? category,
+    String? userId,
+  }) async {
+    final canonicalKey = normalizeKey(name);
+    final repo = FoodImageRepository.instance;
+
+    // 1. Check user override for pan cutout
+    final saved = await repo.fetchMapping(
+      type: FoodEntityType.ingredient,
+      entityKey: canonicalKey,
+      userId: userId,
+    );
+    if (saved != null && saved.isPanOverride && saved.panCutoutUrl != null && saved.panCutoutUrl!.isNotEmpty) {
+      return saved.panCutoutUrl!;
+    }
+
+    // 2. Curated local transparent cutouts
+    final curated = findCuratedCutout(name);
+    if (curated != null) {
+      return curated;
+    }
+
+    // 3. Saved shared cutout mapping
+    if (saved != null && saved.panCutoutUrl != null && saved.panCutoutUrl!.isNotEmpty) {
+      return saved.panCutoutUrl!;
+    }
+
+    // 4. Background removal pipeline via Edge Function
+    try {
+      final res = await _invokeEdgeFunction({
+        'action': 'resolve-cutout',
+        'query': canonicalKey,
+        'imageUrl': saved?.imageUrl,
+        'category': category,
+      });
+      if (res['ok'] == true && res['panCutoutUrl'] != null && (res['panCutoutUrl'] as String).isNotEmpty) {
+        final cutoutUrl = res['panCutoutUrl'] as String;
+        if (saved != null) {
+          final updated = saved.copyWith(panCutoutUrl: cutoutUrl);
+          await repo.saveSharedMapping(updated);
+        }
+        return cutoutUrl;
+      }
+    } catch (e) {
+      debugPrint('[FoodImageResolver] Cutout resolution error: $e');
+    }
+
+    // 5. Fallback clean transparent placeholder (never a photographic rectangular JPG)
+    return getCleanTransparentPlaceholder(category);
   }
 
   /// Searches image provider candidates for manual image selection.
