@@ -304,21 +304,42 @@ class RecipeRecommendation {
       reasons.add("Helps support today's protein goal");
     }
 
-    final int? rawPrep = (json['preparationTimeMinutes'] as num? ??
-            json['prepTimeMinutes'] as num? ??
-            json['prepTime'] as num?)
-        ?.toInt();
-    final int? rawCook = (json['cookingTimeMinutes'] as num? ??
-            json['cookingTime'] as num? ??
-            json['cookTimeMinutes'] as num? ??
-            json['cookTime'] as num?)
-        ?.toInt();
-    final int? rawTotal = (json['totalTimeMinutes'] as num? ??
-            json['totalTime'] as num? ??
-            json['totalDurationMinutes'] as num? ??
-            json['durationMinutes'] as num? ??
-            json['timeMinutes'] as num?)
-        ?.toInt();
+    int? parseMinutes(dynamic val) {
+      if (val == null) return null;
+      if (val is num) return val.toInt();
+      if (val is String) {
+        final match = RegExp(r'\d+').firstMatch(val);
+        if (match != null) {
+          return int.tryParse(match.group(0)!);
+        }
+      }
+      return null;
+    }
+
+    final int? rawPrep = parseMinutes(json['preparationTimeMinutes'] ??
+        json['prepTimeMinutes'] ??
+        json['prepTime'] ??
+        json['preparation_time_minutes'] ??
+        json['prep_time_minutes'] ??
+        json['preparation_time'] ??
+        json['prep_time']);
+    final int? rawCook = parseMinutes(json['cookingTimeMinutes'] ??
+        json['cookingTime'] ??
+        json['cookTimeMinutes'] ??
+        json['cookTime'] ??
+        json['cooking_time_minutes'] ??
+        json['cook_time_minutes'] ??
+        json['cooking_time'] ??
+        json['cook_time']);
+    final int? rawTotal = parseMinutes(json['totalTimeMinutes'] ??
+        json['totalTime'] ??
+        json['totalDurationMinutes'] ??
+        json['total_time_minutes'] ??
+        json['total_duration_minutes'] ??
+        json['durationMinutes'] ??
+        json['duration_minutes'] ??
+        json['timeMinutes'] ??
+        json['time_minutes']);
 
     final int prepTime;
     final int? cookTime;

@@ -238,6 +238,37 @@ function normalizeN8nResponse(decoded: any): Record<string, any> {
       ? m.alternatives.map(String)
       : [];
 
+    function parseMinutes(val: any): number | null {
+      if (typeof val === 'number' && !isNaN(val) && val >= 0) return Math.round(val);
+      if (typeof val === 'string') {
+        const match = val.match(/\d+/);
+        if (match) {
+          const n = parseInt(match[0], 10);
+          if (!isNaN(n) && n >= 0) return n;
+        }
+      }
+      return null;
+    }
+
+    const resolvedPrepTime = parseMinutes(
+      m.preparationTimeMinutes ??
+      m.prepTimeMinutes ??
+      m.prepTime ??
+      m.preparation_time_minutes ??
+      m.prep_time_minutes ??
+      m.prep_time
+    );
+
+    const resolvedCookingTime = parseMinutes(
+      m.cookingTimeMinutes ??
+      m.cookingTime ??
+      m.cookTimeMinutes ??
+      m.cookTime ??
+      m.cooking_time_minutes ??
+      m.cook_time_minutes ??
+      m.cook_time
+    );
+
     meal = {
       name: m.name ? String(m.name).trim() : 'Logged Meal',
       mealType: m.mealType ? String(m.mealType).toLowerCase().trim() : 'lunch',
@@ -248,8 +279,8 @@ function normalizeN8nResponse(decoded: any): Record<string, any> {
         : m.reason
         ? String(m.reason).trim()
         : 'A meal prepared with ingredients from your fridge.',
-      preparationTimeMinutes: typeof m.preparationTimeMinutes === 'number' ? m.preparationTimeMinutes : 20,
-      cookingTimeMinutes: typeof m.cookingTimeMinutes === 'number' ? m.cookingTimeMinutes : (typeof m.cookingTime === 'number' ? m.cookingTime : 15),
+      preparationTimeMinutes: resolvedPrepTime,
+      cookingTimeMinutes: resolvedCookingTime,
       servings: m.servings ? String(m.servings).trim() : (m.servingSize ? String(m.servingSize).trim() : '1 serving'),
       missingIngredients: Array.isArray(m.missingIngredients) ? m.missingIngredients.map(String) : [],
       preparationSteps: preparationSteps,

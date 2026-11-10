@@ -733,7 +733,7 @@ class MealDetailInfo {
         : (spec?.fatGrams);
     final int? prepTime = (rec.prepTimeMinutes > 0)
         ? rec.prepTimeMinutes
-        : spec?.prepTimeMinutes;
+        : (rec.cookingTimeMinutes == null ? spec?.prepTimeMinutes : null);
     final int? cookTime = (rec.cookingTimeMinutes != null && rec.cookingTimeMinutes! > 0)
         ? rec.cookingTimeMinutes
         : null;

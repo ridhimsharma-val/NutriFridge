@@ -178,53 +178,70 @@ void main() {
     // Scenario 4: Different recipes display their own actual cooking durations
     // -------------------------------------------------------------------------
     test('Scenario 4: Different recipes display distinct dynamic total durations without 20 min hardcoded fallback', () {
-      // 15 min recipe (e.g. Omelette: 5 min prep + 10 min cook)
-      final omelette = createTestRec(
-        title: 'Omelette',
-        calories: 210,
-        proteinGrams: 14,
-        prepTimeMinutes: 5,
-        cookingTimeMinutes: 10,
-      );
-      expect(omelette.totalTimeMinutes, equals(15));
-      final omeletteDetail = MealDetailInfo.fromRecommendation(omelette);
-      expect(omeletteDetail.totalTimeMinutes, equals(15));
+      // 1. Preparation 10 + cooking 5 = 15 minutes
+      final json15 = {
+        'id': 'rec_15',
+        'title': 'Quick Scramble',
+        'calories': 210,
+        'proteinG': 14,
+        'preparationTimeMinutes': 10,
+        'cookingTimeMinutes': 5,
+      };
+      final rec15 = RecipeRecommendation.fromJson(json15);
+      expect(rec15.prepTimeMinutes, equals(10));
+      expect(rec15.cookingTimeMinutes, equals(5));
+      expect(rec15.totalTimeMinutes, equals(15));
+      final detail15 = MealDetailInfo.fromRecommendation(rec15);
+      expect(detail15.totalTimeMinutes, equals(15));
 
-      // 25 min recipe (e.g. Fried Rice: 10 min prep + 15 min cook)
-      final friedRice = createTestRec(
-        title: 'Fried Rice',
-        calories: 380,
-        proteinGrams: 10,
-        prepTimeMinutes: 10,
-        cookingTimeMinutes: 15,
-      );
-      expect(friedRice.totalTimeMinutes, equals(25));
-      final friedRiceDetail = MealDetailInfo.fromRecommendation(friedRice);
-      expect(friedRiceDetail.totalTimeMinutes, equals(25));
+      // 2. Preparation 15 + cooking 10 = 25 minutes (testing snake_case / string parsing)
+      final json25 = {
+        'id': 'rec_25',
+        'title': 'Vegetable Fried Rice',
+        'calories': 380,
+        'proteinG': 10,
+        'prep_time_minutes': '15',
+        'cooking_time_minutes': '10',
+      };
+      final rec25 = RecipeRecommendation.fromJson(json25);
+      expect(rec25.prepTimeMinutes, equals(15));
+      expect(rec25.cookingTimeMinutes, equals(10));
+      expect(rec25.totalTimeMinutes, equals(25));
+      final detail25 = MealDetailInfo.fromRecommendation(rec25);
+      expect(detail25.totalTimeMinutes, equals(25));
 
-      // 30 min recipe (e.g. Pasta: 10 min prep + 20 min cook)
-      final pasta = createTestRec(
-        title: 'Pasta Primavera',
-        calories: 420,
-        proteinGrams: 12,
-        prepTimeMinutes: 10,
-        cookingTimeMinutes: 20,
-      );
-      expect(pasta.totalTimeMinutes, equals(30));
-      final pastaDetail = MealDetailInfo.fromRecommendation(pasta);
-      expect(pastaDetail.totalTimeMinutes, equals(30));
+      // 3. Preparation 20 + cooking 10 = 30 minutes (testing alternative keys)
+      final json30 = {
+        'id': 'rec_30',
+        'title': 'Slow Simmer Pasta',
+        'calories': 420,
+        'proteinG': 12,
+        'preparation_time': 20,
+        'cooking_time': 10,
+      };
+      final rec30 = RecipeRecommendation.fromJson(json30);
+      expect(rec30.prepTimeMinutes, equals(20));
+      expect(rec30.cookingTimeMinutes, equals(10));
+      expect(rec30.totalTimeMinutes, equals(30));
+      final detail30 = MealDetailInfo.fromRecommendation(rec30);
+      expect(detail30.totalTimeMinutes, equals(30));
 
-      // Recipe with NO time estimate (0 prep, null cook) -> totalTimeMinutes is null (no 20 min fallback!)
-      final noTimeRecipe = createTestRec(
-        title: 'Custom Mystery Salad',
-        calories: 150,
-        proteinGrams: 4,
-        prepTimeMinutes: 0,
-        cookingTimeMinutes: null,
-      );
+      // 4. Missing duration fields -> totalTimeMinutes is null (no 20 min fallback!)
+      final jsonNoTime = {
+        'id': 'rec_none',
+        'title': 'Custom Mystery Salad',
+        'calories': 150,
+        'proteinG': 4,
+      };
+      final noTimeRecipe = RecipeRecommendation.fromJson(jsonNoTime);
       expect(noTimeRecipe.totalTimeMinutes, isNull);
       final noTimeDetail = MealDetailInfo.fromRecommendation(noTimeRecipe);
       expect(noTimeDetail.totalTimeMinutes, isNull);
+
+      // 5. Recipe duration state isolation: subsequent recipes must not inherit previous recipe durations
+      expect(rec15.totalTimeMinutes, isNot(equals(rec25.totalTimeMinutes)));
+      expect(rec25.totalTimeMinutes, isNot(equals(rec30.totalTimeMinutes)));
+      expect(noTimeRecipe.totalTimeMinutes, isNot(equals(rec30.totalTimeMinutes)));
     });
 
     // -------------------------------------------------------------------------
@@ -272,6 +289,39 @@ void main() {
 
       // MealDetailScreen has 2 instances of "25 min": one in hero overlay, one in nutrition & prep
       expect(find.text('25 min'), findsNWidgets(2));
+
+      // Case B: Recipe with MISSING duration hides duration badge on both screens
+      final recNoDuration = createTestRec(
+        title: 'Fresh Garden Salad',
+        calories: 120,
+        proteinGrams: 3,
+        prepTimeMinutes: 0,
+        cookingTimeMinutes: null,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: RecommendationCard(
+              discoveryMode: MealDiscoveryMode.aiSuggestion,
+              recommendation: recNoDuration,
+              status: RecommendationStatus.loaded,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining(RegExp(r'\d+\s*min')), findsNothing);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MealDetailScreen(
+            recommendation: recNoDuration,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining(RegExp(r'\d+\s*min')), findsNothing);
     });
 
     // -------------------------------------------------------------------------

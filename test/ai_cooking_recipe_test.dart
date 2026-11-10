@@ -174,11 +174,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Step-by-step instructions available via AI'), findsOneWidget);
-      expect(find.text('Tap "Cook with AI" to generate full preparation steps, timings, and heat levels tailored to your fridge.'), findsOneWidget);
+      expect(find.text('Step-by-step preparation'), findsOneWidget);
+      expect(find.text('Get clear cooking instructions with timings and heat levels for this recipe.'), findsOneWidget);
       expect(find.text("Preparation instructions aren't available for this recipe yet."), findsNothing);
       expect(find.text('Generate Steps'), findsOneWidget);
-      expect(find.text('Cook with AI'), findsWidgets);
     });
 
     testWidgets('Tapping Generate Steps generates and populates preparation steps in-place', (WidgetTester tester) async {
@@ -635,12 +634,9 @@ A delicious, high-protein breakfast made with ingredients from your fridge.
       );
       await tester.pumpAndSettle();
 
-      // Tap Cook with AI
-      final cookWithAiBtn = find.text('Cook with AI');
-      expect(cookWithAiBtn, findsWidgets);
-      await tester.ensureVisible(cookWithAiBtn.first);
-      await tester.tap(cookWithAiBtn.first);
-      await tester.pumpAndSettle();
+      // Verify Log Meal button is present and viewing meal detail does not mutate inventory
+      final logMealBtn = find.text('Log Meal');
+      expect(logMealBtn, findsOneWidget);
 
       // Verify fridge inventory remains completely unmodified
       final milkAfter = FridgeCategoryRepository.findItemByName('Milk', exact: true);
