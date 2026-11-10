@@ -9,7 +9,7 @@ class AppColors {
   static const Color vibrantLime = Color(0xFFB7E34B);   // Secondary highlights
   static const Color softCream = Color(0xFFF7F9F1);     // Main application background
   static const Color coralPeach = Color(0xFFFF9675);    // Secondary accent
-  static const Color paleMint = Color(0xFFDDF3E7);      // Wellness and information surfaces
+  static const Color paleMint = Color(0xFFDDF3E7);      // Light accent and information surfaces
   static const Color darkText = Color(0xFF172E27);      // Main text
   static const Color pureWhite = Color(0xFFFFFFFF);     // Cards and surfaces
 

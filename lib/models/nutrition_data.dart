@@ -451,24 +451,6 @@ class RecipeRecommendation {
   }
 }
 
-class WellnessScoreData {
-  final int currentScore;
-  final int previousScore;
-  final String statusText;
-  final int maxScore;
-  final bool hasSufficientData;
-
-  const WellnessScoreData({
-    required this.currentScore,
-    required this.previousScore,
-    required this.statusText,
-    this.maxScore = 100,
-    this.hasSufficientData = true,
-  });
-
-  int get scoreDiff => currentScore - previousScore;
-}
-
 class MacroNutrient {
   final String name;
   final int amountGrams;
@@ -700,23 +682,6 @@ class MockDataRepository {
     }).toList();
   }
 
-  /// Returns genuine logged meal history belonging strictly to yesterday in local timezone
-  static List<Map<String, dynamic>> get yesterdayLoggedMealsHistory {
-    final start = localStartOfYesterday;
-    final end = localStartOfToday;
-
-    return _loggedMealsHistory.where((m) {
-      final ts = m['timestamp'];
-      final DateTime? local = ts is DateTime
-          ? ts.toLocal()
-          : (ts is String && ts.isNotEmpty ? DateTime.tryParse(ts)?.toLocal() : null);
-      if (local != null) {
-        return !local.isBefore(start) && local.isBefore(end);
-      }
-      return false;
-    }).toList();
-  }
-
   static String _formatMealType(String raw) {
     if (raw.isEmpty) return 'Meal';
     final lower = raw.trim().toLowerCase();
@@ -771,49 +736,6 @@ class MockDataRepository {
 
   static RecipeRecommendation? _deriveDynamicRecommendation() {
     return recommendationProvider?.call();
-  }
-
-  static WellnessScoreData? _explicitWellness;
-  static WellnessScoreData? get wellness =>
-      _explicitWellness ?? _deriveDynamicWellness();
-
-  static void setWellnessForTesting(WellnessScoreData? w) {
-    _explicitWellness = w;
-    _notify();
-  }
-
-  static WellnessScoreData? _deriveDynamicWellness() {
-    final todayHistory = todayLoggedMealsHistory;
-    final yesterdayHistory = yesterdayLoggedMealsHistory;
-
-    final yesterdayMealsCount = yesterdayHistory.length;
-    final int prevScore = yesterdayMealsCount > 0
-        ? (72 + (yesterdayMealsCount * 5)).clamp(70, 95)
-        : 0;
-
-    // Check genuine meals logged today
-    final int todayCount = _loggedMealsHistory.isNotEmpty
-        ? todayHistory.length
-        : _currentMeals.where((m) => m.isCompleted).length;
-
-    // When a new day starts and no qualifying wellness data exists, display 0/100
-    if (todayCount == 0 && _currentNutrition.consumedCalories == 0) {
-      return WellnessScoreData(
-        currentScore: 0,
-        previousScore: prevScore,
-        statusText: 'No meals logged yet today',
-        hasSufficientData: true,
-      );
-    }
-
-    // Preserve exact existing formula: (72 + (mealsCount * 5)).clamp(70, 95)
-    final score = todayCount > 0 ? (72 + (todayCount * 5)).clamp(70, 95) : 70;
-    return WellnessScoreData(
-      currentScore: score,
-      previousScore: prevScore,
-      statusText: score >= 85 ? 'Great today' : 'Good progress',
-      hasSufficientData: true,
-    );
   }
 
   static const DailyNutritionData _initialNutrition = DailyNutritionData(
@@ -1249,12 +1171,6 @@ class MockDataRepository {
       ],
       requiredIngredients: ['Paneer', 'Rice', 'Capsicum', 'Onion'],
     );
-    _explicitWellness = const WellnessScoreData(
-      currentScore: 82,
-      previousScore: 78,
-      statusText: 'Great today',
-      hasSufficientData: true,
-    );
     _currentNutrition = const DailyNutritionData(
       consumedCalories: 1620,
       targetCalories: 2200,
@@ -1345,7 +1261,6 @@ class MockDataRepository {
       expiryAlertsEnabled: false,
     );
     _explicitRecommendation = null;
-    _explicitWellness = null;
     resetClock();
     onResetRecommendation?.call();
     NotificationRepository.reset();

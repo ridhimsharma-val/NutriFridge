@@ -14,7 +14,6 @@ import 'widgets/meal_status_card.dart';
 import 'widgets/notification_popover.dart';
 import 'widgets/nutrition_card.dart';
 import 'widgets/recommendation_card.dart';
-import 'widgets/wellness_score_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,7 +23,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  bool _isWellnessExpanded = false;
   bool _isNutritionExpanded = false;
   DateTime _lastKnownDate = DateTime(
     DateTime.now().year,
@@ -89,13 +87,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       MealRecommendationService.fetchRecommendation(forceRefresh: true);
       _scheduleNextMidnightTimer();
     } else {
-      // App resumed from background: refresh daily score and meals
+      // App resumed from background: refresh today's meals and nutrition
       MockDataRepository.loadFromSupabase();
     }
   }
 
   void _initializeDataAndRecommendations() {
-    // 1. Refresh today's meals and wellness score when dashboard opens
+    // 1. Refresh today's meals and nutrition when dashboard opens
     if (AuthService.instance.isAuthenticated && AuthService.instance.currentUser != null) {
       MockDataRepository.loadFromSupabase();
     }
@@ -153,7 +151,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final errorMessage = MealRecommendationService.errorMessage;
         final alternativeMessage = MealRecommendationService.alternativeMessage;
         final isChanging = MealRecommendationService.isChangingSuggestion;
-        final wellness = MockDataRepository.wellness;
         final nutrition = MockDataRepository.nutrition;
         final meals = MockDataRepository.meals;
         final hasUnread = NotificationRepository.hasUnread;
@@ -260,20 +257,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
                   const SizedBox(height: 16),
 
-                  // 3. Today's Wellness (Interactive Smooth Expandable Card)
-                  WellnessScoreCard(
-                    wellnessData: wellness,
-                    isExpanded: _isWellnessExpanded,
-                    onToggle: () {
-                      setState(() {
-                        _isWellnessExpanded = !_isWellnessExpanded;
-                      });
-                    },
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // 4. Nutrition Today (Interactive Smooth Expandable Card with Hero Calorie Arc & Compact Macro Cards)
+                  // 3. Nutrition Today (Interactive Smooth Expandable Card with Hero Calorie Arc & Compact Macro Cards)
                   NutritionCard(
                     nutritionData: nutrition,
                     isExpanded: _isNutritionExpanded,
@@ -286,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
                   const SizedBox(height: 16),
 
-                  // 5. Today's Meals (Breakfast, Lunch, Snack, Dinner with Real Food Photography & Calorie Count)
+                  // 4. Today's Meals (Breakfast, Lunch, Snack, Dinner with Real Food Photography & Calorie Count)
                   MealStatusCardSection(
                     meals: meals,
                     onMealTap: (meal) {

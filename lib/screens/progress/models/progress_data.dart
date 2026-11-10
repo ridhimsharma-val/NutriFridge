@@ -66,9 +66,6 @@ class HeatmapCellData {
 /// Aggregated nutrition progress data for Week or Month periods
 class ProgressAnalyticsData {
   final String period; // 'Week' or 'Month'
-  final int wellnessScore;
-  final int? previousWellnessScore;
-  final String wellnessInterpretation;
   final List<DayNutritionSummary> daySummaries;
   final List<HeatmapCellData> heatmapCells;
   final int averageDailyCalories;
@@ -85,9 +82,6 @@ class ProgressAnalyticsData {
 
   const ProgressAnalyticsData({
     required this.period,
-    required this.wellnessScore,
-    this.previousWellnessScore,
-    this.wellnessInterpretation = '',
     required this.daySummaries,
     required this.heatmapCells,
     required this.averageDailyCalories,
@@ -272,11 +266,6 @@ class ProgressDataService {
       );
     }).toList();
 
-    // Wellness Score: 0/100 if no meals in this period; else (72 + meals * 5).clamp(70, 95)
-    final int wellnessScore = weeklyTotalMeals > 0
-        ? (72 + (weeklyTotalMeals * 5)).clamp(70, 95)
-        : 0;
-
     // Macro distribution for Week: daily average across the 7 days of the week
     final int avgProtein = (weeklyTotalProtein / 7).round();
     final int avgCarbs = (weeklyTotalCarbs / 7).round();
@@ -287,8 +276,6 @@ class ProgressDataService {
 
     return ProgressAnalyticsData(
       period: 'Week',
-      wellnessScore: wellnessScore,
-      previousWellnessScore: null,
       daySummaries: weekDays,
       heatmapCells: heatmap,
       averageDailyCalories: avgDailyCals,
@@ -447,11 +434,6 @@ class ProgressDataService {
       }
     }
 
-    // Monthly Wellness Score: 0/100 if no meals this month; else (72 + meals * 5).clamp(70, 95)
-    final int wellnessScore = monthlyTotalMeals > 0
-        ? (72 + (monthlyTotalMeals * 5)).clamp(70, 95)
-        : 0;
-
     // Monthly Macro Donut Chart: daily average across the month
     final int daysElapsedInMonth = now.day.clamp(1, daysInMonth);
     final int avgProtein = (monthlyTotalProtein / daysElapsedInMonth).round();
@@ -462,8 +444,6 @@ class ProgressDataService {
 
     return ProgressAnalyticsData(
       period: 'Month',
-      wellnessScore: wellnessScore,
-      previousWellnessScore: null,
       daySummaries: monthWeeks,
       heatmapCells: heatmap,
       averageDailyCalories: avgDailyCals,

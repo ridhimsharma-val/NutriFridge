@@ -7,7 +7,6 @@ import 'models/progress_data.dart';
 import 'widgets/consistency_heatmap.dart';
 import 'widgets/macro_donut_chart.dart';
 import 'widgets/weekly_calories_chart.dart';
-import 'widgets/wellness_score_hero.dart';
 
 /// Cinematic Nutrition Progress Screen
 /// Mobile-first editorial analytics narrative displaying real Supabase nutrition data.
@@ -74,14 +73,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                   if (!analytics.hasRecords)
                     _buildEmptyState()
                   else ...[
-                    // 2. Cinematic Wellness Hero
-                    WellnessScoreHero(
-                      score: analytics.wellnessScore,
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // 3. Macronutrient Donut Chart
+                    // 2. Macronutrient Donut Chart
                     MacroDonutChart(
                       proteinGrams: analytics.macroChartProteinGrams,
                       carbsGrams: analytics.macroChartCarbsGrams,
@@ -92,7 +84,7 @@ class _ProgressScreenState extends State<ProgressScreen>
 
                     const SizedBox(height: 20),
 
-                    // 4. Weekly Calorie Chart
+                    // 3. Weekly Calorie Chart
                     WeeklyCaloriesChart(
                       summaries: analytics.daySummaries,
                       period: _selectedPeriod,
@@ -101,7 +93,7 @@ class _ProgressScreenState extends State<ProgressScreen>
 
                     const SizedBox(height: 20),
 
-                    // 5. Minimal LeetCode-style Consistency Heatmap
+                    // 4. Minimal LeetCode-style Consistency Heatmap
                     ConsistencyHeatmap(
                       cells: analytics.heatmapCells,
                       period: _selectedPeriod,

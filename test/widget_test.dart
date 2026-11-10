@@ -361,9 +361,9 @@ void main() {
     expect(find.text('Add a few ingredients and NutriFridge AI can help you decide what to cook.'), findsOneWidget);
     expect(find.text('Ask NutriFridge AI'), findsOneWidget);
 
-    // Verify Today's Wellness clean empty state
-    expect(find.text("Today's Wellness"), findsOneWidget);
-    expect(find.text('Your wellness score today'), findsOneWidget);
+    // Verify Wellness score is removed from Dashboard
+    expect(find.text("Today's Wellness"), findsNothing);
+    expect(find.text('Your wellness score today'), findsNothing);
 
     // Verify Nutrition Today
     expect(find.text('Nutrition Today'), findsOneWidget);
@@ -1405,11 +1405,9 @@ void main() {
     expect(find.text('Week'), findsOneWidget);
     expect(find.text('Month'), findsOneWidget);
 
-    // 4. Verify Cinematic Wellness Hero
-    expect(find.text('WELLNESS SCORE'), findsOneWidget);
-    expect(find.text('out of 100'), findsOneWidget);
-    expect(find.text('NutriFridge wellness indicator • Not a medical assessment'), findsNothing);
-    expect(find.textContaining('demo baseline'), findsNothing);
+    // 4. Verify Wellness Hero is removed
+    expect(find.text('WELLNESS SCORE'), findsNothing);
+    expect(find.text('out of 100'), findsNothing);
 
     // 5. Verify Macronutrient Donut Chart
     expect(find.text('Calorie distribution by macro'), findsOneWidget);
@@ -1648,7 +1646,7 @@ void main() {
     expect(MockDataRepository.profile.mealRemindersEnabled, isFalse);
   });
 
-  testWidgets('Home Screen - Notification Popover, Expandable Wellness & Expandable Nutrition Breakdown', (WidgetTester tester) async {
+  testWidgets('Home Screen - Notification Popover & Expandable Nutrition Breakdown', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
     tester.view.devicePixelRatio = 3.0;
 
@@ -1689,31 +1687,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Notifications'), findsNothing);
 
-    // 3. Today's Wellness Expandable Card Interaction
-    expect(find.text("Today's Wellness"), findsOneWidget);
-    expect(find.text('7-day wellness trend'), findsNothing);
-
-    // Tap to expand Today's Wellness
-    await tester.tap(find.text("Today's Wellness"));
-    await tester.pumpAndSettle();
-
-    // Verify Expanded Wellness Content
-    expect(find.text('7-day wellness trend'), findsOneWidget);
-    expect(find.text("Today's contributing factors"), findsOneWidget);
-    expect(find.text('Protein intake'), findsOneWidget);
-    expect(find.text('Food variety'), findsOneWidget);
-    expect(find.text('Meal consistency'), findsOneWidget);
-    expect(find.text('NutriFridge wellness indicator · Not a medical assessment'), findsOneWidget);
-
-    // Tap on Friday in the 7-day trend
-    await tester.tap(find.text('Fri'));
-    await tester.pumpAndSettle();
-    expect(find.text('Fri: 85 pts'), findsOneWidget);
-
-    // Tap to collapse Today's Wellness
-    await tester.tap(find.text("Today's Wellness"));
-    await tester.pumpAndSettle();
-    expect(find.text('7-day wellness trend'), findsNothing);
+    // 3. Verify Wellness Card is absent
+    expect(find.text("Today's Wellness"), findsNothing);
 
     // 4. Nutrition Today Expandable Breakdown Interaction
     expect(find.text('Nutrition Today'), findsOneWidget);
@@ -1739,30 +1714,6 @@ void main() {
     await tester.tap(find.text('Collapse'));
     await tester.pumpAndSettle();
     expect(find.text("Today's meals"), findsNothing);
-
-    // 5. Dual Independent Expansion
-    // Expand Wellness
-    await tester.ensureVisible(find.text("Today's Wellness"));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text("Today's Wellness"));
-    await tester.pumpAndSettle();
-
-    // Expand Nutrition
-    await tester.ensureVisible(find.text('Nutrition Today'));
-    await tester.tap(find.text('Nutrition Today'));
-    await tester.pumpAndSettle();
-
-    // Both are expanded simultaneously without conflict
-    expect(find.text('7-day wellness trend'), findsOneWidget);
-    expect(find.text("Today's meals"), findsOneWidget);
-
-    // Collapse Wellness, Nutrition remains expanded
-    await tester.ensureVisible(find.text("Today's Wellness"));
-    await tester.tap(find.text("Today's Wellness"));
-    await tester.pumpAndSettle();
-
-    expect(find.text('7-day wellness trend'), findsNothing);
-    expect(find.text("Today's meals"), findsOneWidget);
   });
 
   testWidgets('Meal Detail Page - Cinematic Food Experience, Nutrition, Fridge Ingredients, AI Context & Video Inspiration', (WidgetTester tester) async {
@@ -1868,7 +1819,7 @@ void main() {
 
     // Verify we are back on Dashboard
     expect(find.text('Suggested for you'), findsOneWidget);
-    expect(find.text("Today's Wellness"), findsOneWidget);
+    expect(find.text("Today's Wellness"), findsNothing);
     expect(find.text('Nutrition Today'), findsOneWidget);
   });
 

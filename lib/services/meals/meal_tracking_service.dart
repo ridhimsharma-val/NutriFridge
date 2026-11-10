@@ -311,7 +311,7 @@ class MealTrackingService {
   }
 
   /// Fetches genuine meals logged during yesterday (in client's local timezone)
-  /// for accurate +/- vs yesterday wellness score calculations.
+  /// for accurate day-over-day tracking.
   Future<List<LoggedMealRecord>> fetchYesterdayMeals({
     String? userId,
     DateTime? clientTime,
