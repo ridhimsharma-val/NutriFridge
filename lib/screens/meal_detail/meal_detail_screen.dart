@@ -13,6 +13,9 @@ import '../home/services/meal_recommendation_service.dart';
 import 'models/meal_ai_context.dart';
 import 'models/meal_detail_data.dart';
 import 'widgets/video_card.dart';
+import '../food_image/food_image_picker_sheet.dart';
+import '../../services/food_image/food_image_model.dart';
+import '../../services/food_image/food_image_service.dart';
 
 /// Comprehensive, Data-Driven Recipe Experience — Meal Detail Page.
 /// Features authentic food photography, per-serving nutrition with transparent provenance,
@@ -37,6 +40,7 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
   bool _isLogging = false;
   bool _isLoadingSteps = false;
   String? _stepsError;
+  String? _overrideImageUrl;
 
   String get _heroTag =>
       widget.heroTag ??
@@ -239,9 +243,19 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: FridgeCategoryRepository.notifier,
+      listenable: Listenable.merge([
+        FridgeCategoryRepository.notifier,
+        FoodImageService.instance.changeNotifier,
+      ]),
       builder: (context, _) {
-        final meal = MealDetailInfo.fromRecommendation(widget.recommendation);
+        final baseMeal = MealDetailInfo.fromRecommendation(widget.recommendation);
+        final serviceImg = FoodImageService.instance.getImageSync(
+          name: widget.recommendation.title,
+          type: FoodEntityType.recipe,
+        );
+        final effectiveImg = _overrideImageUrl ??
+            (!serviceImg.isPlaceholder ? serviceImg.imageUrl : baseMeal.imageUrl);
+        final meal = baseMeal.copyWith(imageUrl: effectiveImg);
 
         return Scaffold(
           backgroundColor: AppColors.softCream,
@@ -418,6 +432,41 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
             ),
           ),
 
+        // Change Recipe Photo Button
+        Positioned(
+          top: topPadding > 0 ? topPadding + 8 : 20,
+          right: (meal.totalTimeMinutes != null && meal.totalTimeMinutes! > 0) ? 104 : 18,
+          child: GestureDetector(
+            onTap: _handleChangeRecipePhoto,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.42),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.photo_library_outlined,
+                    color: Colors.white,
+                    size: 14,
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    'Photo',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
         // Hero Typography Overlays (Bottom)
         Positioned(
           left: 20,
@@ -479,6 +528,20 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _handleChangeRecipePhoto() async {
+    final updated = await FoodImagePickerSheet.show(
+      context,
+      entityName: widget.recommendation.title,
+      entityType: FoodEntityType.recipe,
+    );
+    if (updated != null && mounted) {
+      setState(() {
+        _overrideImageUrl = updated.imageUrl;
+      });
+      MealRecommendationService.updateRecommendationImage(updated.imageUrl);
+    }
   }
 
   // ==========================================

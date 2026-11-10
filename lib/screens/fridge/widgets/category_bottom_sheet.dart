@@ -494,15 +494,7 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
                   padding: const EdgeInsets.all(4),
                   child: Center(
                     child: (item.effectiveImageAsset != null || item.imageAsset != null)
-                        ? Image.asset(
-                            item.effectiveImageAsset ?? item.imageAsset!,
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.medium,
-                            errorBuilder: (context, error, stackTrace) => Text(
-                              item.iconEmoji ?? '🍽️',
-                              style: const TextStyle(fontSize: 24),
-                            ),
-                          )
+                        ? _buildItemImage(item)
                         : Text(
                             item.iconEmoji ?? '🍽️',
                             style: const TextStyle(fontSize: 24),
@@ -619,6 +611,30 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildItemImage(CategoryFoodItem item) {
+    final path = item.effectiveImageAsset ?? item.imageAsset!;
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return Image.network(
+        path,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
+        errorBuilder: (context, error, stackTrace) => Text(
+          item.iconEmoji ?? '🍽️',
+          style: const TextStyle(fontSize: 24),
+        ),
+      );
+    }
+    return Image.asset(
+      path,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.medium,
+      errorBuilder: (context, error, stackTrace) => Text(
+        item.iconEmoji ?? '🍽️',
+        style: const TextStyle(fontSize: 24),
       ),
     );
   }

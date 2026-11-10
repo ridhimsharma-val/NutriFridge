@@ -488,16 +488,27 @@ class _CookingBasketPanelState extends State<CookingBasketPanel> {
                         ),
                         child: Center(
                           child: (item.effectiveImageAsset != null || item.imageAsset != null)
-                              ? Image.asset(
-                                  item.effectiveImageAsset ?? item.imageAsset!,
-                                  width: 18,
-                                  height: 18,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (context, error, stackTrace) => Text(
-                                    item.iconEmoji ?? '🥗',
-                                    style: const TextStyle(fontSize: 13),
-                                  ),
-                                )
+                              ? ((item.effectiveImageAsset ?? item.imageAsset!).startsWith('http')
+                                  ? Image.network(
+                                      item.effectiveImageAsset ?? item.imageAsset!,
+                                      width: 18,
+                                      height: 18,
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (context, error, stackTrace) => Text(
+                                        item.iconEmoji ?? '🥗',
+                                        style: const TextStyle(fontSize: 13),
+                                      ),
+                                    )
+                                  : Image.asset(
+                                      item.effectiveImageAsset ?? item.imageAsset!,
+                                      width: 18,
+                                      height: 18,
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (context, error, stackTrace) => Text(
+                                        item.iconEmoji ?? '🥗',
+                                        style: const TextStyle(fontSize: 13),
+                                      ),
+                                    ))
                               : Text(
                                   item.iconEmoji ?? '🥗',
                                   style: const TextStyle(fontSize: 13),

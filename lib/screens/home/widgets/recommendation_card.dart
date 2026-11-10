@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../models/nutrition_data.dart';
+import '../../../services/food_image/food_image_model.dart';
+import '../../../services/food_image/food_image_service.dart';
 import '../../fridge/models/category_item.dart';
 import '../services/meal_recommendation_service.dart';
 
@@ -1009,7 +1011,20 @@ class RecommendationCard extends StatelessWidget {
   }
 
   Widget _buildFoodImage([RecipeRecommendation? rec]) {
-    final url = rec?.imageUrl ?? recommendation?.imageUrl;
+    final effectiveRec = rec ?? recommendation;
+    final title = effectiveRec?.title;
+    String? url = effectiveRec?.imageUrl;
+
+    if (title != null && title.isNotEmpty) {
+      final serviceImg = FoodImageService.instance.getImageSync(
+        name: title,
+        type: FoodEntityType.recipe,
+      );
+      if (!serviceImg.isPlaceholder) {
+        url = serviceImg.imageUrl;
+      }
+    }
+
     if (url != null && url.startsWith('assets/')) {
       return Image.asset(
         url,

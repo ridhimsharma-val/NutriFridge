@@ -4,6 +4,7 @@ import '../../core/transitions/hero_transition_route.dart';
 import '../../models/notification_data.dart';
 import '../../models/nutrition_data.dart';
 import '../../services/auth/auth_service.dart';
+import '../../services/food_image/food_image_service.dart';
 import '../ai_assistant/ai_assistant_screen.dart';
 import '../fridge/fridge_page.dart';
 import '../fridge/models/category_item.dart';
@@ -144,6 +145,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         MealRecommendationService.isChangingSuggestionNotifier,
         MealRecommendationService.discoveryModeNotifier,
         MealRecommendationService.recipeOriginNotifier,
+        FoodImageService.instance.changeNotifier,
       ]),
       builder: (context, _) {
         final recommendation = MockDataRepository.recommendation;

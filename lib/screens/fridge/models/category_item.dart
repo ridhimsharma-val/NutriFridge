@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../models/notification_data.dart';
 import '../../../../services/auth/auth_service.dart';
+import '../../../../services/food_image/food_image_model.dart';
+import '../../../../services/food_image/food_image_service.dart';
 import '../../../../services/inventory/fridge_inventory_repository.dart';
 
 /// Expiry urgency level with calm, subtle pastel status colors
@@ -128,8 +130,8 @@ class CategoryFoodItem {
     );
   }
 
-  /// Returns the item's specific food image asset path.
-  /// If [imageAsset] was not provided or points to a category collage, resolves to its dedicated item visual.
+  /// Returns the item's specific food image asset path or resolved network URL.
+  /// Checks centralized FoodImageService for user overrides or previously mapped photographs.
   String? get effectiveImageAsset {
     if (imageAsset != null &&
         imageAsset!.isNotEmpty &&
@@ -146,7 +148,17 @@ class CategoryFoodItem {
         !imageAsset!.contains('categories/others')) {
       return imageAsset;
     }
-    return FoodItemAssetRegistry.getAssetForItem(name);
+
+    final serviceImage = FoodImageService.instance.getImageSync(
+      name: name,
+      type: FoodEntityType.ingredient,
+      category: category,
+    );
+    if (!serviceImage.isPlaceholder) {
+      return serviceImage.imageUrl;
+    }
+
+    return FoodItemAssetRegistry.getAssetForItem(name, category);
   }
 
   /// Soft background color for status tag

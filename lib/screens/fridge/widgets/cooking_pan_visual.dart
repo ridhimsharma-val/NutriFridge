@@ -190,10 +190,11 @@ class CookingPanVisual extends StatefulWidget {
   /// Resolves the dedicated transparent food cutout asset for cooking pan rendering.
   /// Prioritizes clean transparent PNG cutouts over JPGs with baked-in backgrounds.
   static String? resolvePanAsset(CategoryFoodItem item) {
-    // 1. If item already points to a transparent PNG/WebP, use it directly
-    final explicit = item.effectiveImageAsset ?? item.imageAsset;
+    // 1. If item points to a local transparent PNG/WebP cutout, use it directly
+    final explicit = item.imageAsset;
     if (explicit != null &&
         explicit.isNotEmpty &&
+        explicit.startsWith('assets/') &&
         (explicit.toLowerCase().endsWith('.png') || explicit.toLowerCase().endsWith('.webp'))) {
       return explicit;
     }

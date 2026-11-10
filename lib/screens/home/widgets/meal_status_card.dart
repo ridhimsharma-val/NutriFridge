@@ -178,18 +178,31 @@ class _MealItemCard extends StatelessWidget {
                   width: 50,
                   height: 50,
                   color: isCompleted ? const Color(0xFFEAF5EE) : const Color(0xFFF6F8F7),
-                  child: Image.asset(
-                    imageAsset,
-                    width: 50,
-                    height: 50,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Center(
-                      child: Text(
-                        meal.iconEmoji.isNotEmpty ? meal.iconEmoji : '🍽️',
-                        style: const TextStyle(fontSize: 22),
-                      ),
-                    ),
-                  ),
+                  child: imageAsset.startsWith('http')
+                      ? Image.network(
+                          imageAsset,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Center(
+                            child: Text(
+                              meal.iconEmoji.isNotEmpty ? meal.iconEmoji : '🍽️',
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        )
+                      : Image.asset(
+                          imageAsset,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Center(
+                            child: Text(
+                              meal.iconEmoji.isNotEmpty ? meal.iconEmoji : '🍽️',
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(width: 14),

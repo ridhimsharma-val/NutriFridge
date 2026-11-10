@@ -130,6 +130,56 @@ class MealDetailInfo {
     return sum > 0 ? sum : null;
   }
 
+  MealDetailInfo copyWith({
+    String? name,
+    String? tag,
+    String? mealType,
+    String? imageUrl,
+    int? calories,
+    int? proteinGrams,
+    int? carbsGrams,
+    int? fatGrams,
+    int? fiberGrams,
+    int? prepTimeMinutes,
+    String? servingSize,
+    String? nutritionSourceLabel,
+    bool? nutritionIsEstimate,
+    List<String>? whyReasons,
+    List<MealIngredientItem>? ingredients,
+    List<RecipePreparationStep>? preparationSteps,
+    List<RecipeVideoItem>? videos,
+    int? cookingTimeMinutes,
+    List<String>? cookingTips,
+    List<String>? substitutions,
+    String? videoSearchQuery,
+    String? videoUrl,
+  }) {
+    return MealDetailInfo(
+      name: name ?? this.name,
+      tag: tag ?? this.tag,
+      mealType: mealType ?? this.mealType,
+      imageUrl: imageUrl ?? this.imageUrl,
+      calories: calories ?? this.calories,
+      proteinGrams: proteinGrams ?? this.proteinGrams,
+      carbsGrams: carbsGrams ?? this.carbsGrams,
+      fatGrams: fatGrams ?? this.fatGrams,
+      fiberGrams: fiberGrams ?? this.fiberGrams,
+      prepTimeMinutes: prepTimeMinutes ?? this.prepTimeMinutes,
+      servingSize: servingSize ?? this.servingSize,
+      nutritionSourceLabel: nutritionSourceLabel ?? this.nutritionSourceLabel,
+      nutritionIsEstimate: nutritionIsEstimate ?? this.nutritionIsEstimate,
+      whyReasons: whyReasons ?? this.whyReasons,
+      ingredients: ingredients ?? this.ingredients,
+      preparationSteps: preparationSteps ?? this.preparationSteps,
+      videos: videos ?? this.videos,
+      cookingTimeMinutes: cookingTimeMinutes ?? this.cookingTimeMinutes,
+      cookingTips: cookingTips ?? this.cookingTips,
+      substitutions: substitutions ?? this.substitutions,
+      videoSearchQuery: videoSearchQuery ?? this.videoSearchQuery,
+      videoUrl: videoUrl ?? this.videoUrl,
+    );
+  }
+
   /// Catalog of real recipe definitions with authentic ingredient measurements and instructions.
   static final Map<String, _RecipeCatalogSpec> _catalogSpecs = {
     'paneer rice bowl': const _RecipeCatalogSpec(

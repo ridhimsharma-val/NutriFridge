@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../models/notification_data.dart';
+import '../../food_image/food_image_picker_sheet.dart';
+import '../../../../services/food_image/food_image_model.dart';
 import '../models/category_item.dart';
 import 'animated_quantity_text.dart';
 
@@ -339,15 +341,7 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                   padding: const EdgeInsets.all(8),
                   child: Center(
                     child: (_item.effectiveImageAsset != null || _item.imageAsset != null)
-                        ? Image.asset(
-                            _item.effectiveImageAsset ?? _item.imageAsset!,
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.medium,
-                            errorBuilder: (context, error, stackTrace) => Text(
-                              _item.iconEmoji ?? '🍽️',
-                              style: const TextStyle(fontSize: 44),
-                            ),
-                          )
+                        ? _buildItemImage()
                         : Text(
                             _item.iconEmoji ?? '🍽️',
                             style: const TextStyle(fontSize: 44),
@@ -356,7 +350,29 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                 ),
               ),
 
-              const SizedBox(height: 14),
+              const SizedBox(height: 8),
+
+              // Change Photo Action
+              Center(
+                child: TextButton.icon(
+                  onPressed: _handleChangePhoto,
+                  icon: const Icon(Icons.photo_library_outlined, size: 15, color: AppColors.forestGreen),
+                  label: const Text(
+                    'Change photo',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.forestGreen,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
 
               // 3. Food Name
               Center(
@@ -621,5 +637,48 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
         ),
       ),
     );
+  }
+
+  Widget _buildItemImage() {
+    final path = _item.effectiveImageAsset ?? _item.imageAsset!;
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return Image.network(
+        path,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
+        errorBuilder: (context, error, stackTrace) => Text(
+          _item.iconEmoji ?? '🍽️',
+          style: const TextStyle(fontSize: 44),
+        ),
+      );
+    }
+    return Image.asset(
+      path,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.medium,
+      errorBuilder: (context, error, stackTrace) => Text(
+        _item.iconEmoji ?? '🍽️',
+        style: const TextStyle(fontSize: 44),
+      ),
+    );
+  }
+
+  Future<void> _handleChangePhoto() async {
+    final updated = await FoodImagePickerSheet.show(
+      context,
+      entityName: _item.name,
+      entityType: FoodEntityType.ingredient,
+      category: _item.category,
+    );
+    if (updated != null && mounted) {
+      final newItem = _item.copyWith(imageAsset: updated.imageUrl);
+      setState(() {
+        _item = newItem;
+      });
+      FridgeCategoryRepository.updateItem(
+        _item.category ?? widget.categoryName,
+        newItem,
+      );
+    }
   }
 }

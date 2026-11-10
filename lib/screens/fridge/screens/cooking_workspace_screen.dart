@@ -694,13 +694,21 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen>
               color: const Color(0xFFF3F7F5),
               child: ((item.imageAsset != null && item.imageAsset!.isNotEmpty) ||
                       (item.iconEmoji == null && item.effectiveImageAsset != null))
-                  ? Image.asset(
-                      item.effectiveImageAsset ?? item.imageAsset!,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => Center(
-                        child: Text(item.iconEmoji ?? '🥘', style: const TextStyle(fontSize: 13)),
-                      ),
-                    )
+                  ? ((item.effectiveImageAsset ?? item.imageAsset!).startsWith('http')
+                      ? Image.network(
+                          item.effectiveImageAsset ?? item.imageAsset!,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) => Center(
+                            child: Text(item.iconEmoji ?? '🥘', style: const TextStyle(fontSize: 13)),
+                          ),
+                        )
+                      : Image.asset(
+                          item.effectiveImageAsset ?? item.imageAsset!,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) => Center(
+                            child: Text(item.iconEmoji ?? '🥘', style: const TextStyle(fontSize: 13)),
+                          ),
+                        ))
                   : Center(
                       child: Text(item.iconEmoji ?? '🥘', style: const TextStyle(fontSize: 13)),
                     ),
@@ -847,14 +855,23 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen>
                                         (item.iconEmoji == null && item.effectiveImageAsset != null))
                                     ? Padding(
                                         padding: const EdgeInsets.all(4),
-                                        child: Image.asset(
-                                          item.effectiveImageAsset ?? item.imageAsset!,
-                                          fit: BoxFit.contain,
-                                          errorBuilder: (context, error, stackTrace) => Center(
-                                            child: Text(item.iconEmoji ?? '🥘',
-                                                style: const TextStyle(fontSize: 18)),
-                                          ),
-                                        ),
+                                        child: (item.effectiveImageAsset ?? item.imageAsset!).startsWith('http')
+                                            ? Image.network(
+                                                item.effectiveImageAsset ?? item.imageAsset!,
+                                                fit: BoxFit.contain,
+                                                errorBuilder: (context, error, stackTrace) => Center(
+                                                  child: Text(item.iconEmoji ?? '🥘',
+                                                      style: const TextStyle(fontSize: 18)),
+                                                ),
+                                              )
+                                            : Image.asset(
+                                                item.effectiveImageAsset ?? item.imageAsset!,
+                                                fit: BoxFit.contain,
+                                                errorBuilder: (context, error, stackTrace) => Center(
+                                                  child: Text(item.iconEmoji ?? '🥘',
+                                                      style: const TextStyle(fontSize: 18)),
+                                                ),
+                                              ),
                                       )
                                     : Center(
                                         child: Text(item.iconEmoji ?? '🥘',

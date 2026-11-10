@@ -259,6 +259,22 @@ class MealRecommendationService {
   static RecipeRecommendation? _currentRecommendation;
   static RecipeRecommendation? get currentRecommendation => _currentRecommendation;
 
+  /// Updates the image URL of the current recommendation across the service and repositories
+  static void updateRecommendationImage(String newImageUrl) {
+    if (_currentRecommendation != null) {
+      _currentRecommendation = _currentRecommendation!.copyWith(imageUrl: newImageUrl);
+      recommendationNotifier.value = _currentRecommendation;
+    }
+    if (_pendingCustomRecipe != null) {
+      _pendingCustomRecipe = _pendingCustomRecipe!.copyWith(imageUrl: newImageUrl);
+    }
+    if (MockDataRepository.recommendation != null) {
+      MockDataRepository.setRecommendationForTesting(
+        MockDataRepository.recommendation!.copyWith(imageUrl: newImageUrl),
+      );
+    }
+  }
+
   static String? _errorMessage;
   static String? get errorMessage => _errorMessage;
 

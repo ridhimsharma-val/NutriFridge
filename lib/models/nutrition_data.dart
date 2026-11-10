@@ -2,6 +2,10 @@ import 'package:flutter/foundation.dart';
 import '../screens/fridge/models/category_item.dart';
 import '../screens/profile/models/user_profile_data.dart';
 import '../services/auth/auth_service.dart';
+import '../services/food_image/food_image_model.dart';
+import '../services/food_image/food_image_repository.dart';
+import '../services/food_image/food_image_resolver.dart';
+import '../services/food_image/food_image_service.dart';
 import '../services/meals/meal_tracking_service.dart';
 import '../services/meals/models/meal_models.dart';
 import '../services/profile/profile_service.dart';
@@ -71,13 +75,35 @@ class MealImageRegistry {
     String? providedUrl,
   }) {
     if (providedUrl != null && providedUrl.isNotEmpty) {
-      if (providedUrl.startsWith('assets/')) return providedUrl;
+      if (providedUrl.startsWith('assets/') ||
+          providedUrl.startsWith('http://') ||
+          providedUrl.startsWith('https://')) {
+        return providedUrl;
+      }
     }
     if (imageKey != null && imageKey.isNotEmpty) {
       final clean = imageKey.toLowerCase().trim().replaceAll('-', '_');
       if (_imageMap.containsKey(clean)) return _imageMap[clean]!;
-      if (clean.startsWith('assets/')) return imageKey;
+      if (clean.startsWith('assets/') || clean.startsWith('http')) return imageKey;
     }
+
+    // Check in-memory repository cache directly without triggering placeholder recursion
+    if (mealName != null && mealName.isNotEmpty) {
+      final canonical = FoodImageResolver.normalizeKey(mealName);
+      final cached = FoodImageRepository.instance.getCachedMapping(
+        type: FoodEntityType.recipe,
+        entityKey: canonical,
+      );
+      if (cached != null && !cached.isPlaceholder) {
+        return cached.imageUrl;
+      }
+    }
+
+    return getFallbackAsset(mealName);
+  }
+
+  /// Direct fallback asset lookup by recipe keywords
+  static String getFallbackAsset([String? mealName]) {
     final name = (mealName ?? '').toLowerCase();
     if (name.contains('rice') && name.contains('paneer')) return 'assets/images/paneer_rice_bowl.jpg';
     if (name.contains('dal') || name.contains('pulao') || name.contains('khichdi')) {
@@ -243,11 +269,17 @@ class RecipeRecommendation {
     final title = (json['name'] ?? json['title'] ?? 'Chef Special').toString();
     final mealType = (json['mealType'] ?? '').toString();
     final imageKey = json['imageKey']?.toString();
+    final rawProvidedUrl = (json['imageUrl'] ?? json['image_url'])?.toString();
     final imageUrl = MealImageRegistry.resolveImage(
       imageKey: imageKey,
       mealName: title,
-      providedUrl: json['imageUrl']?.toString(),
+      providedUrl: rawProvidedUrl,
     );
+
+    // Trigger centralized image resolution for newly discovered recipes if not already network-backed
+    if (title.isNotEmpty && title != 'Chef Special' && (rawProvidedUrl == null || !rawProvidedUrl.startsWith('http'))) {
+      FoodImageService.instance.resolveImage(name: title, type: FoodEntityType.recipe);
+    }
 
     final List<String> requiredIngs = [];
     final List<String> missingIngs = [];
