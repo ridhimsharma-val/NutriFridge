@@ -53,7 +53,14 @@ function normalizeKey(str: string): string {
     .trim();
 }
 
-function calculateMatchScore(query: string, alt: string, urlSlug: string, entityType: string): number {
+function calculateMatchScore(
+  query: string,
+  alt: string,
+  urlSlug: string,
+  entityType: string,
+  cuisine?: string,
+  ingredients?: string[]
+): number {
   const normQuery = normalizeKey(query);
   const normAlt = (alt || '').toLowerCase();
   const normSlug = (urlSlug || '').toLowerCase();
@@ -61,52 +68,62 @@ function calculateMatchScore(query: string, alt: string, urlSlug: string, entity
 
   if (!text.trim()) return 10;
 
-  // Penalize wallpapers, desktop backgrounds, vectors, and cool backgrounds
-  const isWallpaper = text.includes('wallpaper') || text.includes('cool backgrounds') || text.includes('desktop background');
-  const penalty = isWallpaper ? 35 : 0;
-
-  // Exact phrase match (e.g. "shahi paneer", "vegetable biryani")
-  if (text.includes(normQuery)) {
-    return Math.max(10, 100 - penalty);
-  }
-
-  const queryTokens = normQuery.split(' ').filter((t) => t.length > 2);
-  if (queryTokens.length === 0) return 20;
-
-  let matched = 0;
-  for (const token of queryTokens) {
-    if (text.includes(token)) {
-      matched++;
-    }
-  }
-
-  const matchRatio = matched / queryTokens.length;
+  // 1. Penalize/reject wallpapers, vectors, desktop backgrounds, and graphics
+  const isJunk = text.includes('wallpaper') || text.includes('cool backgrounds') || text.includes('desktop background') || text.includes('vector') || text.includes('illustration');
+  if (isJunk) return 0;
 
   if (entityType === 'recipe') {
-    // For recipes, dish nouns are critical
+    // 2. Strict vegetarian filter: If the dish is vegetarian/paneer/veg/dal, reject any meat/chicken/fish
+    const isVegQuery = normQuery.includes('veg') || normQuery.includes('paneer') || normQuery.includes('dal') || normQuery.includes('salad');
+    const hasMeat = text.includes('chicken') || text.includes('meat') || text.includes('beef') || text.includes('pork') || text.includes('fish') || text.includes('drumstick') || text.includes('mutton') || text.includes('seafood');
+    if (isVegQuery && hasMeat) return 0;
+
+    // 3. Exact phrase match (e.g. "shahi paneer", "vegetable biryani")
+    if (text.includes(normQuery)) {
+      return 95;
+    }
+
+    const queryTokens = normQuery.split(' ').filter((t) => t.length > 2);
+    if (queryTokens.length === 0) return 20;
+
     // Identify primary dish anchor (usually the last word or distinct noun, e.g. "biryani", "paneer", "soup", "curry", "pizza", "salad")
     const mainDishNoun = queryTokens[queryTokens.length - 1];
     const hasMainNoun = text.includes(mainDishNoun);
 
-    // If all tokens matched:
-    if (matched === queryTokens.length) {
-      return Math.max(10, 90 - penalty);
-    }
-
-    // If the main dish noun didn't match at all (e.g. "biryani" missing in "vegetable biryani"):
     if (!hasMainNoun) {
-      return Math.max(0, 15 - penalty); // Reject irrelevant images (e.g. wallpaper with 'vegetables' but no 'biryani')
+      return 10; // Reject if core dish noun isn't in candidate tags
     }
 
-    // If main dish noun matched, but modifier (e.g. "shahi") didn't:
-    // Check if food/dish/recipe is present
-    const hasRecipeContext = text.includes('dish') || text.includes('recipe') || text.includes('curry') || text.includes('cooked');
-    if (hasRecipeContext && matchRatio >= 0.5) {
-      // Partial match (e.g. generic paneer for shahi paneer): ~35-45
-      return Math.max(10, Math.round(matchRatio * 70) - penalty);
+    let score = 55; // Base score for having the core dish noun
+
+    // Match other query tokens (e.g. "shahi", "vegetable")
+    let otherMatches = 0;
+    for (let i = 0; i < queryTokens.length - 1; i++) {
+      if (text.includes(queryTokens[i])) otherMatches++;
+    }
+    score += otherMatches * 20;
+
+    // Recipe & culinary context tags
+    const hasCulinaryContext = text.includes('dish') || text.includes('recipe') || text.includes('curry') || text.includes('cooked') || text.includes('meal') || text.includes('cuisine') || text.includes('bowl');
+    if (hasCulinaryContext) score += 15;
+
+    // Cuisine match (e.g. "indian", "asian")
+    if (cuisine && text.includes(cuisine.toLowerCase())) {
+      score += 10;
+    } else if (text.includes('indian') || text.includes('asian')) {
+      score += 10;
     }
 
-    return Math.max(10, Math.round(matchRatio * 50) - penalty);
+    // Ingredients match (e.g. "rice", "spices")
+    if (Array.isArray(ingredients)) {
+      for (const ing of ingredients) {
+        if (typeof ing === 'string' && ing.length > 2 && text.includes(ing.toLowerCase())) {
+          score += 5;
+        }
+      }
+    }
+
+    return Math.min(score, 95);
   }
 
   // Ingredient scoring
@@ -115,11 +132,24 @@ function calculateMatchScore(query: string, alt: string, urlSlug: string, entity
   }
   if (normQuery.includes('apple') && text.includes('pineapple') && !text.includes('red apple') && !text.includes('fresh apple')) {
     if (!text.includes('apple fruit') && !text.includes('green apple')) {
-      matched = Math.max(0, matched - 1);
+      return 0;
     }
   }
 
-  return Math.max(10, Math.round(matchRatio * 85) - penalty);
+  // Exact phrase match for ingredient
+  if (text.includes(normQuery)) {
+    return 100;
+  }
+
+  const queryTokens = normQuery.split(' ').filter((t) => t.length > 2);
+  if (queryTokens.length === 0) return 20;
+
+  let matched = 0;
+  for (const token of queryTokens) {
+    if (text.includes(token)) matched++;
+  }
+  const matchRatio = matched / queryTokens.length;
+  return Math.max(10, Math.round(matchRatio * 85));
 }
 
 // Configurable confidence thresholds
@@ -403,6 +433,52 @@ serve(async (req: Request) => {
       );
     }
 
+    const canonicalKey = normalizeKey(query);
+
+    // Check existing mapping in database first to avoid redundant external API calls and downloads
+    if (action === 'resolve' && supabaseServiceKey) {
+      try {
+        const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });
+        const { data: existingMapping } = await supabaseAdmin
+          .from('food_image_mappings')
+          .select('*')
+          .eq('entity_type', entityType)
+          .eq('entity_key', canonicalKey)
+          .or(userId ? `user_id.is.null,user_id.eq.${userId}` : 'user_id.is.null')
+          .order('is_user_override', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (existingMapping && existingMapping.image_url) {
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              action,
+              query,
+              entityType,
+              totalFound: 1,
+              candidates: [],
+              bestMatch: {
+                photoId: existingMapping.provider_photo_id || 'stored',
+                imageUrl: existingMapping.image_url,
+                thumbnailUrl: existingMapping.image_url,
+                photographerName: existingMapping.photographer_name || 'Pixabay Contributor',
+                photographerUrl: existingMapping.photographer_url || 'https://pixabay.com',
+                sourcePageUrl: existingMapping.source_page_url || 'https://pixabay.com',
+                altDescription: existingMapping.alt_description || query,
+                provider: existingMapping.provider || 'pixabay',
+                score: 100,
+              },
+              panCutoutUrl: existingMapping.pan_cutout_url,
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      } catch (err) {
+        console.warn('Error checking existing mapping:', err);
+      }
+    }
+
     // 5. Query official Pixabay API (https://pixabay.com/api/)
     const cleanQuery = query
       .replace(/[^a-zA-Z0-9\s]/g, ' ')
@@ -452,6 +528,35 @@ serve(async (req: Request) => {
       }
     }
 
+    // Smart culinary fallback for recipes when exact query returns no or weak hits
+    if (entityType === 'recipe') {
+      const queryTokens = cleanQuery.toLowerCase().split(' ').filter((t) => t.length > 2);
+      const mainDishNoun = queryTokens.length > 0 ? queryTokens[queryTokens.length - 1] : '';
+
+      const preScores = photos.map((p) => calculateMatchScore(cleanQuery, p.tags, p.pageURL, entityType, body.cuisine, body.ingredients));
+      const hasAcceptableMatch = preScores.some((s) => s >= RECIPE_SCORE_THRESHOLD);
+
+      if (!hasAcceptableMatch && mainDishNoun) {
+        let fallbackTerm = '';
+        if (cleanQuery.includes('biryani')) {
+          fallbackTerm = 'biryani rice';
+        } else if (cleanQuery.includes('paneer')) {
+          fallbackTerm = 'paneer dish';
+        } else if (body.cuisine) {
+          fallbackTerm = `${body.cuisine} ${mainDishNoun}`;
+        } else {
+          fallbackTerm = `${mainDishNoun} dish`;
+        }
+
+        if (fallbackTerm && fallbackTerm.toLowerCase() !== cleanQuery.toLowerCase()) {
+          const fallbackRes = await queryPixabay(fallbackTerm, 'food');
+          if (fallbackRes.status === 200 && fallbackRes.hits.length > 0) {
+            photos = [...photos, ...fallbackRes.hits];
+          }
+        }
+      }
+    }
+
     if (pixabayStatus === 429) {
       return new Response(
         JSON.stringify({
@@ -480,8 +585,13 @@ serve(async (req: Request) => {
 
     // 6. Score and normalize candidates
     const candidates: ScoredCandidate[] = [];
+    const seenPhotoIds = new Set<string>();
     for (const p of photos) {
-      const score = calculateMatchScore(query, p.tags, p.pageURL, entityType);
+      const pid = String(p.id);
+      if (seenPhotoIds.has(pid)) continue;
+      seenPhotoIds.add(pid);
+
+      const score = calculateMatchScore(query, p.tags, p.pageURL, entityType, body.cuisine, body.ingredients);
 
       // Webformat (~640px) is ideal for inventory and cards; largeImageURL (~1280px) for recipe hero
       const primaryUrl = entityType === 'recipe'
@@ -489,7 +599,7 @@ serve(async (req: Request) => {
         : (p.webformatURL || p.largeImageURL);
 
       candidates.push({
-        photoId: String(p.id),
+        photoId: pid,
         imageUrl: primaryUrl,
         thumbnailUrl: p.previewURL || p.webformatURL,
         photographerName: p.user || 'Pixabay Contributor',

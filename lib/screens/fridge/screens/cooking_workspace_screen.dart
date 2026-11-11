@@ -7,6 +7,8 @@ import '../models/category_item.dart';
 import '../services/cooking_basket_service.dart';
 import '../widgets/cooking_pan_visual.dart';
 import '../../home/services/meal_recommendation_service.dart';
+import '../../food_image/widgets/food_image_view.dart';
+import '../../../services/food_image/food_image_model.dart';
 
 /// Full-screen expanded cooking workspace.
 ///
@@ -692,26 +694,16 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen>
               width: 24,
               height: 24,
               color: const Color(0xFFF3F7F5),
-              child: ((item.imageAsset != null && item.imageAsset!.isNotEmpty) ||
-                      (item.iconEmoji == null && item.effectiveImageAsset != null))
-                  ? ((item.effectiveImageAsset ?? item.imageAsset!).startsWith('http')
-                      ? Image.network(
-                          item.effectiveImageAsset ?? item.imageAsset!,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) => Center(
-                            child: Text(item.iconEmoji ?? '🥘', style: const TextStyle(fontSize: 13)),
-                          ),
-                        )
-                      : Image.asset(
-                          item.effectiveImageAsset ?? item.imageAsset!,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) => Center(
-                            child: Text(item.iconEmoji ?? '🥘', style: const TextStyle(fontSize: 13)),
-                          ),
-                        ))
-                  : Center(
-                      child: Text(item.iconEmoji ?? '🥘', style: const TextStyle(fontSize: 13)),
-                    ),
+              child: FoodImageView(
+                name: item.name,
+                type: FoodEntityType.ingredient,
+                category: item.category,
+                iconEmoji: item.iconEmoji,
+                fit: BoxFit.contain,
+                fallbackWidget: Center(
+                  child: Text(item.iconEmoji ?? '🥘', style: const TextStyle(fontSize: 13)),
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 6),
@@ -796,8 +788,6 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen>
                 final double angle = (1.0 - t) * (index.isEven ? -0.2 : 0.2);
                 final double dy = (1.0 - t) * -22.0;
 
-                final String? imgAsset = item.effectiveImageAsset ?? item.imageAsset;
-
                 return Transform.translate(
                   offset: Offset(0, dy),
                   child: Transform.rotate(
@@ -851,32 +841,20 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen>
                                   border: Border.all(color: AppColors.cardBorder, width: 0.8),
                                 ),
                                 clipBehavior: Clip.antiAlias,
-                                child: ((imgAsset != null && imgAsset.isNotEmpty) ||
-                                        (item.iconEmoji == null && item.effectiveImageAsset != null))
-                                    ? Padding(
-                                        padding: const EdgeInsets.all(4),
-                                        child: (item.effectiveImageAsset ?? item.imageAsset!).startsWith('http')
-                                            ? Image.network(
-                                                item.effectiveImageAsset ?? item.imageAsset!,
-                                                fit: BoxFit.contain,
-                                                errorBuilder: (context, error, stackTrace) => Center(
-                                                  child: Text(item.iconEmoji ?? '🥘',
-                                                      style: const TextStyle(fontSize: 18)),
-                                                ),
-                                              )
-                                            : Image.asset(
-                                                item.effectiveImageAsset ?? item.imageAsset!,
-                                                fit: BoxFit.contain,
-                                                errorBuilder: (context, error, stackTrace) => Center(
-                                                  child: Text(item.iconEmoji ?? '🥘',
-                                                      style: const TextStyle(fontSize: 18)),
-                                                ),
-                                              ),
-                                      )
-                                    : Center(
-                                        child: Text(item.iconEmoji ?? '🥘',
-                                            style: const TextStyle(fontSize: 18)),
-                                      ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(4),
+                                  child: FoodImageView(
+                                    name: item.name,
+                                    type: FoodEntityType.ingredient,
+                                    category: item.category,
+                                    iconEmoji: item.iconEmoji,
+                                    fit: BoxFit.contain,
+                                    fallbackWidget: Center(
+                                      child: Text(item.iconEmoji ?? '🥘',
+                                          style: const TextStyle(fontSize: 18)),
+                                    ),
+                                  ),
+                                ),
                               ),
                               const SizedBox(width: 10),
                               Expanded(

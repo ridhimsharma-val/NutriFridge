@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../models/nutrition_data.dart';
+import '../../food_image/widgets/food_image_view.dart';
+import '../../../services/food_image/food_image_model.dart';
 
 /// Redesigned Today's Meals section inspired by the reference design:
 /// - Real food photography thumbnail
@@ -145,12 +147,6 @@ class _MealItemCard extends StatelessWidget {
 
     final String displaySlot = meal.mealType.isNotEmpty ? meal.mealType : 'Logged';
 
-    // Resolve food photography asset for the meal
-    final String imageAsset = MealImageRegistry.resolveImage(
-      mealName: displayName,
-      imageKey: meal.imageUrl ?? loggedRecord?['imageKey']?.toString(),
-    );
-
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -174,35 +170,22 @@ class _MealItemCard extends StatelessWidget {
               // Left: Rounded Food Image Thumbnail
               ClipRRect(
                 borderRadius: BorderRadius.circular(13),
-                child: Container(
+                child: SizedBox(
                   width: 50,
                   height: 50,
-                  color: isCompleted ? const Color(0xFFEAF5EE) : const Color(0xFFF6F8F7),
-                  child: imageAsset.startsWith('http')
-                      ? Image.network(
-                          imageAsset,
-                          width: 50,
-                          height: 50,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Center(
-                            child: Text(
-                              meal.iconEmoji.isNotEmpty ? meal.iconEmoji : '🍽️',
-                              style: const TextStyle(fontSize: 22),
-                            ),
-                          ),
-                        )
-                      : Image.asset(
-                          imageAsset,
-                          width: 50,
-                          height: 50,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Center(
-                            child: Text(
-                              meal.iconEmoji.isNotEmpty ? meal.iconEmoji : '🍽️',
-                              style: const TextStyle(fontSize: 22),
-                            ),
-                          ),
-                        ),
+                  child: FoodImageView(
+                    name: displayName,
+                    type: FoodEntityType.recipe,
+                    width: 50,
+                    height: 50,
+                    fit: BoxFit.cover,
+                    fallbackWidget: Center(
+                      child: Text(
+                        meal.iconEmoji.isNotEmpty ? meal.iconEmoji : '🍽️',
+                        style: const TextStyle(fontSize: 22),
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 14),

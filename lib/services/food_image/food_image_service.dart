@@ -21,6 +21,7 @@ class FoodImageService {
     required FoodEntityType type,
     String? category,
     String? cuisine,
+    List<String>? ingredients,
     String? userId,
   }) async {
     final model = await FoodImageResolver.instance.resolve(
@@ -28,6 +29,7 @@ class FoodImageService {
       type: type,
       category: category,
       cuisine: cuisine,
+      ingredients: ingredients,
       userId: userId,
     );
     _notify();
@@ -40,6 +42,8 @@ class FoodImageService {
     required String name,
     required FoodEntityType type,
     String? category,
+    String? cuisine,
+    List<String>? ingredients,
     String? userId,
   }) {
     final canonicalKey = FoodImageResolver.normalizeKey(name);
@@ -51,11 +55,22 @@ class FoodImageService {
 
     if (cached != null) return cached;
 
+    // Fast synchronous curated local asset check (Priority 2: Milk, Paneer, Apple, Broccoli, etc.)
+    if (FoodImageResolver.mockHandler == null) {
+      final curated = FoodImageResolver.instance.checkCuratedAsset(canonicalKey, name, type);
+      if (curated != null) {
+        FoodImageRepository.instance.putInMemoryCache(curated);
+        return curated;
+      }
+    }
+
     // Trigger background resolution lazily without blocking widget build
     resolveImage(
       name: name,
       type: type,
       category: category,
+      cuisine: cuisine,
+      ingredients: ingredients,
       userId: userId,
     );
 

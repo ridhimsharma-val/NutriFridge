@@ -19,6 +19,9 @@ class FoodImageResolver {
   /// In-flight resolution deduplication map (key: "$entityType:$entityKey")
   final Map<String, Future<FoodImageModel>> _inFlight = {};
 
+  /// Cooldown cache for failed resolutions to avoid repeated requests on rebuilds
+  final Map<String, DateTime> _failedResolutions = {};
+
   /// Normalizes ingredient or recipe names into canonical search keys.
   /// Removes quantity strings, metric/imperial units, parenthesized comments, and special characters.
   static String normalizeKey(String rawName) {
@@ -123,7 +126,7 @@ class FoodImageResolver {
   }
 
   /// Checks if an exact local curated asset mapping exists.
-  FoodImageModel? _checkCuratedAsset(String canonicalKey, String displayName, FoodEntityType type) {
+  FoodImageModel? checkCuratedAsset(String canonicalKey, String displayName, FoodEntityType type) {
     if (type == FoodEntityType.ingredient) {
       const Map<String, String> localAssets = {
         'milk': 'assets/images/foods/milk.png',
@@ -256,6 +259,7 @@ class FoodImageResolver {
     required FoodEntityType type,
     String? category,
     String? cuisine,
+    List<String>? ingredients,
     String? userId,
   }) async {
     final canonicalKey = normalizeKey(name);
@@ -264,6 +268,18 @@ class FoodImageResolver {
     // 1. Check in-flight deduplication
     if (_inFlight.containsKey(inFlightKey)) {
       return _inFlight[inFlightKey]!;
+    }
+
+    // Check failure cooldown (60 seconds) to avoid repeated API pounding
+    final lastFailure = _failedResolutions[inFlightKey];
+    if (lastFailure != null && DateTime.now().difference(lastFailure).inSeconds < 60) {
+      final cached = FoodImageRepository.instance.getCachedMapping(
+        type: type,
+        entityKey: canonicalKey,
+        userId: userId,
+      );
+      if (cached != null) return cached;
+      return buildPlaceholder(name: name, type: type, category: category);
     }
 
     final completer = Completer<FoodImageModel>();
@@ -280,6 +296,7 @@ class FoodImageResolver {
       );
 
       if (savedMapping != null) {
+        _failedResolutions.remove(inFlightKey);
         completer.complete(savedMapping);
         return savedMapping;
       }
@@ -288,9 +305,11 @@ class FoodImageResolver {
       final searchResult = await _invokeEdgeFunction({
         'action': 'resolve',
         'query': canonicalKey,
+        'displayName': name,
         'entityType': type.toDbString(),
         'category': category,
         'cuisine': cuisine,
+        'ingredients': ingredients,
         'orientation': type == FoodEntityType.ingredient ? 'all' : 'horizontal',
       });
 
@@ -322,25 +341,32 @@ class FoodImageResolver {
           updatedAt: DateTime.now(),
         );
 
+        _failedResolutions.remove(inFlightKey);
         await repo.saveSharedMapping(resolvedModel);
         completer.complete(resolvedModel);
         return resolvedModel;
       }
 
-      // Priority 5: Existing curated local asset or clean category placeholder fallback
-      final curated = _checkCuratedAsset(canonicalKey, name, type);
+      // Priority 5: Fallback to curated local asset when external search has no match or offline
+      final curated = checkCuratedAsset(canonicalKey, name, type);
       if (curated != null) {
+        _failedResolutions.remove(inFlightKey);
         repo.putInMemoryCache(curated);
         completer.complete(curated);
         return curated;
       }
 
+      // Mark failure cooldown if no acceptable candidate found
+      _failedResolutions[inFlightKey] = DateTime.now();
+
+      // Priority 5: Fallback clean placeholder
       final placeholder = buildPlaceholder(name: name, type: type, category: category);
       repo.putInMemoryCache(placeholder);
       completer.complete(placeholder);
       return placeholder;
     } catch (e) {
       debugPrint('[FoodImageResolver] Error resolving $name: $e');
+      _failedResolutions[inFlightKey] = DateTime.now();
       final fallback = buildPlaceholder(name: name, type: type, category: category);
       completer.complete(fallback);
       return fallback;
@@ -513,6 +539,8 @@ class FoodImageResolver {
       final headers = <String, String>{};
       if (token != null && token.isNotEmpty) {
         headers['Authorization'] = 'Bearer $token';
+      } else if (SupabaseConfig.isConfigured && SupabaseConfig.supabasePublishableKey.isNotEmpty) {
+        headers['Authorization'] = 'Bearer ${SupabaseConfig.supabasePublishableKey}';
       }
       if (SupabaseConfig.isConfigured && SupabaseConfig.supabasePublishableKey.isNotEmpty) {
         headers['apikey'] = SupabaseConfig.supabasePublishableKey;

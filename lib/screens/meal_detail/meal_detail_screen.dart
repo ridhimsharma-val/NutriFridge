@@ -252,6 +252,7 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
         final serviceImg = FoodImageService.instance.getImageSync(
           name: widget.recommendation.title,
           type: FoodEntityType.recipe,
+          ingredients: widget.recommendation.requiredIngredients,
         );
         final effectiveImg = _overrideImageUrl ??
             (!serviceImg.isPlaceholder ? serviceImg.imageUrl : baseMeal.imageUrl);

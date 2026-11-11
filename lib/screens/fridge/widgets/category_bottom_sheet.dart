@@ -7,6 +7,8 @@ import 'food_details_sheet.dart';
 import 'cooking_pan_widget.dart';
 import 'cooking_pan_visual.dart';
 import 'flying_ingredient_overlay.dart';
+import '../../food_image/widgets/food_image_view.dart';
+import '../../../services/food_image/food_image_model.dart';
 
 /// Large reusable mobile bottom sheet for a food category
 /// Features:
@@ -616,23 +618,13 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
   }
 
   Widget _buildItemImage(CategoryFoodItem item) {
-    final path = item.effectiveImageAsset ?? item.imageAsset!;
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return Image.network(
-        path,
-        fit: BoxFit.contain,
-        filterQuality: FilterQuality.medium,
-        errorBuilder: (context, error, stackTrace) => Text(
-          item.iconEmoji ?? '🍽️',
-          style: const TextStyle(fontSize: 24),
-        ),
-      );
-    }
-    return Image.asset(
-      path,
+    return FoodImageView(
+      name: item.name,
+      type: FoodEntityType.ingredient,
+      category: item.category,
+      iconEmoji: item.iconEmoji,
       fit: BoxFit.contain,
-      filterQuality: FilterQuality.medium,
-      errorBuilder: (context, error, stackTrace) => Text(
+      fallbackWidget: Text(
         item.iconEmoji ?? '🍽️',
         style: const TextStyle(fontSize: 24),
       ),

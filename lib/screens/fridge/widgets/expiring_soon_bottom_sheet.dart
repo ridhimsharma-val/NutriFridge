@@ -3,6 +3,8 @@ import '../../../core/theme/app_colors.dart';
 import '../models/category_item.dart';
 import 'animated_quantity_text.dart';
 import 'food_details_sheet.dart';
+import '../../food_image/widgets/food_image_view.dart';
+import '../../../services/food_image/food_image_model.dart';
 
 /// Modal bottom sheet displaying all inventory items qualifying as "Expiring Soon" (0–3 days).
 /// Replicates the visual design, interactions, and layout of the category bottom sheet:
@@ -297,20 +299,17 @@ class _ExpiringSoonBottomSheetState extends State<ExpiringSoonBottomSheet> {
                   ),
                   padding: const EdgeInsets.all(4),
                   child: Center(
-                    child: (item.effectiveImageAsset != null || item.imageAsset != null)
-                        ? Image.asset(
-                            item.effectiveImageAsset ?? item.imageAsset!,
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.medium,
-                            errorBuilder: (context, error, stackTrace) => Text(
-                              item.iconEmoji ?? '🍽️',
-                              style: const TextStyle(fontSize: 24),
-                            ),
-                          )
-                        : Text(
-                            item.iconEmoji ?? '🍽️',
-                            style: const TextStyle(fontSize: 24),
-                          ),
+                    child: FoodImageView(
+                      name: item.name,
+                      type: FoodEntityType.ingredient,
+                      category: item.category,
+                      iconEmoji: item.iconEmoji,
+                      fit: BoxFit.contain,
+                      fallbackWidget: Text(
+                        item.iconEmoji ?? '🍽️',
+                        style: const TextStyle(fontSize: 24),
+                      ),
+                    ),
                   ),
                 ),
 

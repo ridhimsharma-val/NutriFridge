@@ -3,7 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../models/nutrition_data.dart';
 import '../../../services/food_image/food_image_model.dart';
-import '../../../services/food_image/food_image_service.dart';
+import '../../food_image/widgets/food_image_view.dart';
 import '../../fridge/models/category_item.dart';
 import '../services/meal_recommendation_service.dart';
 
@@ -1013,36 +1013,15 @@ class RecommendationCard extends StatelessWidget {
   Widget _buildFoodImage([RecipeRecommendation? rec]) {
     final effectiveRec = rec ?? recommendation;
     final title = effectiveRec?.title;
-    String? url = effectiveRec?.imageUrl;
+    if (title == null || title.isEmpty) return _buildFallbackImage();
 
-    if (title != null && title.isNotEmpty) {
-      final serviceImg = FoodImageService.instance.getImageSync(
-        name: title,
-        type: FoodEntityType.recipe,
-      );
-      if (!serviceImg.isPlaceholder) {
-        url = serviceImg.imageUrl;
-      }
-    }
-
-    if (url != null && url.startsWith('assets/')) {
-      return Image.asset(
-        url,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _buildFallbackImage(),
-      );
-    } else if (url != null && url.isNotEmpty) {
-      return Image.network(
-        url,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _buildFallbackImage(),
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return _buildImagePlaceholder();
-        },
-      );
-    }
-    return _buildFallbackImage();
+    return FoodImageView(
+      name: title,
+      type: FoodEntityType.recipe,
+      ingredients: effectiveRec?.requiredIngredients,
+      fit: BoxFit.cover,
+      fallbackWidget: _buildFallbackImage(),
+    );
   }
 
   Widget _buildFallbackImage() {
@@ -1066,22 +1045,6 @@ class RecommendationCard extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildImagePlaceholder() {
-    return Container(
-      color: const Color(0xFFFBECE4),
-      child: const Center(
-        child: SizedBox(
-          width: 22,
-          height: 22,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(AppColors.peachAccent),
-          ),
         ),
       ),
     );

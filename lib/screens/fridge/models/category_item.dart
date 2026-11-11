@@ -148,32 +148,25 @@ class CategoryFoodItem {
       return storageImagePath;
     }
 
-    // 3. Fallback to specific local asset if provided (and not a generic category thumbnail)
+    // 3. Fallback to specific local asset ONLY if it is an exact curated asset for this specific item,
+    // NEVER an unrelated category fallback (e.g. do not show apple for pineapple)
     if (imageAsset != null &&
         imageAsset!.isNotEmpty &&
-        !imageAsset!.contains('categories/vegetables') &&
-        !imageAsset!.contains('categories/fruits') &&
-        !imageAsset!.contains('categories/dairy_products') &&
-        !imageAsset!.contains('categories/non_veg') &&
-        !imageAsset!.contains('categories/leftovers') &&
-        !imageAsset!.contains('categories/packaged_food') &&
-        !imageAsset!.contains('categories/juices') &&
-        !imageAsset!.contains('categories/ice_cream') &&
-        !imageAsset!.contains('categories/frozen_food') &&
-        !imageAsset!.contains('categories/dry_fruits') &&
-        !imageAsset!.contains('categories/others')) {
+        FoodItemAssetRegistry.hasExactAsset(name)) {
       return imageAsset;
     }
 
-    return serviceImage.imageUrl;
+    // Not yet resolved or no exact asset: return null so clean placeholder is displayed
+    return null;
   }
 
   /// Returns the dedicated transparent cutout asset or URL specifically for the Interactive Cooking Pan.
   /// Never returns a non-transparent rectangular JPG photograph with a baked-in background.
   String? get effectivePanAsset {
-    // 1. If explicit imageAsset is already a transparent PNG/WebP (local or network), use it
+    // 1. If explicit imageAsset is already a transparent PNG/WebP AND is an exact curated asset
     if (imageAsset != null &&
         imageAsset!.isNotEmpty &&
+        FoodItemAssetRegistry.hasExactAsset(name) &&
         (imageAsset!.toLowerCase().endsWith('.png') || imageAsset!.toLowerCase().endsWith('.webp'))) {
       return imageAsset;
     }
@@ -336,6 +329,21 @@ class FoodItemAssetRegistry {
     'honey': 'assets/images/foods/honey.jpg',
     'chocolate': 'assets/images/foods/chocolate.jpg',
   };
+
+  /// Checks if an exact curated asset exists for this specific food name.
+  /// Prevents generic category fallbacks (e.g. apple.png for any fruit) from being treated as exact assets.
+  static bool hasExactAsset(String name) {
+    final cleanName = name.trim().toLowerCase();
+    if (_itemAssetMap.containsKey(cleanName)) return true;
+    for (final entry in _itemAssetMap.entries) {
+      if (cleanName == entry.key ||
+          cleanName.startsWith('${entry.key} ') ||
+          cleanName.endsWith(' ${entry.key}')) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   /// Resolves the dedicated asset path for an item by name and optional category.
   /// Never returns a category collage/hero image.

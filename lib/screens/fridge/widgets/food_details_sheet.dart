@@ -3,6 +3,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../models/notification_data.dart';
 import '../../food_image/food_image_picker_sheet.dart';
 import '../../food_image/pan_cutout_picker_sheet.dart';
+import '../../food_image/widgets/food_image_view.dart';
 import '../../../../services/food_image/food_image_model.dart';
 import '../models/category_item.dart';
 import 'animated_quantity_text.dart';
@@ -666,23 +667,13 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
   }
 
   Widget _buildItemImage() {
-    final path = _item.effectiveImageAsset ?? _item.imageAsset!;
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return Image.network(
-        path,
-        fit: BoxFit.contain,
-        filterQuality: FilterQuality.medium,
-        errorBuilder: (context, error, stackTrace) => Text(
-          _item.iconEmoji ?? '🍽️',
-          style: const TextStyle(fontSize: 44),
-        ),
-      );
-    }
-    return Image.asset(
-      path,
+    return FoodImageView(
+      name: _item.name,
+      type: FoodEntityType.ingredient,
+      category: _item.category,
+      iconEmoji: _item.iconEmoji,
       fit: BoxFit.contain,
-      filterQuality: FilterQuality.medium,
-      errorBuilder: (context, error, stackTrace) => Text(
+      fallbackWidget: Text(
         _item.iconEmoji ?? '🍽️',
         style: const TextStyle(fontSize: 44),
       ),

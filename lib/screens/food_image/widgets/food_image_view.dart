@@ -8,6 +8,9 @@ class FoodImageView extends StatelessWidget {
   final String name;
   final FoodEntityType type;
   final String? category;
+  final String? cuisine;
+  final List<String>? ingredients;
+  final String? iconEmoji;
   final double? width;
   final double? height;
   final BoxFit fit;
@@ -20,6 +23,9 @@ class FoodImageView extends StatelessWidget {
     required this.name,
     required this.type,
     this.category,
+    this.cuisine,
+    this.ingredients,
+    this.iconEmoji,
     this.width,
     this.height,
     this.fit = BoxFit.cover,
@@ -37,12 +43,15 @@ class FoodImageView extends StatelessWidget {
           name: name,
           type: type,
           category: category,
+          cuisine: cuisine,
+          ingredients: ingredients,
         );
 
         Widget imageWidget;
         if (imageModel.isNetwork) {
           imageWidget = Image.network(
             imageModel.imageUrl,
+            key: ValueKey(imageModel.imageUrl),
             width: width,
             height: height,
             fit: fit,
@@ -50,33 +59,27 @@ class FoodImageView extends StatelessWidget {
                 fallbackWidget ?? _buildDefaultFallback(),
             loadingBuilder: (context, child, loadingProgress) {
               if (loadingProgress == null) return child;
-              return Container(
-                width: width,
-                height: height,
-                color: AppColors.cardBorder.withValues(alpha: 0.3),
-                child: const Center(
-                  child: SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.forestGreen,
-                    ),
-                  ),
-                ),
-              );
+              return _buildLoadingContainer();
             },
           );
-        } else {
+        } else if (!imageModel.isPlaceholder) {
           imageWidget = Image.asset(
             imageModel.imageUrl,
+            key: ValueKey(imageModel.imageUrl),
             width: width,
             height: height,
             fit: fit,
             errorBuilder: (context, error, stackTrace) =>
                 fallbackWidget ?? _buildDefaultFallback(),
           );
+        } else {
+          imageWidget = fallbackWidget ?? _buildCleanPlaceholder();
         }
+
+        imageWidget = AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: imageWidget,
+        );
 
         if (borderRadius != null) {
           imageWidget = ClipRRect(
@@ -117,17 +120,68 @@ class FoodImageView extends StatelessWidget {
     );
   }
 
+  Widget _buildLoadingContainer() {
+    return Container(
+      width: width,
+      height: height,
+      color: AppColors.cardBorder.withValues(alpha: 0.3),
+      child: const Center(
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppColors.forestGreen,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCleanPlaceholder() {
+    return Container(
+      key: const ValueKey('clean_placeholder'),
+      width: width,
+      height: height,
+      color: const Color(0xFFF1F5F9),
+      child: Center(
+        child: iconEmoji != null && iconEmoji!.isNotEmpty
+            ? Text(
+                iconEmoji!,
+                style: TextStyle(
+                  fontSize: (width != null && width! < 32) ? 14 : 24,
+                ),
+              )
+            : const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.forestGreen,
+                ),
+              ),
+      ),
+    );
+  }
+
   Widget _buildDefaultFallback() {
     return Container(
       width: width,
       height: height,
       color: const Color(0xFFF1F5F9),
-      child: const Center(
-        child: Icon(
-          Icons.restaurant_rounded,
-          color: AppColors.textSecondary,
-          size: 24,
-        ),
+      child: Center(
+        child: iconEmoji != null && iconEmoji!.isNotEmpty
+            ? Text(
+                iconEmoji!,
+                style: TextStyle(
+                  fontSize: (width != null && width! < 32) ? 14 : 24,
+                ),
+              )
+            : const Icon(
+                Icons.restaurant_rounded,
+                color: AppColors.textSecondary,
+                size: 24,
+              ),
       ),
     );
   }

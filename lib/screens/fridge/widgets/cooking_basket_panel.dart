@@ -7,6 +7,8 @@ import '../models/category_item.dart';
 import '../services/cooking_basket_service.dart';
 import '../../home/services/meal_recommendation_service.dart';
 import 'cooking_pan_widget.dart';
+import '../../food_image/widgets/food_image_view.dart';
+import '../../../services/food_image/food_image_model.dart';
 
 /// Persistent cooking basket bottom panel for "Use My Ingredients" mode.
 /// Allows viewing selected ingredients, removing items, typing an optional dish name,
@@ -487,32 +489,19 @@ class _CookingBasketPanelState extends State<CookingBasketPanel> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Center(
-                          child: (item.effectiveImageAsset != null || item.imageAsset != null)
-                              ? ((item.effectiveImageAsset ?? item.imageAsset!).startsWith('http')
-                                  ? Image.network(
-                                      item.effectiveImageAsset ?? item.imageAsset!,
-                                      width: 18,
-                                      height: 18,
-                                      fit: BoxFit.contain,
-                                      errorBuilder: (context, error, stackTrace) => Text(
-                                        item.iconEmoji ?? '🥗',
-                                        style: const TextStyle(fontSize: 13),
-                                      ),
-                                    )
-                                  : Image.asset(
-                                      item.effectiveImageAsset ?? item.imageAsset!,
-                                      width: 18,
-                                      height: 18,
-                                      fit: BoxFit.contain,
-                                      errorBuilder: (context, error, stackTrace) => Text(
-                                        item.iconEmoji ?? '🥗',
-                                        style: const TextStyle(fontSize: 13),
-                                      ),
-                                    ))
-                              : Text(
-                                  item.iconEmoji ?? '🥗',
-                                  style: const TextStyle(fontSize: 13),
-                                ),
+                          child: FoodImageView(
+                            name: item.name,
+                            type: FoodEntityType.ingredient,
+                            category: item.category,
+                            iconEmoji: item.iconEmoji,
+                            width: 18,
+                            height: 18,
+                            fit: BoxFit.contain,
+                            fallbackWidget: Text(
+                              item.iconEmoji ?? '🥗',
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 6),
