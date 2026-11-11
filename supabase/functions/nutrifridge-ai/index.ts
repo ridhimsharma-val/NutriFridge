@@ -168,11 +168,14 @@ function normalizeN8nResponse(decoded: any): Record<string, any> {
   for (const it of rawInventoryItems) {
     if (it && typeof it === 'object' && it.name) {
       const q = typeof it.quantity === 'number' && it.quantity > 0 ? it.quantity : null;
+      const isFullRemoval = Boolean(it.isFullRemoval) || (action === 'remove_inventory_items' && q === null);
       inventoryItems.push({
         name: String(it.name).trim(),
         category: normalizeCategory(it.category),
         quantity: q,
         unit: it.unit ? String(it.unit).trim() : (q ? 'pieces' : null),
+        isFullRemoval: isFullRemoval,
+        matchedInventoryItemId: it.matchedInventoryItemId ?? it.id ?? null,
         expiryDate: it.expiryDate ?? null,
         expiryDaysEstimate: typeof it.expiryDaysEstimate === 'number' ? it.expiryDaysEstimate : null,
         confidence: typeof it.confidence === 'number' ? Math.min(1.0, Math.max(0.0, it.confidence)) : 0.95,
@@ -868,6 +871,7 @@ serve(async (req: Request) => {
     });
   } catch (fetchErr: any) {
     const isTimeout = fetchErr.name === 'AbortError';
+    console.error(`[nutrifridge-ai] n8n fetch error (req: ${n8nPayload.requestId}, timeout: ${isTimeout}):`, fetchErr.message);
     return new Response(
       JSON.stringify({
         ok: false,
@@ -899,6 +903,8 @@ serve(async (req: Request) => {
     const upstreamError = errorDetail?.error;
     const errorCode = upstreamError?.code ?? errorDetail?.code ?? (status === 504 ? 'GEMINI_REQUEST_TIMEOUT' : `N8N_UPSTREAM_${status}`);
     const isRetryable = upstreamError?.retryable ?? (status >= 500 || status === 429);
+
+    console.error(`[nutrifridge-ai] n8n error response (req: ${n8nPayload.requestId}, status: ${status}, code: ${errorCode}):`, upstreamError?.message ?? errorDetail?.message ?? 'No error details');
 
     let assistantMessage = errorDetail?.assistantMessage ?? upstreamError?.message;
     if (!assistantMessage) {

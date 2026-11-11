@@ -596,17 +596,18 @@ class SupabaseAiFunctionClient {
       return 'Google Gemini authentication failed. Please verify API key configuration.';
     } else if (errorCode == 'INVALID_AI_RESPONSE' || errorCode == 'INVALID_N8N_RESPONSE') {
       return 'NutriFridge AI returned an unexpected response. Please retry.';
-    } else if (errorCode == 'N8N_NOT_CONFIGURED' ||
-        e.status == 503 ||
-        e.status == 502 ||
-        errorCode == 'CONNECTION_FAILED' ||
-        (errorCode is String && errorCode.startsWith('N8N_UPSTREAM_'))) {
+    } else if (errorCode == 'N8N_NOT_CONFIGURED') {
       return 'NutriFridge AI is temporarily unavailable. Please try again.';
     } else if (backendMessage != null &&
         backendMessage.isNotEmpty &&
-        !backendMessage.toLowerCase().contains('internal server error')) {
+        !backendMessage.toLowerCase().contains('internal server error') &&
+        !backendMessage.toLowerCase().contains('upstream n8n returned')) {
       return backendMessage;
-    } else if (e.status >= 500) {
+    } else if (e.status == 503 ||
+        e.status == 502 ||
+        errorCode == 'CONNECTION_FAILED' ||
+        (errorCode is String && errorCode.startsWith('N8N_UPSTREAM_')) ||
+        e.status >= 500) {
       return 'NutriFridge AI is temporarily unavailable. Please try again.';
     } else if (e.status == 400) {
       return 'Request could not be processed. Please check your selected ingredients.';
