@@ -130,7 +130,7 @@ function calculateMatchScore(
   if (normQuery.includes('paneer') && text.includes('tofu') && !text.includes('paneer')) {
     return 0; // Reject tofu when looking for paneer
   }
-  if (normQuery.includes('apple') && text.includes('pineapple') && !text.includes('red apple') && !text.includes('fresh apple')) {
+  if ((normQuery === 'apple' || normQuery === 'apples') && text.includes('pineapple') && !text.includes('red apple') && !text.includes('fresh apple')) {
     if (!text.includes('apple fruit') && !text.includes('green apple')) {
       return 0;
     }
@@ -182,8 +182,13 @@ async function mirrorImageToStorage(
   // 2. Fetch from Pixabay server-side
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6000);
-    const imgRes = await fetch(sourceImageUrl, { signal: controller.signal }).finally(() => clearTimeout(timeout));
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const imgRes = await fetch(sourceImageUrl, {
+      headers: {
+        'User-Agent': 'NutriFridge-App/1.0',
+      },
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeout));
     if (!imgRes.ok) {
       console.warn(`Failed to fetch image from Pixabay: status ${imgRes.status}`);
       return null;
@@ -491,7 +496,7 @@ serve(async (req: Request) => {
       pixabayUrl.searchParams.set('q', searchTerm);
       pixabayUrl.searchParams.set('image_type', 'photo');
       pixabayUrl.searchParams.set('safesearch', 'true');
-      pixabayUrl.searchParams.set('per_page', String(Math.max(perPage, 5)));
+      pixabayUrl.searchParams.set('per_page', String(Math.max(perPage, 15)));
       if (categoryFilter) {
         pixabayUrl.searchParams.set('category', categoryFilter);
       }
@@ -539,7 +544,7 @@ serve(async (req: Request) => {
       if (!hasAcceptableMatch && mainDishNoun) {
         let fallbackTerm = '';
         if (cleanQuery.includes('biryani')) {
-          fallbackTerm = 'biryani rice';
+          fallbackTerm = 'biryani';
         } else if (cleanQuery.includes('paneer')) {
           fallbackTerm = 'paneer dish';
         } else if (body.cuisine) {
@@ -622,7 +627,6 @@ serve(async (req: Request) => {
 
     // Check existing pan cutout for this entity
     let panCutoutUrl: string | null = null;
-    const canonicalKey = normalizeKey(query);
     try {
       const { data: existingEntry } = await supabaseClient
         .from('food_image_mappings')
