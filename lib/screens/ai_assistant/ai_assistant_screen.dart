@@ -38,6 +38,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   final List<AiChatMessage> _messages = [];
   bool _isSending = false;
+  bool _isRecording = false;
+  final FocusNode _inputFocusNode = FocusNode();
   bool _isConfirmingInventory = false;
   bool _isRemovingInventory = false;
   String? _selectedImageBase64;
@@ -57,6 +59,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     }
     _pendingQuickActionIntent = AiAssistantService.activeQuickActionIntent;
     _messages.addAll(AiAssistantService.sessionMessages);
+
+    _inputFocusNode.addListener(_onInputFocusOrTextChanged);
+    _textController.addListener(_onInputFocusOrTextChanged);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
@@ -99,10 +104,28 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   @override
   void dispose() {
+    _inputFocusNode.removeListener(_onInputFocusOrTextChanged);
+    _textController.removeListener(_onInputFocusOrTextChanged);
+    _inputFocusNode.dispose();
     _chilluController.dispose();
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onInputFocusOrTextChanged() {
+    if (_isSending || _isRecording) return;
+    final hasFocus = _inputFocusNode.hasFocus;
+    final hasText = _textController.text.trim().isNotEmpty;
+    if (hasFocus || hasText) {
+      if (_chilluController.state != ChilluState.attentive && _chilluController.state != ChilluState.thinking) {
+        _chilluController.attentive();
+      }
+    } else {
+      if (_chilluController.state == ChilluState.attentive) {
+        _chilluController.idle();
+      }
+    }
   }
 
   void _syncSession() {
@@ -141,28 +164,40 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     }
   }
 
-  void _handleVoiceInputPlaceholder() {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.mic_none_rounded, color: Colors.white, size: 20),
-            SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Voice input is coming soon!',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: AppColors.forestGreen,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+  void _handleVoiceInput() {
+    if (_isSending) return;
+
+    if (!_isRecording) {
+      // Start actual voice recording session
+      setState(() {
+        _isRecording = true;
+      });
+      _chilluController.listening();
+    } else {
+      // End recording and transition to thinking as message processing begins
+      setState(() {
+        _isRecording = false;
+      });
+      _chilluController.think();
+
+      final voicePrompt = _textController.text.trim().isNotEmpty
+          ? _textController.text.trim()
+          : "What can I cook with the ingredients in my fridge?";
+      _textController.clear();
+      _handleSend(promptOverride: voicePrompt);
+    }
+  }
+
+  void _cancelVoiceRecording() {
+    if (!_isRecording) return;
+    setState(() {
+      _isRecording = false;
+    });
+    if (_inputFocusNode.hasFocus || _textController.text.trim().isNotEmpty) {
+      _chilluController.attentive();
+    } else {
+      _chilluController.idle();
+    }
   }
 
   void _retryLastUserMessage() {
@@ -226,7 +261,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     });
 
     _scrollToBottom();
-    _chilluController.process();
+    _chilluController.think();
     ChilluSoundController.instance.playProcessingShimmer();
 
     final currentIntent = _pendingQuickActionIntent;
@@ -440,7 +475,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         _chilluController.recipeFound();
         ChilluSoundController.instance.playRecipeFound();
       } else {
-        _chilluController.idle();
+        if (_inputFocusNode.hasFocus || _textController.text.trim().isNotEmpty) {
+          _chilluController.attentive();
+        } else {
+          _chilluController.idle();
+        }
       }
     } catch (e) {
       debugPrint('[AiAssistantScreen] Error processing send request: $e');
@@ -2884,12 +2923,22 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               ],
             ),
 
-            // Microphone Button (Voice Input Placeholder)
+            // Microphone Button (Voice Input)
             IconButton(
-              icon: const Icon(Icons.mic_none_rounded, color: AppColors.forestGreen),
-              tooltip: 'Voice Input',
-              onPressed: _handleVoiceInputPlaceholder,
+              icon: Icon(
+                _isRecording ? Icons.stop_circle_rounded : Icons.mic_none_rounded,
+                color: _isRecording ? AppColors.error : AppColors.forestGreen,
+              ),
+              tooltip: _isRecording ? 'Stop Recording & Send' : 'Voice Input',
+              onPressed: _handleVoiceInput,
             ),
+
+            if (_isRecording)
+              IconButton(
+                icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary, size: 20),
+                tooltip: 'Cancel Voice Recording',
+                onPressed: _cancelVoiceRecording,
+              ),
 
             // Text Field
             Expanded(
@@ -2899,20 +2948,30 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                 decoration: BoxDecoration(
                   color: const Color(0xFFF4F1EA),
                   borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: const Color(0xFFE8E5DF), width: 1),
+                  border: Border.all(
+                    color: _isRecording ? AppColors.forestGreen : const Color(0xFFE8E5DF),
+                    width: _isRecording ? 1.5 : 1,
+                  ),
                 ),
                 child: TextField(
+                  focusNode: _inputFocusNode,
                   controller: _textController,
                   maxLines: 4,
                   minLines: 1,
                   textCapitalization: TextCapitalization.sentences,
                   style: const TextStyle(fontSize: 14, color: AppColors.neutralCharcoal),
-                  decoration: const InputDecoration(
-                    hintText: 'Ask anything, add food, or log meal...',
-                    hintStyle: TextStyle(fontSize: 13.5, color: Color(0xFF9CA3AF)),
+                  decoration: InputDecoration(
+                    hintText: _isRecording
+                        ? 'Listening to your voice... Tap mic to send'
+                        : 'Ask anything, add food, or log meal...',
+                    hintStyle: TextStyle(
+                      fontSize: 13.5,
+                      color: _isRecording ? AppColors.forestGreen : const Color(0xFF9CA3AF),
+                      fontWeight: _isRecording ? FontWeight.w600 : FontWeight.normal,
+                    ),
                     border: InputBorder.none,
                     isDense: true,
-                    contentPadding: EdgeInsets.symmetric(vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   ),
                   onSubmitted: (_) => _handleSend(),
                 ),

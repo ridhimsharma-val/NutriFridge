@@ -167,15 +167,61 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         }
         break;
 
+      case ChilluState.attentive:
+        _tiltController.animateTo(0.35, curve: Curves.easeOut);
+        _processingFloatController.stop();
+        if (!_idleBreathingController.isAnimating) {
+          _idleBreathingController.repeat(reverse: true);
+        }
+        if (!_floatingController.isAnimating) {
+          _floatingController.repeat();
+        }
+        if (!_leftLeafController.isAnimating) {
+          _leftLeafController.repeat();
+        }
+        if (!_rightLeafController.isAnimating) {
+          _rightLeafController.repeat();
+        }
+        break;
+
+      case ChilluState.listening:
+        _tiltController.animateTo(0.65, curve: Curves.easeInOut);
+        _processingFloatController.stop();
+        if (!_idleBreathingController.isAnimating) {
+          _idleBreathingController.repeat(reverse: true);
+        }
+        if (!_floatingController.isAnimating) {
+          _floatingController.repeat();
+        }
+        if (!_leftLeafController.isAnimating) {
+          _leftLeafController.repeat();
+        }
+        if (!_rightLeafController.isAnimating) {
+          _rightLeafController.repeat();
+        }
+        break;
+
+      case ChilluState.thinking:
+        _tiltController.animateTo(0.85, curve: Curves.easeInOut);
+        _processingFloatController.stop();
+        if (!_idleBreathingController.isAnimating) {
+          _idleBreathingController.repeat(reverse: true);
+        }
+        if (!_floatingController.isAnimating) {
+          _floatingController.repeat();
+        }
+        if (!_leftLeafController.isAnimating) {
+          _leftLeafController.repeat();
+        }
+        if (!_rightLeafController.isAnimating) {
+          _rightLeafController.repeat();
+        }
+        break;
+
       case ChilluState.greeting:
       case ChilluState.itemAdded:
         _processingFloatController.stop();
         _bounceController.forward(from: 0.0);
-        break;
-
-      case ChilluState.thinking:
-        _processingFloatController.stop();
-        _tiltController.animateTo(0.5, curve: Curves.easeInOut);
         break;
 
       case ChilluState.error:
@@ -344,18 +390,41 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         double scaleX = 1.0;
         double rotation = 0.0;
 
-        // 1. Idle breathing: 1-2% subtle chest expansion & contraction
-        if (state == ChilluState.idle || state == ChilluState.sleepy) {
+        // 1. Idle & interactive breathing: 1-2% subtle chest expansion & contraction
+        final bool isInteractiveOrIdle = state == ChilluState.idle ||
+            state == ChilluState.attentive ||
+            state == ChilluState.listening ||
+            state == ChilluState.thinking ||
+            state == ChilluState.sleepy;
+
+        if (isInteractiveOrIdle) {
           final breathProgress = Curves.easeInOut.transform(_idleBreathingController.value);
           scaleY = 1.0 + (breathProgress * 0.018); // ~1.8% expansion
           scaleX = 1.0 - (breathProgress * 0.010); // ~1.0% contraction
         }
 
-        // 2. Subtle body floating: slow, soothing floating cycle
-        if (state == ChilluState.idle || state == ChilluState.sleepy) {
+        // 2. Subtle body floating & state-specific postures
+        if (isInteractiveOrIdle) {
           final floatVal = _floatingController.value;
-          // Smooth sine curve: floats upwards by up to 2.2px
-          translateY += -2.2 * math.sin(floatVal * 2 * math.pi);
+          final floatSin = math.sin(floatVal * 2 * math.pi);
+          translateY += -2.0 * floatSin;
+
+          if (state == ChilluState.attentive) {
+            // Attentive: subtle alert forward tilt towards conversation
+            rotation = _tiltController.value * 0.040; // ~1.4 deg
+            translateY += -1.5;
+            scaleY += 0.012; // Slight alert perk
+          } else if (state == ChilluState.listening) {
+            // Listening: curious head tilt listening to the voice, engaged audio rhythm
+            final listenCycle = math.sin(floatVal * 2 * math.pi);
+            rotation = (-0.05 * (_tiltController.value / 0.65)) + (listenCycle * 0.012);
+            translateY += -1.8 + (listenCycle * 1.2);
+          } else if (state == ChilluState.thinking) {
+            // Thinking: gentle thoughtful head tilt and contemplative bob
+            final thinkCycle = math.sin(floatVal * 2 * math.pi);
+            rotation = (0.07 * (_tiltController.value / 0.85)) + (thinkCycle * 0.010);
+            translateY += -2.5 + (thinkCycle * 1.5);
+          }
         }
 
         // 3. Processing floating effect
@@ -380,7 +449,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         }
 
         // 5. Tilt effect (thinking / error)
-        if (_tiltController.value > 0.0) {
+        if (_tiltController.value > 0.0 && state != ChilluState.attentive && state != ChilluState.listening && state != ChilluState.thinking) {
           final tVal = _tiltController.value;
           if (state == ChilluState.error) {
             rotation = math.sin(tVal * math.pi * 3) * 0.08;
@@ -391,13 +460,39 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         }
 
         // 6. Independent leaf sprout sway calculation
-        final bool isIdleState = state == ChilluState.idle || state == ChilluState.sleepy || state == ChilluState.thinking;
-        final double leftLeafAngle = isIdleState
-            ? math.sin(_leftLeafController.value * 2 * math.pi) * 0.020
+        final bool isLayeredState = isInteractiveOrIdle;
+        final double leftLeafAngle;
+        final double rightLeafAngle;
+        if (isLayeredState) {
+          final lVal = _leftLeafController.value;
+          final rVal = _rightLeafController.value;
+          double lAngle = math.sin(lVal * 2 * math.pi) * 0.020;
+          double rAngle = math.sin(rVal * 2 * math.pi) * -0.016;
+
+          if (state == ChilluState.attentive) {
+            lAngle += 0.008;
+            rAngle -= 0.008;
+          } else if (state == ChilluState.listening) {
+            final listenSway = math.sin(_floatingController.value * 2 * math.pi);
+            lAngle += listenSway * 0.018;
+            rAngle += listenSway * -0.014;
+          } else if (state == ChilluState.thinking) {
+            final thinkSway = math.sin(_floatingController.value * 2 * math.pi);
+            lAngle += thinkSway * 0.008;
+            rAngle += thinkSway * -0.006;
+          }
+          leftLeafAngle = lAngle;
+          rightLeafAngle = rAngle;
+        } else {
+          leftLeafAngle = 0.0;
+          rightLeafAngle = 0.0;
+        }
+
+        // 7. Eye movement and gaze focus
+        final double gazeEyelid = state == ChilluState.thinking
+            ? (0.14 + (math.sin(_floatingController.value * 2 * math.pi) * 0.025)).clamp(0.0, 0.20)
             : 0.0;
-        final double rightLeafAngle = isIdleState
-            ? math.sin(_rightLeafController.value * 2 * math.pi) * -0.016
-            : 0.0;
+        final double effectiveBlinkProgress = math.max(_blinkController.value, gazeEyelid);
 
         return Transform.translate(
           offset: Offset(0, translateY),
@@ -415,7 +510,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
                   alignment: Alignment.center,
                   clipBehavior: Clip.none,
                   children: [
-                    if (!isIdleState)
+                    if (!isLayeredState)
                       // Non-idle states: full character in one layer
                       Image.asset(
                         ChilluMascot.masterAsset,
@@ -466,12 +561,12 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
                       ),
                     ],
 
-                    // 4. Natural Eye Blinking Overlay
-                    if (_blinkController.value > 0.0)
+                    // 4. Natural Eye Blinking & Pensive Gaze Overlay
+                    if (effectiveBlinkProgress > 0.0)
                       CustomPaint(
                         size: Size(widget.size, widget.size),
                         painter: _ChilluEyeBlinkPainter(
-                          blinkProgress: _blinkController.value,
+                          blinkProgress: effectiveBlinkProgress,
                         ),
                       ),
                   ],
@@ -516,7 +611,11 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           final hop = 4 * bVal * (1 - bVal);
           shadowScale = 1.0 - (0.35 * hop);
           shadowOpacity = 0.12 - (0.06 * hop);
-        } else if (state == ChilluState.idle || state == ChilluState.sleepy) {
+        } else if (state == ChilluState.idle ||
+            state == ChilluState.attentive ||
+            state == ChilluState.listening ||
+            state == ChilluState.thinking ||
+            state == ChilluState.sleepy) {
           final breath = Curves.easeInOut.transform(_idleBreathingController.value);
           final floatVal = _floatingController.value;
           final floatSin = math.sin(floatVal * 2 * math.pi);
@@ -573,6 +672,10 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
     switch (s) {
       case ChilluState.idle:
         return 'happy and waiting';
+      case ChilluState.attentive:
+        return 'attentive and focused';
+      case ChilluState.listening:
+        return 'listening to your voice';
       case ChilluState.greeting:
         return 'waving hello';
       case ChilluState.thinking:

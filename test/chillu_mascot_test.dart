@@ -50,6 +50,55 @@ void main() {
 
       controller.dispose();
     });
+
+    test('Attentive, listening, and thinking are persistent until explicitly transitioned', () async {
+      final controller = ChilluAnimationController();
+
+      controller.attentive();
+      expect(controller.state, ChilluState.attentive);
+      await Future.delayed(const Duration(milliseconds: 60));
+      // Does not auto-reset
+      expect(controller.state, ChilluState.attentive);
+
+      controller.listening();
+      expect(controller.state, ChilluState.listening);
+      await Future.delayed(const Duration(milliseconds: 60));
+      expect(controller.state, ChilluState.listening);
+
+      controller.think();
+      expect(controller.state, ChilluState.thinking);
+      await Future.delayed(const Duration(milliseconds: 60));
+      expect(controller.state, ChilluState.thinking);
+
+      controller.idle();
+      expect(controller.state, ChilluState.idle);
+
+      controller.dispose();
+    });
+
+    test('State flow: idle -> attentive -> listening -> thinking -> idle', () {
+      final controller = ChilluAnimationController();
+
+      expect(controller.state, ChilluState.idle);
+
+      // User focuses input / types
+      controller.attentive();
+      expect(controller.state, ChilluState.attentive);
+
+      // Voice recording starts
+      controller.listening();
+      expect(controller.state, ChilluState.listening);
+
+      // Recording ends, message submitted
+      controller.think();
+      expect(controller.state, ChilluState.thinking);
+
+      // Response received
+      controller.idle();
+      expect(controller.state, ChilluState.idle);
+
+      controller.dispose();
+    });
   });
 
   group('ChilluSoundController Tests', () {
@@ -180,6 +229,47 @@ void main() {
       await tester.pump();
 
       expect(controller.state, ChilluState.greeting);
+
+      controller.dispose();
+    });
+
+    testWidgets('Renders seamlessly across attentive, listening, and thinking states', (WidgetTester tester) async {
+      final controller = ChilluAnimationController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ChilluMascot(
+              controller: controller,
+              size: 100,
+            ),
+          ),
+        ),
+      );
+
+      // 1. Attentive state
+      controller.attentive();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(controller.state, ChilluState.attentive);
+      expect(find.byType(ChilluMascot), findsOneWidget);
+
+      // 2. Listening state
+      controller.listening();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(controller.state, ChilluState.listening);
+      expect(find.byType(ChilluMascot), findsOneWidget);
+
+      // 3. Thinking state
+      controller.think();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(controller.state, ChilluState.thinking);
+      expect(find.byType(ChilluMascot), findsOneWidget);
+
+      // 4. Return to Idle
+      controller.idle();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(controller.state, ChilluState.idle);
+      expect(find.byType(ChilluMascot), findsOneWidget);
 
       controller.dispose();
     });

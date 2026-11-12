@@ -6,6 +6,12 @@ enum ChilluState {
   /// Gentle breathing and occasional blinking.
   idle,
 
+  /// Attentive posture when user focuses on chat input or types.
+  attentive,
+
+  /// Active listening posture when voice recording starts.
+  listening,
+
   /// Friendly bounce when greeted or welcomed.
   greeting,
 
@@ -84,12 +90,13 @@ class ChilluAnimationController extends ChangeNotifier {
         return const Duration(milliseconds: 1200);
       case ChilluState.error:
         return const Duration(milliseconds: 1800);
-      case ChilluState.thinking:
-        return const Duration(milliseconds: 2000);
       case ChilluState.idle:
+      case ChilluState.attentive:
+      case ChilluState.listening:
+      case ChilluState.thinking:
       case ChilluState.processing:
       case ChilluState.sleepy:
-        // Persistent states until explicitly changed
+        // Persistent states driven by actual application state
         return null;
     }
   }
@@ -97,11 +104,19 @@ class ChilluAnimationController extends ChangeNotifier {
   /// Sets Chillu to idle gentle breathing.
   void idle() => triggerState(ChilluState.idle, duration: Duration.zero);
 
+  /// Sets Chillu to attentive posture (focused on chat input/typing).
+  void attentive({Duration? duration}) =>
+      triggerState(ChilluState.attentive, duration: duration);
+
+  /// Sets Chillu to active listening posture during voice recording.
+  void listening({Duration? duration}) =>
+      triggerState(ChilluState.listening, duration: duration);
+
   /// Triggers friendly greeting bounce.
   void greet({Duration? duration}) =>
       triggerState(ChilluState.greeting, duration: duration);
 
-  /// Enters thinking state.
+  /// Enters thinking state while awaiting assistant reply.
   void think({Duration? duration}) =>
       triggerState(ChilluState.thinking, duration: duration);
 
