@@ -1994,62 +1994,54 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     final bool isMealMessage = message.meal != null || message.action == 'log_meal';
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Container(
-          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.88),
-          decoration: BoxDecoration(
-            color: isMealMessage ? const Color(0xFFFFFDF9) : AppColors.cardWhite,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(4),
-              topRight: Radius.circular(18),
-              bottomLeft: Radius.circular(18),
-              bottomRight: Radius.circular(18),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: ChilluMascot(
+              size: 46,
+              showShadow: false,
             ),
-            border: Border.all(
-              color: isMealMessage ? AppColors.peachBorder : const Color(0xFFE5ECE7),
-              width: 1.2,
-            ),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0A000000),
-                blurRadius: 10,
-                offset: Offset(0, 3),
-              ),
-            ],
           ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Assistant Identity header
-              Row(
-                children: const [
-                  ChilluMascot(size: 18, showShadow: false),
-                  SizedBox(width: 6),
-                  Text(
-                    'Chillu · AI Assistant',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.forestGreen,
-                      letterSpacing: 0.2,
-                    ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Container(
+              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.80),
+              decoration: BoxDecoration(
+                color: isMealMessage ? const Color(0xFFFFFDF9) : AppColors.cardWhite,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(4),
+                  topRight: Radius.circular(18),
+                  bottomLeft: Radius.circular(18),
+                  bottomRight: Radius.circular(18),
+                ),
+                border: Border.all(
+                  color: isMealMessage ? AppColors.peachBorder : const Color(0xFFE5ECE7),
+                  width: 1.2,
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x0A000000),
+                    blurRadius: 10,
+                    offset: Offset(0, 3),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-
-              // Assistant Text
-              Text(
-                message.text,
-                style: const TextStyle(
-                  color: AppColors.neutralCharcoal,
-                  fontSize: 14.5,
-                  height: 1.45,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Assistant Text
+                  Text(
+                    message.text,
+                    style: const TextStyle(
+                      color: AppColors.neutralCharcoal,
+                      fontSize: 14.5,
+                      height: 1.45,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
 
               // Embedded Action: Add Inventory Items
               if (message.action == 'add_inventory_items' &&
@@ -2099,7 +2091,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           ),
         ),
       ),
-    );
+    ],
+  ),
+);
   }
 
   Widget _buildInventoryActionCard(AiChatMessage message) {
@@ -2752,34 +2746,47 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   Widget _buildTypingIndicator() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: const [
-              BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2)),
-            ],
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: ChilluMascot(
+              controller: _chilluController,
+              size: 46,
+              showShadow: false,
+            ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ChilluMascot(
-                controller: _chilluController,
-                size: 36,
-                showShadow: false,
+          const SizedBox(width: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppColors.cardWhite,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(4),
+                topRight: Radius.circular(18),
+                bottomLeft: Radius.circular(18),
+                bottomRight: Radius.circular(18),
               ),
-              const SizedBox(width: 10),
-              const Text(
-                'Chillu is thinking...',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+              border: Border.all(
+                color: const Color(0xFFE5ECE7),
+                width: 1.2,
               ),
-            ],
+              boxShadow: const [
+                BoxShadow(color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 3)),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Text(
+                  'Chillu is thinking...',
+                  style: TextStyle(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
