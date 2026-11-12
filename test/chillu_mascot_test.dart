@@ -274,7 +274,7 @@ void main() {
       controller.dispose();
     });
 
-    testWidgets('Curious Perk-Up attentive animation progresses through perk, glance, and settles into alert resting pose', (WidgetTester tester) async {
+    testWidgets('Curious Perk-Up entrance progresses into continuous attentive animation loop', (WidgetTester tester) async {
       final controller = ChilluAnimationController();
 
       await tester.pumpWidget(
@@ -297,17 +297,26 @@ void main() {
       expect(controller.state, ChilluState.attentive);
       expect(find.byType(ChilluMascot), findsOneWidget);
 
-      // Side glance phase (500ms)
-      await tester.pump(const Duration(milliseconds: 250));
+      // Entrance settling (750ms total)
+      await tester.pump(const Duration(milliseconds: 500));
       expect(controller.state, ChilluState.attentive);
 
-      // Settled alert resting pose (850ms)
-      await tester.pump(const Duration(milliseconds: 350));
-      expect(controller.state, ChilluState.attentive);
+      // Continuous loop remains actively animated over subsequent seconds (e.g. 5s, 10s, 15s)
+      for (int i = 0; i < 15; i++) {
+        await tester.pump(const Duration(seconds: 1));
+        expect(controller.state, ChilluState.attentive);
+        expect(find.byType(ChilluMascot), findsOneWidget);
+      }
 
-      // Subsequent pumps stay in alert resting pose without looping perk-up
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(controller.state, ChilluState.attentive);
+      // Transition immediately to thinking on submit
+      controller.think();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(controller.state, ChilluState.thinking);
+
+      // Transition back to idle
+      controller.idle();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(controller.state, ChilluState.idle);
 
       controller.dispose();
     });

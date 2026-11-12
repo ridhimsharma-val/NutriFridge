@@ -113,26 +113,20 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     super.dispose();
   }
 
-  bool _wasInputFocused = false;
-
   void _onInputFocusOrTextChanged() {
     if (_isSending || _isRecording) return;
-    final hasFocus = _inputFocusNode.hasFocus;
     final hasNonWhitespace = _textController.text.trim().isNotEmpty;
-    final justGainedFocus = hasFocus && !_wasInputFocused;
-    _wasInputFocused = hasFocus;
 
-    if (hasNonWhitespace || justGainedFocus) {
+    if (hasNonWhitespace) {
+      // First non-whitespace character triggers Attentive; subsequent keystrokes maintain it without restarting
       if (_chilluController.state != ChilluState.attentive && _chilluController.state != ChilluState.thinking) {
         _chilluController.attentive();
       }
-    } else if (!hasNonWhitespace && !hasFocus) {
+    } else {
+      // When input message is cleared, return smoothly to Idle
       if (_chilluController.state == ChilluState.attentive) {
         _chilluController.idle();
       }
-    } else if (!hasNonWhitespace && hasFocus && _chilluController.state == ChilluState.attentive) {
-      // When input is cleared while focused, handle transition gracefully back to idle
-      _chilluController.idle();
     }
   }
 

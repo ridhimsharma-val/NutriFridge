@@ -62,6 +62,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
   late AnimationController _listeningPulseController;
   late AnimationController _thinkingCycleController;
   late AnimationController _attentivePerkController;
+  late AnimationController _attentiveLoopController;
 
   Timer? _blinkTimer;
   final math.Random _random = math.Random();
@@ -137,10 +138,16 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
       duration: const Duration(milliseconds: 2400),
     );
 
-    // 11. Attentive Curious Perk-Up: squash, spring pop up, leaf reaction, side glance, alert pose (850ms)
+    // 11. Attentive Curious Perk-Up: squash, spring pop up, leaf reaction, side glance, alert pose (750ms)
     _attentivePerkController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 850),
+      duration: const Duration(milliseconds: 750),
+    );
+
+    // 12. Attentive Continuous Loop: playful spring micro-bounces, body sways, organic leaf swaying, expressive eye movements (3600ms)
+    _attentiveLoopController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3600),
     );
 
     _syncAnimationsWithState(_controller.state);
@@ -180,6 +187,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _processingFloatController.stop();
         _listeningPulseController.stop();
         _thinkingCycleController.stop();
+        _attentiveLoopController.stop();
         _attentivePerkController.animateTo(0.0, duration: const Duration(milliseconds: 280), curve: Curves.easeOut);
         if (!_idleBreathingController.isAnimating) {
           _idleBreathingController.repeat(reverse: true);
@@ -201,6 +209,9 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _listeningPulseController.stop();
         _thinkingCycleController.stop();
         _attentivePerkController.forward(from: 0.0);
+        if (!_attentiveLoopController.isAnimating) {
+          _attentiveLoopController.repeat();
+        }
         if (!_idleBreathingController.isAnimating) {
           _idleBreathingController.repeat(reverse: true);
         }
@@ -217,6 +228,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _processingFloatController.stop();
         _thinkingCycleController.stop();
         _attentivePerkController.stop();
+        _attentiveLoopController.stop();
         if (!_listeningPulseController.isAnimating) {
           _listeningPulseController.repeat();
         }
@@ -236,6 +248,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _processingFloatController.stop();
         _listeningPulseController.stop();
         _attentivePerkController.stop();
+        _attentiveLoopController.stop();
         if (!_thinkingCycleController.isAnimating) {
           _thinkingCycleController.repeat();
         }
@@ -256,6 +269,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _listeningPulseController.stop();
         _thinkingCycleController.stop();
         _attentivePerkController.stop();
+        _attentiveLoopController.stop();
         _bounceController.forward(from: 0.0);
         break;
 
@@ -264,6 +278,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _listeningPulseController.stop();
         _thinkingCycleController.stop();
         _attentivePerkController.stop();
+        _attentiveLoopController.stop();
         _tiltController.animateTo(1.0, curve: Curves.elasticOut);
         break;
 
@@ -273,6 +288,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _listeningPulseController.stop();
         _thinkingCycleController.stop();
         _attentivePerkController.stop();
+        _attentiveLoopController.stop();
         if (!_processingFloatController.isAnimating) {
           _processingFloatController.repeat(reverse: true);
         }
@@ -286,6 +302,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _listeningPulseController.stop();
         _thinkingCycleController.stop();
         _attentivePerkController.stop();
+        _attentiveLoopController.stop();
         break;
 
       case ChilluState.sleepy:
@@ -293,6 +310,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _listeningPulseController.stop();
         _thinkingCycleController.stop();
         _attentivePerkController.stop();
+        _attentiveLoopController.stop();
         _tiltController.animateTo(0.2, curve: Curves.easeOut);
         if (!_idleBreathingController.isAnimating) {
           _idleBreathingController.repeat(reverse: true);
@@ -353,6 +371,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
     _listeningPulseController.dispose();
     _thinkingCycleController.dispose();
     _attentivePerkController.dispose();
+    _attentiveLoopController.dispose();
     super.dispose();
   }
 
@@ -436,6 +455,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _listeningPulseController,
         _thinkingCycleController,
         _attentivePerkController,
+        _attentiveLoopController,
       ]),
       builder: (context, _) {
         double translateY = 0.0;
@@ -464,56 +484,63 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           if (state == ChilluState.idle || state == ChilluState.sleepy) {
             translateY += -2.0 * floatSin;
           } else if (state == ChilluState.attentive) {
-            // CURIOUS PERK-UP ATTENTIVE ANIMATION:
-            // 1. Quick perk-up with squash & stretch (p: 0.0 -> 0.35)
-            // 2. Rebound settling into alert resting pose (p: 0.35 -> 0.70)
-            // 3. Playful sideways head tilt during side glance (p: 0.40 -> 0.74)
-            // 4. Alert resting pose with subtle micro-breathing (p: 0.74 -> 1.00)
+            // ATTENTIVE:
+            // 1. Initial Curious Perk-Up entrance (p: 0.0 -> 1.0 via _attentivePerkController)
+            // 2. Continuous Attentive Animation Loop (loopVal: 0.0 -> 1.0 via _attentiveLoopController)
             final p = _attentivePerkController.value;
+            final loopVal = _attentiveLoopController.value;
+            final loopBlend = Curves.easeIn.transform(p); // 0.0 at entrance, 1.0 when settled into loop
 
-            final double perkTranslate;
-            final double perkScaleY;
-            final double perkScaleX;
+            // Entrance Perk-Up trajectory:
+            final double entranceTranslate;
+            final double entranceScaleY;
+            final double entranceScaleX;
+            final double entranceRot;
 
             if (p < 0.12) {
-              // Anticipation squash down
               final sub = p / 0.12;
-              perkTranslate = 2.0 * sub;
-              perkScaleY = 1.0 - (0.06 * sub);
-              perkScaleX = 1.0 + (0.05 * sub);
+              entranceTranslate = 2.0 * sub;
+              entranceScaleY = 1.0 - (0.06 * sub);
+              entranceScaleX = 1.0 + (0.05 * sub);
+              entranceRot = 0.0;
             } else if (p < 0.35) {
-              // Spring stretch pop up
               final sub = (p - 0.12) / 0.23;
               final tEase = Curves.easeOutBack.transform(sub);
-              perkTranslate = 2.0 + ((-11.5 - 2.0) * tEase); // pops up to -11.5px
-              perkScaleY = 0.94 + ((1.09 - 0.94) * tEase);
-              perkScaleX = 1.05 + ((0.93 - 1.05) * tEase);
-            } else if (p < 0.65) {
-              // Rebound settling
-              final sub = (p - 0.35) / 0.30;
+              entranceTranslate = 2.0 + ((-11.5 - 2.0) * tEase);
+              entranceScaleY = 0.94 + ((1.09 - 0.94) * tEase);
+              entranceScaleX = 1.05 + ((0.93 - 1.05) * tEase);
+              entranceRot = 0.0;
+            } else if (p < 0.70) {
+              final sub = (p - 0.35) / 0.35;
               final tEase = Curves.easeInOut.transform(sub);
-              perkTranslate = -11.5 + ((-6.0 - -11.5) * tEase);
-              perkScaleY = 1.09 + ((1.03 - 1.09) * tEase);
-              perkScaleX = 0.93 + ((0.985 - 0.93) * tEase);
+              entranceTranslate = -11.5 + ((-6.0 - -11.5) * tEase);
+              entranceScaleY = 1.09 + ((1.03 - 1.09) * tEase);
+              entranceScaleX = 0.93 + ((0.985 - 0.93) * tEase);
+              entranceRot = math.sin(sub * math.pi) * 0.040; // Playful entrance tilt
             } else {
-              // Alert resting pose with micro-breathing
-              final breath = Curves.easeInOut.transform(_idleBreathingController.value);
-              perkTranslate = -6.0 + (breath * 0.8);
-              perkScaleY = 1.03 + (breath * 0.010);
-              perkScaleX = 0.985 - (breath * 0.006);
+              entranceTranslate = -6.0;
+              entranceScaleY = 1.03;
+              entranceScaleX = 0.985;
+              entranceRot = 0.0;
             }
 
-            translateY += perkTranslate;
-            scaleY = perkScaleY;
-            scaleX = perkScaleX;
+            // Continuous Attentive Loop dynamics:
+            // 1. Playful spring-like micro-bounces (period 1200ms -> 6*pi)
+            final double springPhase = math.sin(loopVal * 6 * math.pi);
+            final double loopTranslate = -6.0 - (springPhase.abs() * 2.4);
+            final double loopScaleY = 1.03 + (springPhase * 0.024);
+            final double loopScaleX = 0.985 - (springPhase * 0.014);
 
-            // Short playful head tilt during side glance (p: 0.40 -> 0.74)
-            if (p >= 0.40 && p <= 0.74) {
-              final sub = (p - 0.40) / 0.34;
-              rotation = math.sin(sub * math.pi) * 0.040; // ~2.3 deg playful tilt
-            } else {
-              rotation = 0.0;
-            }
+            // 2. Gentle alternating body tilt & posture shifts (period 1800ms -> 4*pi)
+            final double bodyTilt = math.sin(loopVal * 4 * math.pi) * 0.038;
+            final double postureShift = math.sin(loopVal * 2 * math.pi) * 0.016;
+            final double loopRot = bodyTilt + postureShift;
+
+            // Seamless blend from entrance perk into continuous loop:
+            translateY += Tween<double>(begin: entranceTranslate, end: loopTranslate).transform(loopBlend);
+            scaleY = Tween<double>(begin: entranceScaleY, end: loopScaleY).transform(loopBlend);
+            scaleX = Tween<double>(begin: entranceScaleX, end: loopScaleX).transform(loopBlend);
+            rotation = Tween<double>(begin: entranceRot, end: loopRot).transform(loopBlend);
           } else if (state == ChilluState.listening) {
             // Listening: rhythmic body bounce (1000ms cycle), visible breathing/pulsing (4.2% scale),
             // attentive side ear tilt (~-4.3 deg)
@@ -594,37 +621,46 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           double rAngle = math.sin(rVal * 2 * math.pi) * -0.016;
 
           if (state == ChilluState.attentive) {
-            // Curious Perk-Up leaf reaction: staggered spring upward & settle into alert perk
             final p = _attentivePerkController.value;
-            final double leftPerk;
-            final double rightPerk;
+            final loopVal = _attentiveLoopController.value;
+            final loopBlend = Curves.easeIn.transform(p);
+
+            // Entrance leaf reaction:
+            final double entLeft;
+            final double entRight;
 
             // Left leaf peaks at p = 0.30
             if (p < 0.30) {
               final sub = (p / 0.30).clamp(0.0, 1.0);
-              leftPerk = Curves.easeOutBack.transform(sub) * 0.11; // ~6.3 deg
-            } else if (p < 0.58) {
-              final sub = ((p - 0.30) / 0.28).clamp(0.0, 1.0);
-              leftPerk = Tween<double>(begin: 0.11, end: 0.045).transform(Curves.easeInOut.transform(sub));
+              entLeft = Curves.easeOutBack.transform(sub) * 0.11; // ~6.3 deg
+            } else if (p < 0.60) {
+              final sub = ((p - 0.30) / 0.30).clamp(0.0, 1.0);
+              entLeft = Tween<double>(begin: 0.11, end: 0.045).transform(Curves.easeInOut.transform(sub));
             } else {
-              leftPerk = 0.045; // Resting alert perk
+              entLeft = 0.045; // Resting alert perk
             }
 
             // Right leaf slightly delayed, peaks at p = 0.38
             if (p < 0.08) {
-              rightPerk = 0.0;
+              entRight = 0.0;
             } else if (p < 0.38) {
               final sub = ((p - 0.08) / 0.30).clamp(0.0, 1.0);
-              rightPerk = -Curves.easeOutBack.transform(sub) * 0.10; // ~-5.7 deg
+              entRight = -Curves.easeOutBack.transform(sub) * 0.10; // ~-5.7 deg
             } else if (p < 0.65) {
               final sub = ((p - 0.38) / 0.27).clamp(0.0, 1.0);
-              rightPerk = Tween<double>(begin: -0.10, end: -0.038).transform(Curves.easeInOut.transform(sub));
+              entRight = Tween<double>(begin: -0.10, end: -0.038).transform(Curves.easeInOut.transform(sub));
             } else {
-              rightPerk = -0.038; // Resting alert perk
+              entRight = -0.038; // Resting alert perk
             }
 
-            lAngle += leftPerk;
-            rAngle += rightPerk;
+            // Continuous loop leaf swaying (different independent periods & phase offsets):
+            // Left sprout sway (frequency: 5*pi) + spring coupling
+            final double loopLeft = 0.045 + (math.sin(loopVal * 5 * math.pi) * 0.034) + (math.sin(loopVal * 6 * math.pi) * 0.012);
+            // Right sprout sway (frequency: 3.5*pi + 1.2 offset) - spring coupling
+            final double loopRight = -0.038 + (math.sin(loopVal * 3.5 * math.pi + 1.2) * 0.030) - (math.sin(loopVal * 6 * math.pi) * 0.012);
+
+            lAngle += Tween<double>(begin: entLeft, end: loopLeft).transform(loopBlend);
+            rAngle += Tween<double>(begin: entRight, end: loopRight).transform(loopBlend);
           } else if (state == ChilluState.listening) {
             // Leaves respond dynamically to rhythmic bounce
             final bouncePhase = math.sin(_listeningPulseController.value * 2 * math.pi);
@@ -649,19 +685,41 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         final double glanceShift;
         if (state == ChilluState.attentive) {
           final p = _attentivePerkController.value;
-          // Widening during spring pop (p: 0.12 -> 0.38)
-          if (p >= 0.12 && p <= 0.38) {
-            final sub = (p - 0.12) / 0.26;
-            eyeWiden = math.sin(sub * math.pi);
+          final loopVal = _attentiveLoopController.value;
+
+          if (p < 0.95) {
+            // Entrance expression:
+            // Widening during spring pop (p: 0.12 -> 0.38)
+            if (p >= 0.12 && p <= 0.38) {
+              final sub = (p - 0.12) / 0.26;
+              eyeWiden = math.sin(sub * math.pi);
+            } else {
+              eyeWiden = 0.0;
+            }
+            // Entrance side glance (p: 0.42 -> 0.74)
+            if (p >= 0.42 && p <= 0.74) {
+              final sub = (p - 0.42) / 0.32;
+              glanceShift = math.sin(sub * math.pi); // 0.0 -> 1.0 -> 0.0
+            } else {
+              glanceShift = 0.0;
+            }
           } else {
-            eyeWiden = 0.0;
-          }
-          // Side glance during (p: 0.42 -> 0.74)
-          if (p >= 0.42 && p <= 0.74) {
-            final sub = (p - 0.42) / 0.32;
-            glanceShift = math.sin(sub * math.pi); // 0.0 -> 1.0 -> 0.0
-          } else {
-            glanceShift = 0.0;
+            // Continuous loop occasional expressive eye movements:
+            // 1. Inquisitive side glance toward chat (loopVal: 0.15 -> 0.28)
+            if (loopVal >= 0.15 && loopVal <= 0.28) {
+              final sub = (loopVal - 0.15) / 0.13;
+              glanceShift = math.sin(sub * math.pi) * 0.85;
+            } else {
+              glanceShift = 0.0;
+            }
+
+            // 2. Alert curious eyebrow lift / eye widening (loopVal: 0.62 -> 0.75)
+            if (loopVal >= 0.62 && loopVal <= 0.75) {
+              final sub = (loopVal - 0.62) / 0.13;
+              eyeWiden = math.sin(sub * math.pi) * 0.80;
+            } else {
+              eyeWiden = 0.0;
+            }
           }
         } else {
           eyeWiden = 0.0;
@@ -805,6 +863,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _listeningPulseController,
         _thinkingCycleController,
         _attentivePerkController,
+        _attentiveLoopController,
       ]),
       builder: (context, _) {
         double shadowScale = 1.0;
@@ -820,20 +879,18 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           shadowScale = 1.0 - (0.35 * hop);
           shadowOpacity = 0.12 - (0.06 * hop);
         } else if (state == ChilluState.attentive) {
-          // Attentive: dynamic shadow reacting to squash, spring pop lift, and alert resting pose
+          // Attentive: dynamic shadow reacting to entrance pop and continuous loop spring bounces
           final p = _attentivePerkController.value;
-          if (p < 0.12) {
-            final sub = p / 0.12;
-            shadowScale = 1.0 + (0.05 * sub);
-            shadowOpacity = 0.11 + (0.02 * sub);
-          } else if (p < 0.35) {
-            final sub = (p - 0.12) / 0.23;
-            final tEase = Curves.easeOutBack.transform(sub);
-            shadowScale = 1.05 - (0.19 * tEase); // down to 0.86
-            shadowOpacity = 0.13 - (0.05 * tEase); // down to 0.08
+          final loopVal = _attentiveLoopController.value;
+          if (p < 0.35) {
+            final sub = (p / 0.35).clamp(0.0, 1.0);
+            shadowScale = 1.0 - (0.14 * Curves.easeOutBack.transform(sub));
+            shadowOpacity = 0.11 - (0.03 * Curves.easeOutBack.transform(sub));
           } else {
-            shadowScale = 0.92;
-            shadowOpacity = 0.10;
+            // Tracks continuous loop spring bounce
+            final springPhase = math.sin(loopVal * 6 * math.pi).abs();
+            shadowScale = 0.92 - (0.05 * springPhase);
+            shadowOpacity = 0.10 - (0.02 * springPhase);
           }
         } else if (state == ChilluState.listening) {
           // Listening: rhythmic bounce ~7.5px with _listeningPulseController
