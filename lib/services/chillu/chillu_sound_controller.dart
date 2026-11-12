@@ -28,7 +28,17 @@ class ChilluSoundController {
   /// Whether Chillu has already chirped greeting in this session.
   bool get hasGreetedThisSession => _hasGreetedThisSession;
 
-  /// Audio asset relative paths (without `assets/` prefix, as required by audioplayers `AssetSource`).
+  /// Canonical 8-sound personality audio assets (~1.8–2.3s each, Celebrating ~2.35s).
+  static const String entryJumpAsset = 'audio/chillu/01_entry_jump.wav';
+  static const String attentiveAsset = 'audio/chillu/02_attentive.wav';
+  static const String listeningAsset = 'audio/chillu/03_listening.wav';
+  static const String thinkingAsset = 'audio/chillu/04_thinking.wav';
+  static const String happyAsset = 'audio/chillu/05_happy.wav';
+  static const String excitedAsset = 'audio/chillu/06_excited.wav';
+  static const String celebratingAsset = 'audio/chillu/07_celebrating.wav';
+  static const String confusedAsset = 'audio/chillu/08_confused.wav';
+
+  /// Legacy alias constants for backwards compatibility.
   static const String greetingChirpAsset = 'audio/chillu/01_greeting_chirp.wav';
   static const String addItemPopAsset = 'audio/chillu/02_add_item_pop.wav';
   static const String thinkingPingAsset = 'audio/chillu/03_thinking_ping.wav';
@@ -105,42 +115,86 @@ class ChilluSoundController {
     }
   }
 
-  /// Greeting chirp: Plays when AI Assistant is opened, once per session.
-  Future<void> playGreetingChirp() async {
+  // ===========================================================================
+  // CANONICAL 8-SOUND PERSONALITY REACTIONS (~2s each, Celebrating ~2.35s)
+  // ===========================================================================
+
+  /// A. Entry Jump (~2.05s): Soft bubbly opening, warm ascending chime, light sparkling finish.
+  /// Plays only once when entering the AI Assistant screen.
+  Future<void> playEntryJump() async {
     if (_hasGreetedThisSession) return;
     _hasGreetedThisSession = true;
-    await _playSound(greetingChirpAsset);
+    await _playSound(entryJumpAsset, cooldown: const Duration(milliseconds: 1500));
   }
 
-  /// Add-item pop: Plays when inventory addition is confirmed.
-  Future<void> playAddItemPop() async {
-    await _playSound(addItemPopAsset);
+  /// B. Attentive (~2.00s): Gentle rising musical notes, soft bubbly accent, cheerful finishing note.
+  /// Plays once when the user begins typing and Chillu enters Attentive.
+  /// Does NOT replay on every keystroke or during the continuous loop.
+  Future<void> playAttentive() async {
+    await _playSound(attentiveAsset, cooldown: const Duration(milliseconds: 1800));
   }
 
-  /// Thinking ping: Short thinking transition, sparingly.
-  Future<void> playThinkingPing() async {
-    await _playSound(thinkingPingAsset, cooldown: const Duration(milliseconds: 500));
+  /// C. Listening (~2.00s): Gentle atmospheric opening, warm tonal pulses, soft finishing chime.
+  /// Plays once when actual microphone recording begins. Does NOT loop.
+  Future<void> playListening() async {
+    await _playSound(listeningAsset, cooldown: const Duration(seconds: 2));
   }
 
-  /// Processing shimmer: Plays when an AI request begins (plays once per request).
-  Future<void> playProcessingShimmer() async {
-    await _playSound(processingShimmerAsset, cooldown: const Duration(seconds: 1));
+  /// D. Thinking (~2.05s): Gentle rising and falling notes, soft sparkling tones, subtle unresolved finish.
+  /// Plays once when Chillu enters Thinking. Does NOT replay during every processing update.
+  Future<void> playThinking() async {
+    await _playSound(thinkingAsset, cooldown: const Duration(seconds: 2));
   }
 
-  /// Recipe found: Plays when recipe recommendation response is received.
-  Future<void> playRecipeFound() async {
-    await _playSound(recipeFoundAsset);
+  /// E. Happy (~2.00s): Bright melodic notes, pleasant bubbly accents, warm uplifting finish.
+  /// Plays on friendly, ordinary positive interactions.
+  Future<void> playHappy() async {
+    await _playSound(happyAsset, cooldown: const Duration(milliseconds: 1500));
   }
 
-  /// Meal logged success: Plays ONLY after backend `log_meal_transaction` confirms success.
-  Future<void> playMealLoggedSuccess() async {
-    await _playSound(mealLoggedSuccessAsset);
+  /// F. Excited (~2.05s): Quick ascending musical sequence, playful sparkles, bright uplifting finish.
+  /// Plays when the AI successfully finds or presents an appealing meal or recipe suggestion.
+  Future<void> playExcited() async {
+    await _playSound(excitedAsset, cooldown: const Duration(milliseconds: 1500));
   }
 
-  /// Confused boop: Plays on appropriate recoverable interaction error or clarification prompt.
-  Future<void> playConfusedBoop() async {
-    await _playSound(confusedBoopAsset);
+  /// G. Celebrating (~2.35s): Chillu's signature mini celebration sound.
+  /// Joyful opening, layered sparkling chimes, cheerful melodic flourish, grand golden finish.
+  /// Plays ONLY after successful confirmation of the corresponding action.
+  Future<void> playCelebrating() async {
+    await _playSound(celebratingAsset, cooldown: const Duration(milliseconds: 1800));
   }
+
+  /// H. Confused (~2.00s): Cute puzzled sound: questioning notes, slight descending movement, soft unresolved finish.
+  /// Plays when an AI response fails or cannot be generated.
+  Future<void> playConfused() async {
+    await _playSound(confusedAsset, cooldown: const Duration(milliseconds: 1500));
+  }
+
+  // ===========================================================================
+  // LEGACY ALIASES (Delegating to the 8 canonical sound reactions)
+  // ===========================================================================
+
+  /// Legacy greeting chirp alias.
+  Future<void> playGreetingChirp() => playEntryJump();
+
+  /// Legacy add-item pop alias (delegates to signature Celebrating).
+  Future<void> playAddItemPop() => playCelebrating();
+
+  /// Legacy thinking ping alias.
+  Future<void> playThinkingPing() => playThinking();
+
+  /// Legacy processing shimmer alias.
+  Future<void> playProcessingShimmer() => playThinking();
+
+  /// Legacy recipe found alias (delegates to Excited).
+  Future<void> playRecipeFound() => playExcited();
+
+  /// Legacy meal logged success alias (delegates to signature Celebrating).
+  Future<void> playMealLoggedSuccess() => playCelebrating();
+
+  /// Legacy confused boop alias.
+  Future<void> playConfusedBoop() => playConfused();
 
   /// Sleepy yawn: Optional empty or idle state.
   Future<void> playSleepyYawn() async {

@@ -66,7 +66,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
       _chilluController.greet();
-      ChilluSoundController.instance.playGreetingChirp();
+      ChilluSoundController.instance.playEntryJump();
     });
 
     _activeMealContext = widget.mealContext ?? AiAssistantService.activeMealContext;
@@ -121,6 +121,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       // First non-whitespace character triggers Attentive; subsequent keystrokes maintain it without restarting
       if (_chilluController.state != ChilluState.attentive && _chilluController.state != ChilluState.thinking) {
         _chilluController.attentive();
+        ChilluSoundController.instance.playAttentive();
       }
     } else {
       // When input message is cleared, return to Confused if latest response was an error, else return to Idle
@@ -180,6 +181,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         _isRecording = true;
       });
       _chilluController.listening();
+      ChilluSoundController.instance.playListening();
     } else {
       // End recording and transition to thinking as message processing begins
       setState(() {
@@ -291,7 +293,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
     _scrollToBottom();
     _chilluController.think();
-    ChilluSoundController.instance.playProcessingShimmer();
+    ChilluSoundController.instance.playThinking();
 
     final currentIntent = _pendingQuickActionIntent;
 
@@ -507,7 +509,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       if (isAiError) {
         // Trigger persistent Confused state when AI response fails
         _chilluController.confused(persistent: true);
-        ChilluSoundController.instance.playConfusedBoop();
+        ChilluSoundController.instance.playConfused();
       } else if (meal != null ||
           action == 'meal_recommendation' ||
           action == 'recipe_ideas' ||
@@ -515,15 +517,15 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           assistantText.contains('Preparation') ||
           assistantText.contains('Step 1')) {
         _chilluController.excited(returnState: returnState);
-        ChilluSoundController.instance.playRecipeFound();
+        ChilluSoundController.instance.playExcited();
       } else {
         _chilluController.happy(returnState: returnState);
-        ChilluSoundController.instance.playGreetingChirp();
+        ChilluSoundController.instance.playHappy();
       }
     } catch (e) {
       debugPrint('[AiAssistantScreen] Error processing send request: $e');
       _chilluController.confused(persistent: true);
-      ChilluSoundController.instance.playConfusedBoop();
+      ChilluSoundController.instance.playConfused();
       if (mounted) {
         setState(() {
           _messages.add(AiChatMessage(
@@ -1217,7 +1219,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       final successMessage = _generateAdditionSuccessMessage(successfullyAddedItems);
 
       _chilluController.itemAdded();
-      ChilluSoundController.instance.playAddItemPop();
+      ChilluSoundController.instance.playCelebrating();
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1462,7 +1464,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
     if (removedCount > 0 || deductedCount > 0) {
       _chilluController.itemAdded();
-      ChilluSoundController.instance.playAddItemPop();
+      ChilluSoundController.instance.playCelebrating();
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1637,7 +1639,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     }
 
     _chilluController.mealLogged();
-    ChilluSoundController.instance.playMealLoggedSuccess();
+    ChilluSoundController.instance.playCelebrating();
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1891,7 +1893,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               _messages.addAll(AiAssistantService.sessionMessages);
             });
             _chilluController.greet();
-            ChilluSoundController.instance.playGreetingChirp();
+            ChilluSoundController.instance.playEntryJump();
           },
         ),
       ],
@@ -1908,7 +1910,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             size: 110,
             onTap: () {
               _chilluController.greet();
-              ChilluSoundController.instance.playGreetingChirp();
+              ChilluSoundController.instance.playHappy();
             },
           ),
           const SizedBox(height: 10),
@@ -2027,7 +2029,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     });
 
     _chilluController.think();
-    ChilluSoundController.instance.playThinkingPing();
+    ChilluSoundController.instance.playThinking();
     _scrollToBottom();
   }
 

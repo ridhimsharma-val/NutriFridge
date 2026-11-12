@@ -157,7 +157,7 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
       _idempotencyKey = null;
 
       // Celebrate successful meal logging with Chillu sound
-      ChilluSoundController.instance.playMealLoggedSuccess();
+      ChilluSoundController.instance.playCelebrating();
 
       if (!mounted) return;
 
