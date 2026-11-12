@@ -96,10 +96,12 @@ void main() {
 
       // Verify that master asset is loaded
       final imageFinder = find.byType(Image);
-      expect(imageFinder, findsOneWidget);
+      expect(imageFinder, findsWidgets);
 
-      final image = tester.widget<Image>(imageFinder);
-      expect((image.image as AssetImage).assetName, ChilluMascot.masterAsset);
+      final images = tester.widgetList<Image>(imageFinder);
+      for (final image in images) {
+        expect((image.image as AssetImage).assetName, ChilluMascot.masterAsset);
+      }
 
       controller.dispose();
     });
@@ -129,7 +131,7 @@ void main() {
       controller.idle();
       await tester.pump();
 
-      final idleImage = tester.widget<Image>(find.byType(Image));
+      final idleImage = tester.widget<Image>(find.byType(Image).first);
       expect((idleImage.image as AssetImage).assetName, ChilluMascot.masterAsset);
 
       controller.dispose();

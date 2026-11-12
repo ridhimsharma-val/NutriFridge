@@ -48,7 +48,9 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
 
   // Animation controllers for idle lifecycle & expressions
   late AnimationController _idleBreathingController;
-  late AnimationController _leafSwayController;
+  late AnimationController _floatingController;
+  late AnimationController _leftLeafController;
+  late AnimationController _rightLeafController;
   late AnimationController _blinkController;
   late AnimationController _processingFloatController;
   late AnimationController _bounceController;
@@ -68,38 +70,49 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
     }
     _controller.addListener(_onControllerStateChanged);
 
-    // 1. Idle breathing: gentle, organic body expansion and contraction (2600ms)
+    // 1. Idle breathing: gentle 1-2% organic body expansion & contraction (3000ms)
     _idleBreathingController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2600),
+      duration: const Duration(milliseconds: 3000),
     )..repeat(reverse: true);
 
-    // 2. Leaf sprout movement: independent gentle sway (2100ms)
-    // Different period from breathing creates lifelike, desynchronized organic motion
-    _leafSwayController = AnimationController(
+    // 2. Subtle body floating: slow, soothing floating cycle (3800ms)
+    _floatingController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2100),
-    )..repeat(reverse: true);
+      duration: const Duration(milliseconds: 3800),
+    )..repeat();
 
-    // 3. Blinking controller: quick, natural eyelid close-and-open (160ms)
+    // 3. Left leaf sprout: independent organic swaying (2300ms)
+    _leftLeafController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2300),
+    )..repeat();
+
+    // 4. Right leaf sprout: independent organic swaying with distinct period (2900ms)
+    _rightLeafController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2900),
+    )..repeat();
+
+    // 5. Blinking controller: quick, natural eyelid close-and-open (140ms)
     _blinkController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 160),
+      duration: const Duration(milliseconds: 140),
     );
 
-    // 4. Processing float: continuous hovering oscillation during AI request
+    // 6. Processing float: continuous hovering oscillation during AI request (1400ms)
     _processingFloatController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     );
 
-    // 5. Bounce: elastic vertical hop for greeting and item added
+    // 7. Bounce: elastic vertical hop for greeting entrance and item added (520ms)
     _bounceController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 520),
     );
 
-    // 6. Tilt: curious angle for thinking and confused error
+    // 8. Tilt: curious angle for thinking and confused error (400ms)
     _tiltController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -143,8 +156,14 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         if (!_idleBreathingController.isAnimating) {
           _idleBreathingController.repeat(reverse: true);
         }
-        if (!_leafSwayController.isAnimating) {
-          _leafSwayController.repeat(reverse: true);
+        if (!_floatingController.isAnimating) {
+          _floatingController.repeat();
+        }
+        if (!_leftLeafController.isAnimating) {
+          _leftLeafController.repeat();
+        }
+        if (!_rightLeafController.isAnimating) {
+          _rightLeafController.repeat();
         }
         break;
 
@@ -166,6 +185,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
 
       case ChilluState.processing:
         _idleBreathingController.stop();
+        _floatingController.stop();
         if (!_processingFloatController.isAnimating) {
           _processingFloatController.repeat(reverse: true);
         }
@@ -175,6 +195,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
       case ChilluState.mealLogged:
         _processingFloatController.stop();
         _idleBreathingController.stop();
+        _floatingController.stop();
         break;
 
       case ChilluState.sleepy:
@@ -183,16 +204,19 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         if (!_idleBreathingController.isAnimating) {
           _idleBreathingController.repeat(reverse: true);
         }
+        if (!_floatingController.isAnimating) {
+          _floatingController.repeat();
+        }
         break;
     }
   }
 
-  /// Schedules the next natural eye blink with irregular timing (3.2s to 5.6s).
+  /// Schedules the next natural eye blink with irregular timing (3.0s to 6.0s).
   void _scheduleNextBlink() {
     _blinkTimer?.cancel();
     if (!mounted) return;
 
-    final nextInterval = 3200 + _random.nextInt(2400);
+    final nextInterval = 3000 + _random.nextInt(3000);
     _blinkTimer = Timer(Duration(milliseconds: nextInterval), () {
       if (!mounted) return;
 
@@ -202,9 +226,9 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           if (!mounted) return;
           _blinkController.reverse().then((_) {
             if (!mounted) return;
-            // 25% chance of a double-blink (two quick blinks in succession)
-            if (_random.nextDouble() < 0.25) {
-              Future.delayed(const Duration(milliseconds: 110), () {
+            // 20% chance of a double-blink (two quick blinks in succession)
+            if (_random.nextDouble() < 0.20) {
+              Future.delayed(const Duration(milliseconds: 120), () {
                 if (!mounted) return;
                 _blinkController.forward(from: 0.0).then((_) {
                   if (mounted) _blinkController.reverse();
@@ -226,7 +250,9 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
       _controller.dispose();
     }
     _idleBreathingController.dispose();
-    _leafSwayController.dispose();
+    _floatingController.dispose();
+    _leftLeafController.dispose();
+    _rightLeafController.dispose();
     _blinkController.dispose();
     _processingFloatController.dispose();
     _bounceController.dispose();
@@ -304,7 +330,9 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
     return AnimatedBuilder(
       animation: Listenable.merge([
         _idleBreathingController,
-        _leafSwayController,
+        _floatingController,
+        _leftLeafController,
+        _rightLeafController,
         _blinkController,
         _processingFloatController,
         _bounceController,
@@ -316,28 +344,32 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         double scaleX = 1.0;
         double rotation = 0.0;
 
-        // 1. Idle breathing & subtle body bobbing
+        // 1. Idle breathing: 1-2% subtle chest expansion & contraction
         if (state == ChilluState.idle || state == ChilluState.sleepy) {
-          final breath = _idleBreathingController.value;
-          // Organic sine expansion
-          scaleY = 1.0 + (breath * 0.022);
-          scaleX = 1.0 - (breath * 0.014);
-          // Very subtle body bobbing (sub-pixel floating rhythm)
-          translateY = -2.0 * math.sin(breath * math.pi);
+          final breathProgress = Curves.easeInOut.transform(_idleBreathingController.value);
+          scaleY = 1.0 + (breathProgress * 0.018); // ~1.8% expansion
+          scaleX = 1.0 - (breathProgress * 0.010); // ~1.0% contraction
         }
 
-        // 2. Processing floating effect
+        // 2. Subtle body floating: slow, soothing floating cycle
+        if (state == ChilluState.idle || state == ChilluState.sleepy) {
+          final floatVal = _floatingController.value;
+          // Smooth sine curve: floats upwards by up to 2.2px
+          translateY += -2.2 * math.sin(floatVal * 2 * math.pi);
+        }
+
+        // 3. Processing floating effect
         if (state == ChilluState.processing) {
           final floatVal = _processingFloatController.value;
           translateY = -8.0 * math.sin(floatVal * math.pi);
           scaleY = 1.0 + (floatVal * 0.02);
         }
 
-        // 3. Bounce effect (greeting / itemAdded)
+        // 4. Bounce effect (greeting entrance / itemAdded)
         if (_bounceController.isAnimating) {
           final bVal = _bounceController.value;
           final hop = 4 * bVal * (1 - bVal);
-          translateY = -14.0 * hop;
+          translateY = -15.0 * hop;
           if (bVal < 0.2) {
             scaleY = 0.94;
             scaleX = 1.05;
@@ -347,23 +379,25 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           }
         }
 
-        // 4. Tilt effect (thinking / error)
+        // 5. Tilt effect (thinking / error)
         if (_tiltController.value > 0.0) {
           final tVal = _tiltController.value;
           if (state == ChilluState.error) {
             rotation = math.sin(tVal * math.pi * 3) * 0.08;
-            translateY = 2.0;
+            translateY += 2.0;
           } else {
             rotation = tVal * 0.08;
           }
         }
 
-        // 5. Subtle organic sway for idle living feel
-        if (state == ChilluState.idle || state == ChilluState.thinking || state == ChilluState.sleepy) {
-          final lVal = _leafSwayController.value;
-          // Smooth sinusoidal sway (~0.7 deg) giving a living, organic presence
-          rotation += math.sin(lVal * math.pi) * 0.012;
-        }
+        // 6. Independent leaf sprout sway calculation
+        final bool isIdleState = state == ChilluState.idle || state == ChilluState.sleepy || state == ChilluState.thinking;
+        final double leftLeafAngle = isIdleState
+            ? math.sin(_leftLeafController.value * 2 * math.pi) * 0.020
+            : 0.0;
+        final double rightLeafAngle = isIdleState
+            ? math.sin(_rightLeafController.value * 2 * math.pi) * -0.016
+            : 0.0;
 
         return Transform.translate(
           offset: Offset(0, translateY),
@@ -381,15 +415,58 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
                   alignment: Alignment.center,
                   clipBehavior: Clip.none,
                   children: [
-                    // Single Chillu character with two natural leafy sprouts (no duplicate overlay)
-                    Image.asset(
-                      ChilluMascot.masterAsset,
-                      width: widget.size,
-                      height: widget.size,
-                      fit: BoxFit.contain,
-                    ),
+                    if (!isIdleState)
+                      // Non-idle states: full character in one layer
+                      Image.asset(
+                        ChilluMascot.masterAsset,
+                        width: widget.size,
+                        height: widget.size,
+                        fit: BoxFit.contain,
+                      )
+                    else ...[
+                      // 1. Chillu body layer (below the sprouts, seamless stem connection)
+                      ClipRect(
+                        clipper: const _BodyClipper(),
+                        child: Image.asset(
+                          ChilluMascot.masterAsset,
+                          width: widget.size,
+                          height: widget.size,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
 
-                    // Natural Eye Blinking Overlay
+                      // 2. Left leafy sprout (independent organic swaying anchored at stem root)
+                      Transform.rotate(
+                        angle: leftLeafAngle,
+                        alignment: const Alignment(-0.01, -0.51),
+                        child: ClipRect(
+                          clipper: const _LeftLeafClipper(),
+                          child: Image.asset(
+                            ChilluMascot.masterAsset,
+                            width: widget.size,
+                            height: widget.size,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+
+                      // 3. Right leafy sprout (independent organic swaying anchored at stem root)
+                      Transform.rotate(
+                        angle: rightLeafAngle,
+                        alignment: const Alignment(-0.01, -0.51),
+                        child: ClipRect(
+                          clipper: const _RightLeafClipper(),
+                          child: Image.asset(
+                            ChilluMascot.masterAsset,
+                            width: widget.size,
+                            height: widget.size,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                    ],
+
+                    // 4. Natural Eye Blinking Overlay
                     if (_blinkController.value > 0.0)
                       CustomPaint(
                         size: Size(widget.size, widget.size),
@@ -420,7 +497,12 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
     }
 
     return AnimatedBuilder(
-      animation: Listenable.merge([_idleBreathingController, _processingFloatController, _bounceController]),
+      animation: Listenable.merge([
+        _idleBreathingController,
+        _floatingController,
+        _processingFloatController,
+        _bounceController,
+      ]),
       builder: (context, _) {
         double shadowScale = 1.0;
         double shadowOpacity = 0.12;
@@ -434,10 +516,13 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           final hop = 4 * bVal * (1 - bVal);
           shadowScale = 1.0 - (0.35 * hop);
           shadowOpacity = 0.12 - (0.06 * hop);
-        } else if (state == ChilluState.idle) {
-          final breath = _idleBreathingController.value;
-          shadowScale = 1.0 + (breath * 0.05);
-          shadowOpacity = 0.11 + (breath * 0.03);
+        } else if (state == ChilluState.idle || state == ChilluState.sleepy) {
+          final breath = Curves.easeInOut.transform(_idleBreathingController.value);
+          final floatVal = _floatingController.value;
+          final floatSin = math.sin(floatVal * 2 * math.pi);
+          // Gently reacts to breathing and floating
+          shadowScale = 1.0 + (breath * 0.03) - (floatSin * 0.03);
+          shadowOpacity = 0.11 + (breath * 0.02) - (floatSin * 0.02);
         }
 
         return Container(
@@ -506,6 +591,46 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         return 'sleepy';
     }
   }
+}
+
+/// Clips the body portion of Chillu below the sprout leaves (y >= 23.8% of bounding box).
+/// Begins at 23.8% of height to allow a seamless 18px overlap with the leaf stems.
+class _BodyClipper extends CustomClipper<Rect> {
+  const _BodyClipper();
+
+  @override
+  Rect getClip(Size size) {
+    return Rect.fromLTRB(0, size.height * 0.238, size.width, size.height);
+  }
+
+  @override
+  bool shouldReclip(covariant _BodyClipper oldClipper) => false;
+}
+
+/// Clips the left leafy sprout (top 25.2% of height, left 49.8% of width).
+class _LeftLeafClipper extends CustomClipper<Rect> {
+  const _LeftLeafClipper();
+
+  @override
+  Rect getClip(Size size) {
+    return Rect.fromLTRB(0, 0, size.width * 0.498, size.height * 0.252);
+  }
+
+  @override
+  bool shouldReclip(covariant _LeftLeafClipper oldClipper) => false;
+}
+
+/// Clips the right leafy sprout (top 25.2% of height, right 49.2% of width to right edge).
+class _RightLeafClipper extends CustomClipper<Rect> {
+  const _RightLeafClipper();
+
+  @override
+  Rect getClip(Size size) {
+    return Rect.fromLTRB(size.width * 0.492, 0, size.width, size.height * 0.252);
+  }
+
+  @override
+  bool shouldReclip(covariant _RightLeafClipper oldClipper) => false;
 }
 
 /// Custom painter for natural eye blinking over Chillu's exact facial geometry.
