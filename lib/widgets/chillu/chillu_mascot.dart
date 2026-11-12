@@ -29,6 +29,9 @@ class ChilluMascot extends StatefulWidget {
   /// Path to joyful jump celebration animated GIF.
   static const String joyfulJumpAsset = 'assets/mascot/chillu/chillu_joyful_jump.gif';
 
+  /// Optional explicit override for disabling animations (e.g. for static historical message avatars).
+  final bool? disableAnimations;
+
   const ChilluMascot({
     super.key,
     this.controller,
@@ -36,6 +39,7 @@ class ChilluMascot extends StatefulWidget {
     this.onTap,
     this.message,
     this.showShadow = true,
+    this.disableAnimations,
   });
 
   @override
@@ -57,6 +61,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
   late AnimationController _tiltController;
   late AnimationController _listeningPulseController;
   late AnimationController _thinkingCycleController;
+  late AnimationController _attentivePerkController;
 
   Timer? _blinkTimer;
   final math.Random _random = math.Random();
@@ -132,6 +137,12 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
       duration: const Duration(milliseconds: 2400),
     );
 
+    // 11. Attentive Curious Perk-Up: squash, spring pop up, leaf reaction, side glance, alert pose (850ms)
+    _attentivePerkController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 850),
+    );
+
     _syncAnimationsWithState(_controller.state);
     _scheduleNextBlink();
   }
@@ -169,6 +180,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _processingFloatController.stop();
         _listeningPulseController.stop();
         _thinkingCycleController.stop();
+        _attentivePerkController.animateTo(0.0, duration: const Duration(milliseconds: 280), curve: Curves.easeOut);
         if (!_idleBreathingController.isAnimating) {
           _idleBreathingController.repeat(reverse: true);
         }
@@ -184,15 +196,13 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         break;
 
       case ChilluState.attentive:
-        _tiltController.animateTo(1.0, duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
+        _tiltController.stop();
         _processingFloatController.stop();
         _listeningPulseController.stop();
         _thinkingCycleController.stop();
+        _attentivePerkController.forward(from: 0.0);
         if (!_idleBreathingController.isAnimating) {
           _idleBreathingController.repeat(reverse: true);
-        }
-        if (!_floatingController.isAnimating) {
-          _floatingController.repeat();
         }
         if (!_leftLeafController.isAnimating) {
           _leftLeafController.repeat();
@@ -206,6 +216,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _tiltController.animateTo(0.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
         _processingFloatController.stop();
         _thinkingCycleController.stop();
+        _attentivePerkController.stop();
         if (!_listeningPulseController.isAnimating) {
           _listeningPulseController.repeat();
         }
@@ -224,6 +235,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _tiltController.animateTo(0.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
         _processingFloatController.stop();
         _listeningPulseController.stop();
+        _attentivePerkController.stop();
         if (!_thinkingCycleController.isAnimating) {
           _thinkingCycleController.repeat();
         }
@@ -243,6 +255,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _processingFloatController.stop();
         _listeningPulseController.stop();
         _thinkingCycleController.stop();
+        _attentivePerkController.stop();
         _bounceController.forward(from: 0.0);
         break;
 
@@ -250,6 +263,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _processingFloatController.stop();
         _listeningPulseController.stop();
         _thinkingCycleController.stop();
+        _attentivePerkController.stop();
         _tiltController.animateTo(1.0, curve: Curves.elasticOut);
         break;
 
@@ -258,6 +272,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _floatingController.stop();
         _listeningPulseController.stop();
         _thinkingCycleController.stop();
+        _attentivePerkController.stop();
         if (!_processingFloatController.isAnimating) {
           _processingFloatController.repeat(reverse: true);
         }
@@ -270,12 +285,14 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _floatingController.stop();
         _listeningPulseController.stop();
         _thinkingCycleController.stop();
+        _attentivePerkController.stop();
         break;
 
       case ChilluState.sleepy:
         _processingFloatController.stop();
         _listeningPulseController.stop();
         _thinkingCycleController.stop();
+        _attentivePerkController.stop();
         _tiltController.animateTo(0.2, curve: Curves.easeOut);
         if (!_idleBreathingController.isAnimating) {
           _idleBreathingController.repeat(reverse: true);
@@ -335,12 +352,13 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
     _tiltController.dispose();
     _listeningPulseController.dispose();
     _thinkingCycleController.dispose();
+    _attentivePerkController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final disableAnimations = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final disableAnimations = widget.disableAnimations ?? (MediaQuery.maybeOf(context)?.disableAnimations ?? false);
     final state = _controller.state;
     final isCelebration = _controller.isCelebrationJump;
 
@@ -417,6 +435,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _tiltController,
         _listeningPulseController,
         _thinkingCycleController,
+        _attentivePerkController,
       ]),
       builder: (context, _) {
         double translateY = 0.0;
@@ -445,13 +464,56 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           if (state == ChilluState.idle || state == ChilluState.sleepy) {
             translateY += -2.0 * floatSin;
           } else if (state == ChilluState.attentive) {
-            // Attentive: noticeable forward body lean (~6.0 deg), small upward lift (-6.5px),
-            // and alert scale perk (+3.8%)
-            final tiltProgress = Curves.easeOutBack.transform(_tiltController.value);
-            rotation = 0.105 * tiltProgress; // ~6.0 deg forward lean towards chat
-            translateY += -6.5 * tiltProgress; // noticeable upward perk
-            scaleY += 0.038 * tiltProgress; // alert height perk
-            scaleX -= 0.015 * tiltProgress;
+            // CURIOUS PERK-UP ATTENTIVE ANIMATION:
+            // 1. Quick perk-up with squash & stretch (p: 0.0 -> 0.35)
+            // 2. Rebound settling into alert resting pose (p: 0.35 -> 0.70)
+            // 3. Playful sideways head tilt during side glance (p: 0.40 -> 0.74)
+            // 4. Alert resting pose with subtle micro-breathing (p: 0.74 -> 1.00)
+            final p = _attentivePerkController.value;
+
+            final double perkTranslate;
+            final double perkScaleY;
+            final double perkScaleX;
+
+            if (p < 0.12) {
+              // Anticipation squash down
+              final sub = p / 0.12;
+              perkTranslate = 2.0 * sub;
+              perkScaleY = 1.0 - (0.06 * sub);
+              perkScaleX = 1.0 + (0.05 * sub);
+            } else if (p < 0.35) {
+              // Spring stretch pop up
+              final sub = (p - 0.12) / 0.23;
+              final tEase = Curves.easeOutBack.transform(sub);
+              perkTranslate = 2.0 + ((-11.5 - 2.0) * tEase); // pops up to -11.5px
+              perkScaleY = 0.94 + ((1.09 - 0.94) * tEase);
+              perkScaleX = 1.05 + ((0.93 - 1.05) * tEase);
+            } else if (p < 0.65) {
+              // Rebound settling
+              final sub = (p - 0.35) / 0.30;
+              final tEase = Curves.easeInOut.transform(sub);
+              perkTranslate = -11.5 + ((-6.0 - -11.5) * tEase);
+              perkScaleY = 1.09 + ((1.03 - 1.09) * tEase);
+              perkScaleX = 0.93 + ((0.985 - 0.93) * tEase);
+            } else {
+              // Alert resting pose with micro-breathing
+              final breath = Curves.easeInOut.transform(_idleBreathingController.value);
+              perkTranslate = -6.0 + (breath * 0.8);
+              perkScaleY = 1.03 + (breath * 0.010);
+              perkScaleX = 0.985 - (breath * 0.006);
+            }
+
+            translateY += perkTranslate;
+            scaleY = perkScaleY;
+            scaleX = perkScaleX;
+
+            // Short playful head tilt during side glance (p: 0.40 -> 0.74)
+            if (p >= 0.40 && p <= 0.74) {
+              final sub = (p - 0.40) / 0.34;
+              rotation = math.sin(sub * math.pi) * 0.040; // ~2.3 deg playful tilt
+            } else {
+              rotation = 0.0;
+            }
           } else if (state == ChilluState.listening) {
             // Listening: rhythmic body bounce (1000ms cycle), visible breathing/pulsing (4.2% scale),
             // attentive side ear tilt (~-4.3 deg)
@@ -532,10 +594,37 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           double rAngle = math.sin(rVal * 2 * math.pi) * -0.016;
 
           if (state == ChilluState.attentive) {
-            // Leafy sprouts perk alertly
-            final perk = _tiltController.value;
-            lAngle += 0.045 * perk;
-            rAngle -= 0.035 * perk;
+            // Curious Perk-Up leaf reaction: staggered spring upward & settle into alert perk
+            final p = _attentivePerkController.value;
+            final double leftPerk;
+            final double rightPerk;
+
+            // Left leaf peaks at p = 0.30
+            if (p < 0.30) {
+              final sub = (p / 0.30).clamp(0.0, 1.0);
+              leftPerk = Curves.easeOutBack.transform(sub) * 0.11; // ~6.3 deg
+            } else if (p < 0.58) {
+              final sub = ((p - 0.30) / 0.28).clamp(0.0, 1.0);
+              leftPerk = Tween<double>(begin: 0.11, end: 0.045).transform(Curves.easeInOut.transform(sub));
+            } else {
+              leftPerk = 0.045; // Resting alert perk
+            }
+
+            // Right leaf slightly delayed, peaks at p = 0.38
+            if (p < 0.08) {
+              rightPerk = 0.0;
+            } else if (p < 0.38) {
+              final sub = ((p - 0.08) / 0.30).clamp(0.0, 1.0);
+              rightPerk = -Curves.easeOutBack.transform(sub) * 0.10; // ~-5.7 deg
+            } else if (p < 0.65) {
+              final sub = ((p - 0.38) / 0.27).clamp(0.0, 1.0);
+              rightPerk = Tween<double>(begin: -0.10, end: -0.038).transform(Curves.easeInOut.transform(sub));
+            } else {
+              rightPerk = -0.038; // Resting alert perk
+            }
+
+            lAngle += leftPerk;
+            rAngle += rightPerk;
           } else if (state == ChilluState.listening) {
             // Leaves respond dynamically to rhythmic bounce
             final bouncePhase = math.sin(_listeningPulseController.value * 2 * math.pi);
@@ -555,7 +644,31 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           rightLeafAngle = 0.0;
         }
 
-        // 7. Eye movement and gaze focus
+        // 7. Curious eye expression and side glance during Attentive
+        final double eyeWiden;
+        final double glanceShift;
+        if (state == ChilluState.attentive) {
+          final p = _attentivePerkController.value;
+          // Widening during spring pop (p: 0.12 -> 0.38)
+          if (p >= 0.12 && p <= 0.38) {
+            final sub = (p - 0.12) / 0.26;
+            eyeWiden = math.sin(sub * math.pi);
+          } else {
+            eyeWiden = 0.0;
+          }
+          // Side glance during (p: 0.42 -> 0.74)
+          if (p >= 0.42 && p <= 0.74) {
+            final sub = (p - 0.42) / 0.32;
+            glanceShift = math.sin(sub * math.pi); // 0.0 -> 1.0 -> 0.0
+          } else {
+            glanceShift = 0.0;
+          }
+        } else {
+          eyeWiden = 0.0;
+          glanceShift = 0.0;
+        }
+
+        // 8. Eye blinking & pensive gaze focus
         final double gazeEyelid;
         if (state == ChilluState.thinking) {
           final cycle = _thinkingCycleController.value;
@@ -650,6 +763,16 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
                           blinkProgress: effectiveBlinkProgress,
                         ),
                       ),
+
+                    // 5. Curious Eye Widening and Playful Side Glance Overlay during Attentive perk-up
+                    if (eyeWiden > 0.0 || glanceShift > 0.0)
+                      CustomPaint(
+                        size: Size(widget.size, widget.size),
+                        painter: _ChilluCuriousEyesPainter(
+                          widenProgress: eyeWiden,
+                          glanceProgress: glanceShift,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -681,6 +804,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _tiltController,
         _listeningPulseController,
         _thinkingCycleController,
+        _attentivePerkController,
       ]),
       builder: (context, _) {
         double shadowScale = 1.0;
@@ -696,10 +820,21 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           shadowScale = 1.0 - (0.35 * hop);
           shadowOpacity = 0.12 - (0.06 * hop);
         } else if (state == ChilluState.attentive) {
-          // Attentive: perk lifts mascot ~6.5px
-          final tiltVal = _tiltController.value;
-          shadowScale = 1.0 - (0.08 * tiltVal);
-          shadowOpacity = 0.11 - (0.02 * tiltVal);
+          // Attentive: dynamic shadow reacting to squash, spring pop lift, and alert resting pose
+          final p = _attentivePerkController.value;
+          if (p < 0.12) {
+            final sub = p / 0.12;
+            shadowScale = 1.0 + (0.05 * sub);
+            shadowOpacity = 0.11 + (0.02 * sub);
+          } else if (p < 0.35) {
+            final sub = (p - 0.12) / 0.23;
+            final tEase = Curves.easeOutBack.transform(sub);
+            shadowScale = 1.05 - (0.19 * tEase); // down to 0.86
+            shadowOpacity = 0.13 - (0.05 * tEase); // down to 0.08
+          } else {
+            shadowScale = 0.92;
+            shadowOpacity = 0.10;
+          }
         } else if (state == ChilluState.listening) {
           // Listening: rhythmic bounce ~7.5px with _listeningPulseController
           final listenPulse = math.sin(_listeningPulseController.value * math.pi);
@@ -958,5 +1093,102 @@ class _ChilluAudioWavePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _ChilluAudioWavePainter oldDelegate) {
     return oldDelegate.progress != progress;
+  }
+}
+
+/// Renders subtle curious eye widening and playful sideways glance during the Attentive perk-up.
+class _ChilluCuriousEyesPainter extends CustomPainter {
+  final double widenProgress; // 0.0 to 1.0
+  final double glanceProgress; // 0.0 to 1.0 (shifts pupils right towards conversation)
+
+  const _ChilluCuriousEyesPainter({
+    required this.widenProgress,
+    required this.glanceProgress,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (widenProgress <= 0.0 && glanceProgress <= 0.0) return;
+
+    final eyeWidth = size.width * 0.20;
+    final eyeHeight = size.height * 0.23;
+
+    final leftCenter = Offset(size.width * 0.3664, size.height * 0.4781);
+    final rightCenter = Offset(size.width * 0.6336, size.height * 0.4781);
+
+    // 1. Playful raised curious eyebrows during eye widening
+    if (widenProgress > 0.05) {
+      final browPaint = Paint()
+        ..color = const Color(0xFF1B4332).withValues(alpha: (widenProgress * 0.85).clamp(0.0, 1.0))
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(1.8, size.width * 0.022)
+        ..strokeCap = StrokeCap.round;
+
+      final browLift = eyeHeight * 0.12 * widenProgress;
+
+      for (final center in [leftCenter, rightCenter]) {
+        final browPath = Path();
+        final start = Offset(center.dx - (eyeWidth * 0.32), center.dy - (eyeHeight * 0.60) - browLift);
+        final peak = Offset(center.dx, center.dy - (eyeHeight * 0.72) - browLift);
+        final end = Offset(center.dx + (eyeWidth * 0.32), center.dy - (eyeHeight * 0.60) - browLift);
+        browPath.moveTo(start.dx, start.dy);
+        browPath.quadraticBezierTo(peak.dx, peak.dy, end.dx, end.dy);
+        canvas.drawPath(browPath, browPaint);
+      }
+    }
+
+    // 2. Playful sideways glance (pupils shift right toward conversation)
+    if (glanceProgress > 0.05) {
+      final shiftX = eyeWidth * 0.13 * glanceProgress;
+      final glanceAlpha = (glanceProgress * 0.95).clamp(0.0, 1.0);
+
+      for (final center in [leftCenter, rightCenter]) {
+        final eyeRect = Rect.fromCenter(center: center, width: eyeWidth, height: eyeHeight);
+        canvas.save();
+        canvas.clipPath(Path()..addOval(eyeRect));
+
+        // Dark pupil shifted right
+        final shiftedCenter = Offset(center.dx + shiftX, center.dy);
+        final pupilPaint = Paint()
+          ..color = Colors.black.withValues(alpha: glanceAlpha)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(shiftedCenter, eyeWidth * 0.32, pupilPaint);
+
+        // Teal iris arc ring on right edge of shifted pupil
+        final irisPaint = Paint()
+          ..color = const Color(0xFF00C9A7).withValues(alpha: glanceAlpha * 0.8)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(1.4, eyeWidth * 0.12);
+        canvas.drawArc(
+          Rect.fromCircle(center: shiftedCenter, radius: eyeWidth * 0.32),
+          -math.pi * 0.35,
+          math.pi * 0.70,
+          false,
+          irisPaint,
+        );
+
+        // Glossy catchlights
+        final catchlightPaint = Paint()
+          ..color = Colors.white.withValues(alpha: glanceAlpha * 0.9)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(
+          Offset(shiftedCenter.dx - (eyeWidth * 0.10), shiftedCenter.dy - (eyeHeight * 0.12)),
+          eyeWidth * 0.11,
+          catchlightPaint,
+        );
+        canvas.drawCircle(
+          Offset(shiftedCenter.dx + (eyeWidth * 0.12), shiftedCenter.dy + (eyeHeight * 0.12)),
+          eyeWidth * 0.06,
+          catchlightPaint,
+        );
+
+        canvas.restore();
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ChilluCuriousEyesPainter oldDelegate) {
+    return oldDelegate.widenProgress != widenProgress || oldDelegate.glanceProgress != glanceProgress;
   }
 }

@@ -113,18 +113,26 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     super.dispose();
   }
 
+  bool _wasInputFocused = false;
+
   void _onInputFocusOrTextChanged() {
     if (_isSending || _isRecording) return;
     final hasFocus = _inputFocusNode.hasFocus;
-    final hasText = _textController.text.trim().isNotEmpty;
-    if (hasFocus || hasText) {
+    final hasNonWhitespace = _textController.text.trim().isNotEmpty;
+    final justGainedFocus = hasFocus && !_wasInputFocused;
+    _wasInputFocused = hasFocus;
+
+    if (hasNonWhitespace || justGainedFocus) {
       if (_chilluController.state != ChilluState.attentive && _chilluController.state != ChilluState.thinking) {
         _chilluController.attentive();
       }
-    } else {
+    } else if (!hasNonWhitespace && !hasFocus) {
       if (_chilluController.state == ChilluState.attentive) {
         _chilluController.idle();
       }
+    } else if (!hasNonWhitespace && hasFocus && _chilluController.state == ChilluState.attentive) {
+      // When input is cleared while focused, handle transition gracefully back to idle
+      _chilluController.idle();
     }
   }
 
@@ -1695,28 +1703,35 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
             // Messages timeline
             Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                itemCount: _messages.length + (_isSending ? 1 : 0) + (_showWelcomeHero ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (_showWelcomeHero) {
-                    if (index == 0) {
-                      return _buildWelcomeHero();
-                    }
-                    final msgIdx = index - 1;
-                    if (msgIdx < _messages.length) {
-                      return _buildMessageItem(_messages[msgIdx]);
-                    } else {
-                      return _buildTypingIndicator();
-                    }
-                  } else {
-                    if (index < _messages.length) {
-                      return _buildMessageItem(_messages[index]);
-                    } else {
-                      return _buildTypingIndicator();
-                    }
-                  }
+              child: Builder(
+                builder: (context) {
+                  final int lastAssistantIdx = _messages.lastIndexWhere((m) => !m.isUser);
+                  return ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    itemCount: _messages.length + (_isSending ? 1 : 0) + (_showWelcomeHero ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (_showWelcomeHero) {
+                        if (index == 0) {
+                          return _buildWelcomeHero();
+                        }
+                        final msgIdx = index - 1;
+                        if (msgIdx < _messages.length) {
+                          final isLatestAssistant = msgIdx == lastAssistantIdx;
+                          return _buildMessageItem(_messages[msgIdx], isLatestAssistant: isLatestAssistant);
+                        } else {
+                          return _buildTypingIndicator();
+                        }
+                      } else {
+                        if (index < _messages.length) {
+                          final isLatestAssistant = index == lastAssistantIdx;
+                          return _buildMessageItem(_messages[index], isLatestAssistant: isLatestAssistant);
+                        } else {
+                          return _buildTypingIndicator();
+                        }
+                      }
+                    },
+                  );
                 },
               ),
             ),
@@ -1960,11 +1975,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     _scrollToBottom();
   }
 
-  Widget _buildMessageItem(AiChatMessage message) {
+  Widget _buildMessageItem(AiChatMessage message, {bool isLatestAssistant = false}) {
     if (message.isUser) {
       return _buildUserBubble(message);
     } else {
-      return _buildAssistantBubble(message);
+      return _buildAssistantBubble(message, isLatest: isLatestAssistant);
     }
   }
 
@@ -2029,16 +2044,18 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     );
   }
 
-  Widget _buildAssistantBubble(AiChatMessage message) {
+  Widget _buildAssistantBubble(AiChatMessage message, {bool isLatest = false}) {
     final bool isMealMessage = message.meal != null || message.action == 'log_meal';
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 2),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
             child: ChilluMascot(
+              controller: isLatest ? _chilluController : null,
+              disableAnimations: !isLatest,
               size: 46,
               showShadow: false,
             ),

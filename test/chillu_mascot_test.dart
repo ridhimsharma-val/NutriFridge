@@ -273,5 +273,83 @@ void main() {
 
       controller.dispose();
     });
+
+    testWidgets('Curious Perk-Up attentive animation progresses through perk, glance, and settles into alert resting pose', (WidgetTester tester) async {
+      final controller = ChilluAnimationController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ChilluMascot(
+              controller: controller,
+              size: 46,
+            ),
+          ),
+        ),
+      );
+
+      // Trigger attentive Curious Perk-Up
+      controller.attentive();
+      await tester.pump(); // Start perk
+
+      // Pop-up phase (250ms)
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(controller.state, ChilluState.attentive);
+      expect(find.byType(ChilluMascot), findsOneWidget);
+
+      // Side glance phase (500ms)
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(controller.state, ChilluState.attentive);
+
+      // Settled alert resting pose (850ms)
+      await tester.pump(const Duration(milliseconds: 350));
+      expect(controller.state, ChilluState.attentive);
+
+      // Subsequent pumps stay in alert resting pose without looping perk-up
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(controller.state, ChilluState.attentive);
+
+      controller.dispose();
+    });
+
+    testWidgets('Historical avatars remain static with disableAnimations: true while latest avatar animates', (WidgetTester tester) async {
+      final controller = ChilluAnimationController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                // Historical message avatar (static)
+                const ChilluMascot(
+                  size: 46,
+                  showShadow: false,
+                  disableAnimations: true,
+                ),
+                // Latest message avatar (reactive)
+                ChilluMascot(
+                  controller: controller,
+                  size: 46,
+                  showShadow: false,
+                  disableAnimations: false,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(ChilluMascot), findsNWidgets(2));
+
+      // Trigger attentive
+      controller.attentive();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      // Both widgets render without conflict
+      expect(controller.state, ChilluState.attentive);
+      expect(find.byType(ChilluMascot), findsNWidgets(2));
+
+      controller.dispose();
+    });
   });
 }
