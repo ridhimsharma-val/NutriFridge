@@ -358,12 +358,11 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           }
         }
 
-        // 5. Independent sprout leaf sway calculation (anchored at stem root)
-        double leafAngle = 0.0;
+        // 5. Subtle organic sway for idle living feel
         if (state == ChilluState.idle || state == ChilluState.thinking || state == ChilluState.sleepy) {
           final lVal = _leafSwayController.value;
-          // Smooth sinusoidal rustle (-1.6 deg to +1.6 deg)
-          leafAngle = math.sin(lVal * math.pi) * 0.028;
+          // Smooth sinusoidal sway (~0.7 deg) giving a living, organic presence
+          rotation += math.sin(lVal * math.pi) * 0.012;
         }
 
         return Transform.translate(
@@ -382,36 +381,13 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
                   alignment: Alignment.center,
                   clipBehavior: Clip.none,
                   children: [
-                    // Main body and master character
+                    // Single Chillu character with two natural leafy sprouts (no duplicate overlay)
                     Image.asset(
                       ChilluMascot.masterAsset,
                       width: widget.size,
                       height: widget.size,
                       fit: BoxFit.contain,
                     ),
-
-                    // Layered Sprout Leaves with independent gentle sway
-                    if (leafAngle.abs() > 0.001)
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        height: widget.size * 0.28,
-                        child: ClipRect(
-                          clipper: _SproutClipper(),
-                          child: Transform.rotate(
-                            angle: leafAngle,
-                            alignment: const Alignment(0.0, 1.0), // Anchor at stem connection
-                            child: Image.asset(
-                              ChilluMascot.masterAsset,
-                              width: widget.size,
-                              height: widget.size,
-                              fit: BoxFit.contain,
-                              alignment: Alignment.topCenter,
-                            ),
-                          ),
-                        ),
-                      ),
 
                     // Natural Eye Blinking Overlay
                     if (_blinkController.value > 0.0)
@@ -530,17 +506,6 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         return 'sleepy';
     }
   }
-}
-
-/// Custom clipper isolating the two top sprout leaves (top 28% of character bounding box).
-class _SproutClipper extends CustomClipper<Rect> {
-  @override
-  Rect getClip(Size size) {
-    return Rect.fromLTWH(0, 0, size.width, size.height);
-  }
-
-  @override
-  bool shouldReclip(covariant CustomClipper<Rect> oldClipper) => false;
 }
 
 /// Custom painter for natural eye blinking over Chillu's exact facial geometry.
