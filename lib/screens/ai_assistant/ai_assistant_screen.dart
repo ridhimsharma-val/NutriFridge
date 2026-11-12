@@ -11,6 +11,9 @@ import '../fridge/models/category_item.dart';
 import 'models/ai_message.dart';
 import 'services/ai_assistant_service.dart';
 import '../meal_detail/models/meal_ai_context.dart';
+import '../../services/chillu/chillu_sound_controller.dart';
+import '../../widgets/chillu/chillu_animation_controller.dart';
+import '../../widgets/chillu/chillu_mascot.dart';
 
 /// Full-featured, interactive AI Assistant screen for NutriFridge.
 /// Acts as the single primary entry point for natural-language food addition,
@@ -43,6 +46,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   String? _pendingQuickActionIntent;
   MealAiContext? _activeMealContext;
   bool _initialPromptDispatched = false;
+  final ChilluAnimationController _chilluController = ChilluAnimationController();
 
   @override
   void initState() {
@@ -56,6 +60,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
+      _chilluController.greet();
+      ChilluSoundController.instance.playGreetingChirp();
     });
 
     _activeMealContext = widget.mealContext ?? AiAssistantService.activeMealContext;
@@ -93,6 +99,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   @override
   void dispose() {
+    _chilluController.dispose();
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -219,6 +226,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     });
 
     _scrollToBottom();
+    _chilluController.process();
+    ChilluSoundController.instance.playProcessingShimmer();
 
     final currentIntent = _pendingQuickActionIntent;
 
@@ -418,8 +427,25 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       setState(() {
         _messages.add(assistantMessage);
       });
+
+      if (needsClarification || action == 'error') {
+        _chilluController.confused();
+        ChilluSoundController.instance.playConfusedBoop();
+      } else if (meal != null ||
+          action == 'meal_recommendation' ||
+          action == 'recipe_ideas' ||
+          (_activeMealContext != null && _isFullRecipeRequest(text)) ||
+          assistantText.contains('Preparation') ||
+          assistantText.contains('Step 1')) {
+        _chilluController.recipeFound();
+        ChilluSoundController.instance.playRecipeFound();
+      } else {
+        _chilluController.idle();
+      }
     } catch (e) {
       debugPrint('[AiAssistantScreen] Error processing send request: $e');
+      _chilluController.confused();
+      ChilluSoundController.instance.playConfusedBoop();
       if (mounted) {
         setState(() {
           _messages.add(AiChatMessage(
@@ -1087,6 +1113,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
       final successMessage = _generateAdditionSuccessMessage(successfullyAddedItems);
 
+      _chilluController.itemAdded();
+      ChilluSoundController.instance.playAddItemPop();
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -1328,6 +1357,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       snackText = 'Removed requested items from your fridge.';
     }
 
+    if (removedCount > 0 || deductedCount > 0) {
+      _chilluController.itemAdded();
+      ChilluSoundController.instance.playAddItemPop();
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -1498,6 +1532,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         _syncSession();
       });
     }
+
+    _chilluController.mealLogged();
+    ChilluSoundController.instance.playMealLoggedSuccess();
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1697,35 +1734,17 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                 ),
               ],
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.asset(
-                'assets/images/app_icon.png',
-                width: 36,
-                height: 36,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.forestGreen, Color(0xFF0F3227)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Center(
-                    child: Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 18),
-                  ),
-                ),
+            child: const Center(
+              child: ChilluMascot(
+                size: 32,
+                showShadow: false,
               ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'NutriFridge AI',
+              'Chillu · AI Assistant',
               style: AppTypography.cardTitle.copyWith(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
@@ -1737,6 +1756,20 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         ],
       ),
       actions: [
+        ValueListenableBuilder<bool>(
+          valueListenable: ChilluSoundController.instance.soundEnabledNotifier,
+          builder: (context, soundEnabled, _) {
+            return IconButton(
+              icon: Icon(
+                soundEnabled ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                color: soundEnabled ? AppColors.forestGreen : AppColors.textSecondary,
+                size: 22,
+              ),
+              tooltip: soundEnabled ? 'Mute Sound Effects' : 'Enable Sound Effects',
+              onPressed: () => ChilluSoundController.instance.toggleSound(),
+            );
+          },
+        ),
         IconButton(
           icon: const Icon(Icons.refresh_rounded, color: AppColors.textSecondary, size: 22),
           tooltip: 'Reset Conversation',
@@ -1747,6 +1780,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               _messages.clear();
               _messages.addAll(AiAssistantService.sessionMessages);
             });
+            _chilluController.greet();
+            ChilluSoundController.instance.playGreetingChirp();
           },
         ),
       ],
@@ -1758,15 +1793,24 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       padding: const EdgeInsets.only(top: 8, bottom: 20),
       child: Column(
         children: [
+          ChilluMascot(
+            controller: _chilluController,
+            size: 110,
+            onTap: () {
+              _chilluController.greet();
+              ChilluSoundController.instance.playGreetingChirp();
+            },
+          ),
+          const SizedBox(height: 10),
           const Text(
-            'Hi there!',
+            'Hi there! I am Chillu',
             style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+              color: AppColors.primaryForest,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           const Text(
             "What's on your plate today?",
             style: TextStyle(
@@ -1872,6 +1916,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       _syncSession();
     });
 
+    _chilluController.think();
+    ChilluSoundController.instance.playThinkingPing();
     _scrollToBottom();
   }
 
@@ -1977,14 +2023,20 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Assistant Identity header
-              const Text(
-                'AI Assistant',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.forestGreen,
-                  letterSpacing: 0.2,
-                ),
+              Row(
+                children: const [
+                  ChilluMascot(size: 18, showShadow: false),
+                  SizedBox(width: 6),
+                  Text(
+                    'Chillu · AI Assistant',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.forestGreen,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 6),
 
@@ -2703,10 +2755,10 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       child: Align(
         alignment: Alignment.centerLeft,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: const Color(0xFFE2E8F0)),
             boxShadow: const [
               BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2)),
@@ -2714,16 +2766,16 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
-            children: const [
-              SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.forestGreen),
+            children: [
+              ChilluMascot(
+                controller: _chilluController,
+                size: 36,
+                showShadow: false,
               ),
-              SizedBox(width: 10),
-              Text(
-                'NutriFridge AI is analyzing...',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+              const SizedBox(width: 10),
+              const Text(
+                'Chillu is thinking...',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
               ),
             ],
           ),

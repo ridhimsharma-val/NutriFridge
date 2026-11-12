@@ -39,6 +39,8 @@ dependencies:
   http: ^1.6.0
   supabase_flutter: ^2.18.3
   url_launcher: ^6.3.0
+  audioplayers: ^6.8.1
+  shared_preferences: ^2.5.4
 
 dev_dependencies:
   flutter_test:
@@ -67,6 +69,8 @@ flutter:
     - assets/images/categories/
     - assets/images/foods/
     - assets/images/magic_fridge/
+    - assets/mascot/chillu/
+    - assets/audio/chillu/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

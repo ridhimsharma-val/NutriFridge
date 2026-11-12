@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../widgets/chillu/chillu_mascot.dart';
 
 /// Modal bottom sheet representing the AI Assistant entry point with meal context handoff.
 class AiAssistantModalSheet extends StatelessWidget {
@@ -79,9 +80,11 @@ class AiAssistantModalSheet extends StatelessWidget {
               Expanded(
                 child: Row(
                   children: [
+                    const ChilluMascot(size: 24, showShadow: false),
+                    const SizedBox(width: 8),
                     Flexible(
                       child: Text(
-                        'NutriFridge Assistant',
+                        'Chillu Assistant',
                         style: AppTypography.greeting.copyWith(
                           fontSize: 17,
                           fontWeight: FontWeight.w700,

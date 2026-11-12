@@ -16,6 +16,7 @@ import 'widgets/video_card.dart';
 import '../food_image/food_image_picker_sheet.dart';
 import '../../services/food_image/food_image_model.dart';
 import '../../services/food_image/food_image_service.dart';
+import '../../services/chillu/chillu_sound_controller.dart';
 
 /// Comprehensive, Data-Driven Recipe Experience — Meal Detail Page.
 /// Features authentic food photography, per-serving nutrition with transparent provenance,
@@ -154,6 +155,9 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
 
       // Clear idempotency key on successful confirmation
       _idempotencyKey = null;
+
+      // Celebrate successful meal logging with Chillu sound
+      ChilluSoundController.instance.playMealLoggedSuccess();
 
       if (!mounted) return;
 
