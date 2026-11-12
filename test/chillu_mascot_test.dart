@@ -16,16 +16,47 @@ void main() {
       controller.dispose();
     });
 
-    test('Celebration jump is true only for recipeFound and mealLogged', () {
+    test('Celebration jump is true strictly for celebrating and mealLogged user actions', () {
       final controller = ChilluAnimationController();
 
-      controller.recipeFound();
-      expect(controller.state, ChilluState.recipeFound);
+      // Celebrating user actions use celebration jump GIF
+      controller.celebrating();
+      expect(controller.state, ChilluState.celebrating);
       expect(controller.isCelebrationJump, isTrue);
 
       controller.mealLogged();
-      expect(controller.state, ChilluState.mealLogged);
+      expect(controller.state, ChilluState.celebrating);
       expect(controller.isCelebrationJump, isTrue);
+
+      controller.itemAdded();
+      expect(controller.state, ChilluState.celebrating);
+      expect(controller.isCelebrationJump, isTrue);
+
+      controller.idle();
+
+      // Recipe suggestions trigger excited, NOT celebration jump
+      controller.excited();
+      expect(controller.state, ChilluState.excited);
+      expect(controller.isCelebrationJump, isFalse);
+
+      controller.idle();
+
+      controller.recipeFound();
+      expect(controller.state, ChilluState.excited);
+      expect(controller.isCelebrationJump, isFalse);
+
+      controller.idle();
+
+      // Other states do not trigger celebration jump
+      controller.happy();
+      expect(controller.state, ChilluState.happy);
+      expect(controller.isCelebrationJump, isFalse);
+
+      controller.idle();
+
+      controller.confused();
+      expect(controller.state, ChilluState.confused);
+      expect(controller.isCelebrationJump, isFalse);
 
       controller.idle();
       expect(controller.state, ChilluState.idle);
@@ -35,6 +66,34 @@ void main() {
       expect(controller.state, ChilluState.processing);
       expect(controller.isCelebrationJump, isFalse);
       expect(controller.isProcessing, isTrue);
+
+      controller.dispose();
+    });
+
+    test('Priority system prevents lower-priority states from interrupting higher-priority transient states', () {
+      final controller = ChilluAnimationController();
+
+      // 1. Celebrating (priority 8) cannot be interrupted by Happy (5) or Attentive (2)
+      controller.celebrating();
+      expect(controller.state, ChilluState.celebrating);
+
+      controller.happy();
+      expect(controller.state, ChilluState.celebrating); // Ignored due to lower priority
+
+      controller.attentive();
+      expect(controller.state, ChilluState.celebrating); // Ignored
+
+      // 2. Excited (priority 7) cannot be interrupted by Happy (5)
+      controller.idle();
+      controller.excited();
+      expect(controller.state, ChilluState.excited);
+
+      controller.happy();
+      expect(controller.state, ChilluState.excited); // Ignored
+
+      // 3. Forced transition can override
+      controller.triggerState(ChilluState.idle, force: true);
+      expect(controller.state, ChilluState.idle);
 
       controller.dispose();
     });
@@ -169,8 +228,8 @@ void main() {
         ),
       );
 
-      // Trigger recipe found
-      controller.recipeFound();
+      // Trigger celebrating
+      controller.celebrating();
       await tester.pump();
 
       final gifImage = tester.widget<Image>(find.byType(Image));
@@ -357,6 +416,59 @@ void main() {
       // Both widgets render without conflict
       expect(controller.state, ChilluState.attentive);
       expect(find.byType(ChilluMascot), findsNWidgets(2));
+
+      controller.dispose();
+    });
+
+    testWidgets('Renders all four emotional reactions (happy, excited, confused, celebrating) seamlessly', (WidgetTester tester) async {
+      final controller = ChilluAnimationController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ChilluMascot(
+              controller: controller,
+              size: 46,
+            ),
+          ),
+        ),
+      );
+
+      // 1. Happy state (cheerful bounce & smiling crescent eyes)
+      controller.happy();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(controller.state, ChilluState.happy);
+      expect(find.byType(ChilluMascot), findsOneWidget);
+
+      // 2. Excited state (energetic high jump & gleaming eyes)
+      controller.idle();
+      controller.excited();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(controller.state, ChilluState.excited);
+      expect(find.byType(ChilluMascot), findsOneWidget);
+
+      // 3. Confused state (head tilt, quizzical asymmetrical brow & leaf tilt)
+      controller.idle();
+      controller.confused();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(controller.state, ChilluState.confused);
+      expect(find.byType(ChilluMascot), findsOneWidget);
+
+      // 4. Celebrating state (triumphant jump)
+      controller.idle();
+      controller.celebrating();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(controller.state, ChilluState.celebrating);
+      expect(find.byType(ChilluMascot), findsOneWidget);
+
+      // Return to idle
+      controller.idle();
+      await tester.pump();
+      expect(controller.state, ChilluState.idle);
 
       controller.dispose();
     });

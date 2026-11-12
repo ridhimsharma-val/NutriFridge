@@ -465,8 +465,14 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         _messages.add(assistantMessage);
       });
 
-      if (needsClarification || action == 'error') {
-        _chilluController.confused();
+      final returnState = (_inputFocusNode.hasFocus || _textController.text.trim().isNotEmpty)
+          ? ChilluState.attentive
+          : ChilluState.idle;
+
+      if (needsClarification ||
+          action == 'need_clarification' ||
+          action == 'clarify') {
+        _chilluController.confused(returnState: returnState);
         ChilluSoundController.instance.playConfusedBoop();
       } else if (meal != null ||
           action == 'meal_recommendation' ||
@@ -474,19 +480,15 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           (_activeMealContext != null && _isFullRecipeRequest(text)) ||
           assistantText.contains('Preparation') ||
           assistantText.contains('Step 1')) {
-        _chilluController.recipeFound();
+        _chilluController.excited(returnState: returnState);
         ChilluSoundController.instance.playRecipeFound();
       } else {
-        if (_inputFocusNode.hasFocus || _textController.text.trim().isNotEmpty) {
-          _chilluController.attentive();
-        } else {
-          _chilluController.idle();
-        }
+        _chilluController.happy(returnState: returnState);
+        ChilluSoundController.instance.playGreetingChirp();
       }
     } catch (e) {
       debugPrint('[AiAssistantScreen] Error processing send request: $e');
-      _chilluController.confused();
-      ChilluSoundController.instance.playConfusedBoop();
+      _chilluController.idle();
       if (mounted) {
         setState(() {
           _messages.add(AiChatMessage(
