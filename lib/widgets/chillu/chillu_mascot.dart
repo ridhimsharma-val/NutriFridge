@@ -69,6 +69,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
   late AnimationController _celebrationController;
 
   Timer? _blinkTimer;
+  Timer? _doubleBlinkTimer;
   final math.Random _random = math.Random();
 
   @override
@@ -351,6 +352,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
   /// Schedules the next natural eye blink with irregular timing (3.0s to 6.0s).
   void _scheduleNextBlink() {
     _blinkTimer?.cancel();
+    _doubleBlinkTimer?.cancel();
     if (!mounted) return;
 
     final nextInterval = 3000 + _random.nextInt(3000);
@@ -365,7 +367,8 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
             if (!mounted) return;
             // 20% chance of a double-blink (two quick blinks in succession)
             if (_random.nextDouble() < 0.20) {
-              Future.delayed(const Duration(milliseconds: 120), () {
+              _doubleBlinkTimer?.cancel();
+              _doubleBlinkTimer = Timer(const Duration(milliseconds: 120), () {
                 if (!mounted) return;
                 _blinkController.forward(from: 0.0).then((_) {
                   if (mounted) _blinkController.reverse();
@@ -382,6 +385,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
   @override
   void dispose() {
     _blinkTimer?.cancel();
+    _doubleBlinkTimer?.cancel();
     _controller.removeListener(_onControllerStateChanged);
     if (_ownsController) {
       _controller.dispose();
@@ -473,41 +477,43 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           final double sX;
           final double rot;
 
-          // 3-stage triumphant jump sequence:
+          final double sizeScale = (widget.size / 100.0).clamp(0.65, 1.25);
+
+          // 3-stage triumphant jump sequence (3x Intensity Upgrade):
           // 1. Primary huge celebratory leap (0.0 -> 0.42)
           if (p < 0.42) {
             final sub = (p / 0.42).clamp(0.0, 1.0);
             final tEase = 4 * sub * (1 - sub);
-            jumpY = -34.0 * tEase; // Doubled triumphant leap!
-            sY = 1.0 + (tEase * 0.16); // Upward victory stretch
-            sX = 1.0 - (tEase * 0.08);
-            rot = math.sin(sub * 2 * math.pi) * 0.085;
+            jumpY = -95.0 * sizeScale * tEase; // 3x celebratory leap!
+            sY = 1.0 + (tEase * 0.42); // Upward victory stretch 42%
+            sX = 1.0 - (tEase * 0.20);
+            rot = math.sin(sub * 2 * math.pi) * 0.25; // Exuberant victory sway (~14 deg)
           }
           // 2. Secondary joyous victory bounce (0.42 -> 0.74)
           else if (p < 0.74) {
             final sub = ((p - 0.42) / 0.32).clamp(0.0, 1.0);
             final tEase = 4 * sub * (1 - sub);
-            jumpY = -18.0 * tEase; // Doubled secondary bounce
-            sY = 1.0 + (tEase * 0.10);
-            sX = 1.0 - (tEase * 0.05);
-            rot = -math.sin(sub * 2 * math.pi) * 0.075;
+            jumpY = -48.0 * sizeScale * tEase; // 3x secondary bounce!
+            sY = 1.0 + (tEase * 0.25);
+            sX = 1.0 - (tEase * 0.12);
+            rot = -math.sin(sub * 2 * math.pi) * 0.20;
           }
           // 3. Satisfying follow-through finish with soft landing cushion (0.74 -> 1.0)
           else {
             final sub = ((p - 0.74) / 0.26).clamp(0.0, 1.0);
-            if (sub < 0.40) {
-              final sub3 = sub / 0.40;
+            if (sub < 0.45) {
+              final sub3 = sub / 0.45;
               final tEase = 4 * sub3 * (1 - sub3);
-              jumpY = -7.0 * tEase;
-              sY = 1.0 + (tEase * 0.04);
-              sX = 1.0 - (tEase * 0.02);
+              jumpY = -20.0 * sizeScale * tEase;
+              sY = 1.0 + (tEase * 0.12);
+              sX = 1.0 - (tEase * 0.06);
             } else {
               // Elastic settling cushion to resting pose
-              final settleSub = ((sub - 0.40) / 0.60).clamp(0.0, 1.0);
+              final settleSub = ((sub - 0.45) / 0.55).clamp(0.0, 1.0);
               final settleSin = math.sin(settleSub * math.pi);
-              jumpY = 1.2 * settleSin;
-              sY = 1.0 - (settleSin * 0.04);
-              sX = 1.0 + (settleSin * 0.03);
+              jumpY = 3.5 * settleSin;
+              sY = 1.0 - (settleSin * 0.10);
+              sX = 1.0 + (settleSin * 0.08);
             }
             rot = 0.0;
           }
@@ -656,7 +662,8 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
             scaleX = Tween<double>(begin: entranceScaleX, end: loopScaleX).transform(loopBlend);
             rotation = Tween<double>(begin: entranceRot, end: loopRot).transform(loopBlend);
           } else if (state == ChilluState.happy) {
-            // HAPPY (2x Intensity): Cheerful body bounce (-24px), warm squash & stretch, joyful sway, and soft settling cushion
+            // HAPPY (3x Intensity Upgrade): Big cheerful body bounce, dynamic squash & stretch, joyful body sway, and elastic landing cushion
+            final double sizeScale = (widget.size / 100.0).clamp(0.65, 1.25);
             final p = _happyController.value;
             final double bounce;
             final double sY;
@@ -664,31 +671,31 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
             if (p < 0.42) {
               final sub = (p / 0.42).clamp(0.0, 1.0);
               final tEase = 4 * sub * (1 - sub);
-              bounce = -24.0 * tEase; // Doubled from -12.0
-              sY = 1.0 + (tEase * 0.12); // Doubled squash/stretch from 0.06
-              sX = 1.0 - (tEase * 0.06);
+              bounce = -65.0 * sizeScale * tEase; // 3x from -24.0 (big joyful bounce)
+              sY = 1.0 + (tEase * 0.32); // 3x squash/stretch from 0.12
+              sX = 1.0 - (tEase * 0.16);
             } else if (p < 0.72) {
               final sub = ((p - 0.42) / 0.30).clamp(0.0, 1.0);
               final tEase = 4 * sub * (1 - sub);
-              bounce = -8.0 * tEase; // Doubled from -4.0
-              sY = 1.0 + (tEase * 0.05);
-              sX = 1.0 - (tEase * 0.03);
+              bounce = -22.0 * sizeScale * tEase; // 3x from -8.0
+              sY = 1.0 + (tEase * 0.14);
+              sX = 1.0 - (tEase * 0.07);
             } else {
               // Stronger, satisfying settling cushion
               final sub = ((p - 0.72) / 0.28).clamp(0.0, 1.0);
               final settleSin = math.sin(sub * math.pi);
-              bounce = 1.8 * settleSin;
-              sY = 1.0 - (settleSin * 0.035);
-              sX = 1.0 + (settleSin * 0.025);
+              bounce = 4.5 * settleSin;
+              sY = 1.0 - (settleSin * 0.09);
+              sX = 1.0 + (settleSin * 0.07);
             }
             translateY += bounce;
             scaleY = sY;
             scaleX = sX;
-            rotation = math.sin(p * 2 * math.pi) * 0.070; // Doubled from 0.035
+            rotation = math.sin(p * 2 * math.pi) * 0.20; // 3x from 0.070 (~11.5 deg cheerful sway!)
           } else if (state == ChilluState.excited || state == ChilluState.recipeFound) {
-            // EXCITED (2x Intensity): Visibly stronger & highly energetic!
-            // High energetic upward jump (-38px) with lively secondary hop (-18px),
-            // pronounced squash-and-stretch, and energetic body sway
+            // EXCITED (3x Intensity Upgrade): Visibly dramatic high jump, explosive secondary hop,
+            // powerful squash-and-stretch, energetic body sway, and impact landing
+            final double sizeScale = (widget.size / 100.0).clamp(0.65, 1.25);
             final p = _excitedController.value;
             final double jump;
             final double sY;
@@ -696,53 +703,63 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
             if (p < 0.44) {
               final sub = (p / 0.44).clamp(0.0, 1.0);
               final tEase = 4 * sub * (1 - sub);
-              jump = -38.0 * tEase; // Doubled from -20.0
-              sY = 1.0 + (tEase * 0.18); // Doubled from 0.10
-              sX = 1.0 - (tEase * 0.09);
+              jump = -105.0 * sizeScale * tEase; // 3x from -38.0 (huge energetic jump!)
+              sY = 1.0 + (tEase * 0.45); // 45% vertical stretch on takeoff/peak
+              sX = 1.0 - (tEase * 0.22);
             } else if (p < 0.74) {
               final sub = ((p - 0.44) / 0.30).clamp(0.0, 1.0);
               final tEase = 4 * sub * (1 - sub);
-              jump = -18.0 * tEase; // Doubled from -9.0
-              sY = 1.0 + (tEase * 0.09);
-              sX = 1.0 - (tEase * 0.045);
+              jump = -48.0 * sizeScale * tEase; // 3x secondary hop from -18.0
+              sY = 1.0 + (tEase * 0.24);
+              sX = 1.0 - (tEase * 0.12);
             } else {
-              // Elastic settling cushion
+              // Energetic tertiary settling hop & impact cushion
               final sub = ((p - 0.74) / 0.26).clamp(0.0, 1.0);
-              final settleSin = math.sin(sub * math.pi);
-              jump = 2.0 * settleSin;
-              sY = 1.0 - (settleSin * 0.045);
-              sX = 1.0 + (settleSin * 0.035);
+              if (sub < 0.45) {
+                final sub3 = sub / 0.45;
+                final tEase = 4 * sub3 * (1 - sub3);
+                jump = -16.0 * sizeScale * tEase;
+                sY = 1.0 + (tEase * 0.10);
+                sX = 1.0 - (tEase * 0.05);
+              } else {
+                final settleSub = ((sub - 0.45) / 0.55).clamp(0.0, 1.0);
+                final settleSin = math.sin(settleSub * math.pi);
+                jump = 5.0 * settleSin;
+                sY = 1.0 - (settleSin * 0.12);
+                sX = 1.0 + (settleSin * 0.10);
+              }
             }
             translateY += jump;
             scaleY = sY;
             scaleX = sX;
-            rotation = math.sin(p * 4 * math.pi) * 0.110; // Doubled from 0.055
+            rotation = math.sin(p * 4 * math.pi) * 0.30; // 3x from 0.110 (~17.2 deg energetic sway!)
           } else if (state == ChilluState.confused || state == ChilluState.error) {
-            // CONFUSED (2x Intensity): Noticeable questioning sideways head tilt (~16.0 deg / +0.28 rad),
-            // clearly visible lateral lean, curious puzzled body sway, inquisitive questioning posture
+            // CONFUSED (3x Intensity Upgrade): Adorable dramatic head tilt (~30 deg / +0.52 rad),
+            // prominent lateral questioning lean (up to 16px), pronounced puzzled body sway
+            final double sizeScale = (widget.size / 100.0).clamp(0.65, 1.25);
             final p = _confusedController.value;
             final double tilt;
             final double sway;
             final double lateralLean;
             if (p < 0.30) {
               final sub = (p / 0.30).clamp(0.0, 1.0);
-              tilt = Curves.easeOutBack.transform(sub) * 0.28; // Doubled from 0.15 (+16 deg)
+              tilt = Curves.easeOutBack.transform(sub) * 0.52; // 3x from 0.28 (~30 deg head tilt!)
               sway = 0.0;
-              lateralLean = Curves.easeOut.transform(sub) * 3.5;
+              lateralLean = Curves.easeOut.transform(sub) * 10.0 * sizeScale;
             } else if (p < 0.75) {
               final sub = (p - 0.30) / 0.45;
-              tilt = 0.28;
-              sway = math.sin(sub * 3 * math.pi) * 0.070; // Doubled from 0.035
-              lateralLean = 3.5 + (math.sin(sub * 2 * math.pi) * 2.5);
+              tilt = 0.52;
+              sway = math.sin(sub * 3 * math.pi) * 0.20; // 3x from 0.070 (~11.5 deg puzzled rocking)
+              lateralLean = (10.0 + (math.sin(sub * 2 * math.pi) * 7.0)) * sizeScale;
             } else {
               final sub = ((p - 0.75) / 0.25).clamp(0.0, 1.0);
-              tilt = Tween<double>(begin: 0.28, end: 0.0).transform(Curves.easeInOut.transform(sub));
+              tilt = Tween<double>(begin: 0.52, end: 0.0).transform(Curves.easeInOut.transform(sub));
               sway = 0.0;
-              lateralLean = Tween<double>(begin: 3.5, end: 0.0).transform(Curves.easeInOut.transform(sub));
+              lateralLean = Tween<double>(begin: 10.0 * sizeScale, end: 0.0).transform(Curves.easeInOut.transform(sub));
             }
             rotation = tilt + sway;
             translateX += lateralLean;
-            translateY += 2.0;
+            translateY += 3.0;
           } else if (state == ChilluState.listening) {
             // Listening: rhythmic body bounce (1000ms cycle), visible breathing/pulsing (4.2% scale),
             // attentive side ear tilt (~-4.3 deg)
@@ -864,27 +881,29 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
             lAngle += Tween<double>(begin: entLeft, end: loopLeft).transform(loopBlend);
             rAngle += Tween<double>(begin: entRight, end: loopRight).transform(loopBlend);
           } else if (state == ChilluState.happy) {
-            // Happy (2x Intensity): both leaves perk up cheerfully and sway with doubled spring
+            // Happy (3x Intensity Upgrade): both leaves perk up cheerfully and sway with 3x spring
             final p = _happyController.value;
             final bounceSway = math.sin(p * math.pi);
-            lAngle += 0.130 * bounceSway; // Doubled from 0.065
-            rAngle -= 0.110 * bounceSway; // Doubled from 0.055
+            final springBack = math.sin(p * 3 * math.pi) * 0.12;
+            lAngle += (0.380 * bounceSway) + springBack; // 3x from 0.130 (~22 deg!)
+            rAngle -= (0.330 * bounceSway) + springBack; // 3x from 0.110 (~-19 deg!)
           } else if (state == ChilluState.excited || state == ChilluState.recipeFound) {
-            // Excited (2x Intensity): both leaves bounce independently with lively energetic flutter
+            // Excited (3x Intensity Upgrade): both leaves bounce independently with wild energetic flutter
             final p = _excitedController.value;
-            final flutter = math.sin(p * 7 * math.pi);
-            lAngle += 0.220 + (flutter * 0.090); // Doubled from 0.11 + 0.045
-            rAngle -= 0.200 - (flutter * 0.090); // Doubled from 0.10 - 0.045
+            final flutter = math.sin(p * 8 * math.pi);
+            lAngle += 0.550 + (flutter * 0.250); // 3x from 0.220 + 0.090 (~31.5 deg perk + 14 deg flutter!)
+            rAngle -= 0.500 - (flutter * 0.250); // 3x from 0.200 - 0.090 (~-28.6 deg perk + 14 deg flutter!)
           } else if (state == ChilluState.confused || state == ChilluState.error) {
-            // Confused (2x Intensity): Asymmetrical leaf tilt! Left leaf perks up high, right leaf droops puzzled
+            // Confused (3x Intensity Upgrade): Massive independent leaf reaction!
+            // Left leaf perks straight up in curiosity (+30 deg), right leaf droops down over face (-35.5 deg)
             final p = _confusedController.value;
             final progress = (p < 0.30)
                 ? Curves.easeOut.transform(p / 0.30)
                 : (p > 0.75)
                     ? (1.0 - Curves.easeInOut.transform((p - 0.75) / 0.25))
                     : 1.0;
-            lAngle += 0.180 * progress;  // Doubled from 0.080 (~10.3 deg perk up)
-            rAngle -= 0.240 * progress;  // Doubled from 0.120 (~-13.8 deg droop down)
+            lAngle += 0.520 * progress;  // 3x from 0.180 (~30 deg straight up!)
+            rAngle -= 0.620 * progress;  // 3x from 0.240 (~-35.5 deg droop low!)
           } else if (state == ChilluState.listening) {
             // Leaves respond dynamically to rhythmic bounce
             final bouncePhase = math.sin(_listeningPulseController.value * 2 * math.pi);
@@ -1131,24 +1150,24 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
             hop = 4 * sub * (1 - sub);
           } else if (cVal < 0.74) {
             final sub = ((cVal - 0.42) / 0.32).clamp(0.0, 1.0);
-            hop = 4 * sub * (1 - sub) * 0.65;
+            hop = 4 * sub * (1 - sub) * 0.75;
           }
-          shadowScale = (1.0 - (0.45 * hop)).clamp(0.40, 1.0);
-          shadowOpacity = (0.12 - (0.08 * hop)).clamp(0.03, 0.12);
+          shadowScale = (1.0 - (0.65 * hop)).clamp(0.20, 1.0);
+          shadowOpacity = (0.12 - (0.10 * hop)).clamp(0.02, 0.12);
         } else if (state == ChilluState.happy && _happyController.isAnimating) {
           final hVal = _happyController.value;
           final hop = 4 * hVal * (1 - hVal);
-          shadowScale = (1.0 - (0.32 * hop)).clamp(0.55, 1.0);
-          shadowOpacity = (0.12 - (0.06 * hop)).clamp(0.04, 0.12);
+          shadowScale = (1.0 - (0.48 * hop)).clamp(0.35, 1.0);
+          shadowOpacity = (0.12 - (0.07 * hop)).clamp(0.03, 0.12);
         } else if ((state == ChilluState.excited || state == ChilluState.recipeFound) && _excitedController.isAnimating) {
           final eVal = _excitedController.value;
           final jumpPhase = (eVal / 0.74).clamp(0.0, 1.0);
           final hop = 4 * jumpPhase * (1 - jumpPhase);
-          shadowScale = (1.0 - (0.45 * hop)).clamp(0.40, 1.0);
-          shadowOpacity = (0.12 - (0.09 * hop)).clamp(0.03, 0.12);
+          shadowScale = (1.0 - (0.60 * hop)).clamp(0.25, 1.0);
+          shadowOpacity = (0.12 - (0.09 * hop)).clamp(0.02, 0.12);
         } else if ((state == ChilluState.confused || state == ChilluState.error) && _confusedController.isAnimating) {
-          shadowScale = 0.94;
-          shadowOpacity = 0.10;
+          shadowScale = 0.92;
+          shadowOpacity = 0.09;
         } else if (_bounceController.isAnimating) {
           final bVal = _bounceController.value;
           final hop = 4 * bVal * (1 - bVal);
@@ -1495,11 +1514,11 @@ class _ChilluEmotionalEyesPainter extends CustomPainter {
         // Soft mint fill concealing the open eye
         canvas.drawOval(eyeRect, mintFur);
 
-        // Cheerful curved smiling arc (^)
+        // Cheerful curved smiling arc (^) with deep smiling curve
         final smilePath = Path();
-        final start = Offset(center.dx - (eyeWidth * 0.38), center.dy + (eyeHeight * 0.08));
-        final peak = Offset(center.dx, center.dy - (eyeHeight * 0.22));
-        final end = Offset(center.dx + (eyeWidth * 0.38), center.dy + (eyeHeight * 0.08));
+        final start = Offset(center.dx - (eyeWidth * 0.40), center.dy + (eyeHeight * 0.10));
+        final peak = Offset(center.dx, center.dy - (eyeHeight * 0.28));
+        final end = Offset(center.dx + (eyeWidth * 0.40), center.dy + (eyeHeight * 0.10));
         smilePath.moveTo(start.dx, start.dy);
         smilePath.quadraticBezierTo(peak.dx, peak.dy, end.dx, end.dy);
         canvas.drawPath(smilePath, smileLashPaint);
@@ -1507,20 +1526,20 @@ class _ChilluEmotionalEyesPainter extends CustomPainter {
         canvas.restore();
 
         // Rosy cheek glow
-        canvas.drawCircle(Offset(center.dx, center.dy + (eyeHeight * 0.58)), eyeWidth * 0.28, blushPaint);
+        canvas.drawCircle(Offset(center.dx, center.dy + (eyeHeight * 0.58)), eyeWidth * 0.36, blushPaint);
 
-        // Cheerful lifted eyebrows (raised higher with 2x intensity)
+        // Cheerful lifted eyebrows (raised high with 3x intensity)
         final browPath = Path();
-        final bStart = Offset(center.dx - (eyeWidth * 0.34), center.dy - (eyeHeight * 0.64) - (eyeHeight * 0.18 * happyAlpha));
-        final bPeak = Offset(center.dx, center.dy - (eyeHeight * 0.82) - (eyeHeight * 0.22 * happyAlpha));
-        final bEnd = Offset(center.dx + (eyeWidth * 0.34), center.dy - (eyeHeight * 0.64) - (eyeHeight * 0.18 * happyAlpha));
+        final bStart = Offset(center.dx - (eyeWidth * 0.36), center.dy - (eyeHeight * 0.64) - (eyeHeight * 0.30 * happyAlpha));
+        final bPeak = Offset(center.dx, center.dy - (eyeHeight * 0.88) - (eyeHeight * 0.35 * happyAlpha));
+        final bEnd = Offset(center.dx + (eyeWidth * 0.36), center.dy - (eyeHeight * 0.64) - (eyeHeight * 0.30 * happyAlpha));
         browPath.moveTo(bStart.dx, bStart.dy);
         browPath.quadraticBezierTo(bPeak.dx, bPeak.dy, bEnd.dx, bEnd.dy);
         canvas.drawPath(browPath, smileLashPaint);
       }
     }
 
-    // 2. EXCITED: Highly energetic gleaming eyes, doubled sparkle catchlights, and lifted brows
+    // 2. EXCITED (3x Intensity Upgrade): Highly energetic gleaming eyes, massive sparkle catchlights, and lifted brows
     if (excitedProgress > 0.0) {
       final excitedAlpha = excitedProgress.clamp(0.0, 1.0);
       final browPaint = Paint()
@@ -1540,52 +1559,51 @@ class _ChilluEmotionalEyesPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round;
 
       for (final center in [leftCenter, rightCenter]) {
-        // High enthusiastic eyebrows (doubled lift from 0.18 to 0.32)
-        final browLift = eyeHeight * 0.32 * excitedAlpha;
+        // High enthusiastic eyebrows (lifted high with 3x intensity)
+        final browLift = eyeHeight * 0.55 * excitedAlpha;
         final browPath = Path();
-        final start = Offset(center.dx - (eyeWidth * 0.34), center.dy - (eyeHeight * 0.62) - browLift);
-        final peak = Offset(center.dx, center.dy - (eyeHeight * 0.82) - browLift);
-        final end = Offset(center.dx + (eyeWidth * 0.34), center.dy - (eyeHeight * 0.62) - browLift);
+        final start = Offset(center.dx - (eyeWidth * 0.36), center.dy - (eyeHeight * 0.62) - browLift);
+        final peak = Offset(center.dx, center.dy - (eyeHeight * 0.96) - browLift);
+        final end = Offset(center.dx + (eyeWidth * 0.36), center.dy - (eyeHeight * 0.62) - browLift);
         browPath.moveTo(start.dx, start.dy);
         browPath.quadraticBezierTo(peak.dx, peak.dy, end.dx, end.dy);
         canvas.drawPath(browPath, browPaint);
 
-        // Enlarged gleam catchlights (bright sparkle burst in the upper pupil)
+        // Huge gleaming catchlights (bright sparkle burst in the upper pupil)
         final c1 = Offset(center.dx - (eyeWidth * 0.08), center.dy - (eyeHeight * 0.10));
-        final starRadius = eyeWidth * 0.22; // Doubled gleam radius
+        final starRadius = eyeWidth * 0.30; // 3x gleam radius
         canvas.drawCircle(c1, starRadius, sparklePaint);
 
-        // 4-point sparkle cross shimmer with doubled reach
-        canvas.drawLine(Offset(c1.dx - (starRadius * 2.2), c1.dy), Offset(c1.dx + (starRadius * 2.2), c1.dy), shimmerPaint);
-        canvas.drawLine(Offset(c1.dx, c1.dy - (starRadius * 2.2)), Offset(c1.dx, c1.dy + (starRadius * 2.2)), shimmerPaint);
+        // 4-point sparkle cross shimmer with expansive reach
+        canvas.drawLine(Offset(c1.dx - (starRadius * 2.6), c1.dy), Offset(c1.dx + (starRadius * 2.6), c1.dy), shimmerPaint);
+        canvas.drawLine(Offset(c1.dx, c1.dy - (starRadius * 2.6)), Offset(c1.dx, c1.dy + (starRadius * 2.6)), shimmerPaint);
 
-        // Secondary playful glint
+        // Dual lively secondary sparkles
         canvas.drawCircle(
-          Offset(center.dx + (eyeWidth * 0.16), center.dy + (eyeHeight * 0.14)),
-          eyeWidth * 0.10,
+          Offset(center.dx + (eyeWidth * 0.18), center.dy + (eyeHeight * 0.15)),
+          eyeWidth * 0.12,
           sparklePaint,
         );
-        // Tertiary sparkle
         canvas.drawCircle(
-          Offset(center.dx - (eyeWidth * 0.12), center.dy + (eyeHeight * 0.16)),
-          eyeWidth * 0.06,
+          Offset(center.dx - (eyeWidth * 0.14), center.dy + (eyeHeight * 0.18)),
+          eyeWidth * 0.08,
           sparklePaint,
         );
       }
     }
 
-    // 3. CONFUSED: Asymmetrical quizzical eyebrows (left cocked high in curiosity, right furrowed flat) & questioning gaze
+    // 3. CONFUSED (3x Intensity Upgrade): Asymmetrical quizzical eyebrows & prominent questioning gaze
     if (confusedProgress > 0.0) {
       final confAlpha = confusedProgress.clamp(0.0, 1.0);
       final browPaint = Paint()
         ..color = const Color(0xFF1B4332).withValues(alpha: confAlpha)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = math.max(2.0, size.width * 0.024)
+        ..strokeWidth = math.max(2.4, size.width * 0.026)
         ..strokeCap = StrokeCap.round;
 
       // Questioning gaze: pupils drift inquisitively towards the upper-side
-      final pupilShiftX = eyeWidth * 0.10 * confAlpha;
-      final pupilShiftY = -eyeHeight * 0.08 * confAlpha;
+      final pupilShiftX = eyeWidth * 0.18 * confAlpha;
+      final pupilShiftY = -eyeHeight * 0.14 * confAlpha;
       final pupilPaint = Paint()
         ..color = Colors.black.withValues(alpha: confAlpha * 0.90)
         ..style = PaintingStyle.fill;
@@ -1618,22 +1636,22 @@ class _ChilluEmotionalEyesPainter extends CustomPainter {
         canvas.restore();
       }
 
-      // Left Eyebrow: Inquisitively cocked high up (doubled lift from 0.22 to 0.40)
-      final leftLift = eyeHeight * 0.40 * confAlpha;
+      // Left Eyebrow: Inquisitively cocked high up (3x lift to 0.65)
+      final leftLift = eyeHeight * 0.65 * confAlpha;
       final leftBrowPath = Path();
       final lStart = Offset(leftCenter.dx - (eyeWidth * 0.32), leftCenter.dy - (eyeHeight * 0.58) - leftLift);
-      final lPeak = Offset(leftCenter.dx - (eyeWidth * 0.05), leftCenter.dy - (eyeHeight * 0.94) - leftLift);
+      final lPeak = Offset(leftCenter.dx - (eyeWidth * 0.05), leftCenter.dy - (eyeHeight * 1.05) - leftLift);
       final lEnd = Offset(leftCenter.dx + (eyeWidth * 0.34), leftCenter.dy - (eyeHeight * 0.54) - (leftLift * 0.4));
       leftBrowPath.moveTo(lStart.dx, lStart.dy);
       leftBrowPath.quadraticBezierTo(lPeak.dx, lPeak.dy, lEnd.dx, lEnd.dy);
       canvas.drawPath(leftBrowPath, browPaint);
 
-      // Right Eyebrow: Puzzled, lowered flat/slightly angled down (doubled drop from 0.06 to 0.12)
-      final rightDrop = eyeHeight * 0.12 * confAlpha;
+      // Right Eyebrow: Puzzled, lowered flat/angled down (3x drop to 0.22)
+      final rightDrop = eyeHeight * 0.22 * confAlpha;
       final rightBrowPath = Path();
       final rStart = Offset(rightCenter.dx - (eyeWidth * 0.34), rightCenter.dy - (eyeHeight * 0.54) + rightDrop);
-      final rPeak = Offset(rightCenter.dx, rightCenter.dy - (eyeHeight * 0.62) + rightDrop);
-      final rEnd = Offset(rightCenter.dx + (eyeWidth * 0.32), rightCenter.dy - (eyeHeight * 0.66) + rightDrop);
+      final rPeak = Offset(rightCenter.dx, rightCenter.dy - (eyeHeight * 0.64) + rightDrop);
+      final rEnd = Offset(rightCenter.dx + (eyeWidth * 0.32), rightCenter.dy - (eyeHeight * 0.70) + rightDrop);
       rightBrowPath.moveTo(rStart.dx, rStart.dy);
       rightBrowPath.quadraticBezierTo(rPeak.dx, rPeak.dy, rEnd.dx, rEnd.dy);
       canvas.drawPath(rightBrowPath, browPaint);
@@ -1730,56 +1748,60 @@ class _ChilluCelebrationSparklesPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (progress <= 0.0 || progress >= 1.0) return;
 
-    final center = Offset(size.width * 0.5, size.height * 0.45);
-    final baseRadius = size.width * 0.48;
+    final center = Offset(size.width * 0.5, size.height * 0.42);
+    final baseRadius = size.width * 0.58;
 
-    // Sparkle burst phases: burst 1 (p: 0.06 -> 0.46), burst 2 (p: 0.44 -> 0.84)
-    final double burst1 = (progress >= 0.06 && progress <= 0.46)
-        ? math.sin(((progress - 0.06) / 0.40) * math.pi)
+    // Sparkle burst phases (3x Intensity Upgrade): burst 1 (p: 0.05 -> 0.46), burst 2 (p: 0.42 -> 0.86)
+    final double burst1 = (progress >= 0.05 && progress <= 0.46)
+        ? math.sin(((progress - 0.05) / 0.41) * math.pi)
         : 0.0;
-    final double burst2 = (progress >= 0.44 && progress <= 0.84)
-        ? math.sin(((progress - 0.44) / 0.40) * math.pi)
+    final double burst2 = (progress >= 0.42 && progress <= 0.86)
+        ? math.sin(((progress - 0.42) / 0.44) * math.pi)
         : 0.0;
 
     final goldPaint = Paint()..style = PaintingStyle.fill;
     final mintPaint = Paint()..style = PaintingStyle.fill;
     final shimmerPaint = Paint()..style = PaintingStyle.fill;
 
-    // Angles for sparkle stars around upper hemisphere
+    // 12 festive victory star positions
     final angles = [
-      -math.pi * 0.85,
-      -math.pi * 0.65,
-      -math.pi * 0.45,
-      -math.pi * 0.25,
-      -math.pi * 0.10,
-      -math.pi * 0.95,
-      -math.pi * 0.50,
-      -math.pi * 0.15,
+      -math.pi * 0.88,
+      -math.pi * 0.72,
+      -math.pi * 0.54,
+      -math.pi * 0.36,
+      -math.pi * 0.18,
+      -math.pi * 0.04,
+      -math.pi * 0.96,
+      -math.pi * 0.80,
+      -math.pi * 0.62,
+      -math.pi * 0.44,
+      -math.pi * 0.26,
+      -math.pi * 0.12,
     ];
 
     for (int i = 0; i < angles.length; i++) {
       final angle = angles[i];
-      final isBurst1 = i < 4;
+      final isBurst1 = i < 6;
       final alpha = isBurst1 ? burst1 : burst2;
       if (alpha <= 0.01) continue;
 
-      final dist = baseRadius * (0.85 + (0.25 * (1.0 - alpha)));
+      final dist = baseRadius * (0.80 + (0.35 * (1.0 - alpha)));
       final pos = Offset(center.dx + math.cos(angle) * dist, center.dy + math.sin(angle) * dist);
-      final radius = math.max(1.8, size.width * (0.035 + (0.015 * (i % 2)))) * alpha;
+      final radius = math.max(3.2, size.width * (0.075 + (0.035 * (i % 2)))) * alpha;
 
       final paint = (i % 3 == 0)
-          ? (goldPaint..color = const Color(0xFFFFD166).withValues(alpha: alpha * 0.9))
+          ? (goldPaint..color = const Color(0xFFFFD166).withValues(alpha: alpha * 0.95))
           : (i % 3 == 1)
-              ? (mintPaint..color = const Color(0xFF06D6A0).withValues(alpha: alpha * 0.85))
-              : (shimmerPaint..color = Colors.white.withValues(alpha: alpha * 0.95));
+              ? (mintPaint..color = const Color(0xFF06D6A0).withValues(alpha: alpha * 0.90))
+              : (shimmerPaint..color = Colors.white.withValues(alpha: alpha * 0.98));
 
-      // Draw 4-point star sparkle
+      // Draw dynamic 4-point star sparkle
       final starPath = Path();
-      starPath.moveTo(pos.dx, pos.dy - (radius * 1.6));
-      starPath.quadraticBezierTo(pos.dx, pos.dy, pos.dx + (radius * 1.6), pos.dy);
-      starPath.quadraticBezierTo(pos.dx, pos.dy, pos.dx, pos.dy + (radius * 1.6));
-      starPath.quadraticBezierTo(pos.dx, pos.dy, pos.dx - (radius * 1.6), pos.dy);
-      starPath.quadraticBezierTo(pos.dx, pos.dy, pos.dx, pos.dy - (radius * 1.6));
+      starPath.moveTo(pos.dx, pos.dy - (radius * 1.8));
+      starPath.quadraticBezierTo(pos.dx, pos.dy, pos.dx + (radius * 1.8), pos.dy);
+      starPath.quadraticBezierTo(pos.dx, pos.dy, pos.dx, pos.dy + (radius * 1.8));
+      starPath.quadraticBezierTo(pos.dx, pos.dy, pos.dx - (radius * 1.8), pos.dy);
+      starPath.quadraticBezierTo(pos.dx, pos.dy, pos.dx, pos.dy - (radius * 1.8));
       canvas.drawPath(starPath, paint);
     }
   }
