@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nutrifridge/services/chillu/chillu_sound_controller.dart';
 import 'package:nutrifridge/widgets/chillu/chillu_animation_controller.dart';
@@ -6,6 +7,18 @@ import 'package:nutrifridge/widgets/chillu/chillu_mascot.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('xyz.luan/audioplayers.global'), (call) async => null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('xyz.luan/audioplayers'), (call) async => null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('plugins.flutter.io/shared_preferences'), (call) async {
+      if (call.method == 'getAll') return <String, dynamic>{};
+      return true;
+    });
+  });
 
   group('ChilluAnimationController Tests', () {
     test('Initial state is idle and celebration jump is false', () {

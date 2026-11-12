@@ -49,6 +49,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   MealAiContext? _activeMealContext;
   bool _initialPromptDispatched = false;
   final ChilluAnimationController _chilluController = ChilluAnimationController();
+  bool _showAudioDebugPanel = true;
+  bool _audioDebugPanelCollapsed = false;
 
   @override
   void initState() {
@@ -1669,13 +1671,20 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.warmCream,
-      appBar: _buildAppBar(),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Contextual meal indicator when opened from Meal Detail or active in session
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) {
+        ChilluSoundController.instance.unlockAudioContext();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.warmCream,
+        appBar: _buildAppBar(),
+        body: SafeArea(
+          child: Column(
+            children: [
+              if (_showAudioDebugPanel) _buildDebugSoundPanel(),
+
+              // Contextual meal indicator when opened from Meal Detail or active in session
             if (_activeMealContext != null)
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -1802,8 +1811,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   bool get _showWelcomeHero => _messages.length <= 1 && _pendingQuickActionIntent == null;
 
@@ -1868,6 +1878,19 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         ],
       ),
       actions: [
+        IconButton(
+          icon: Icon(
+            _showAudioDebugPanel ? Icons.tune_rounded : Icons.tune_outlined,
+            color: _showAudioDebugPanel ? AppColors.forestGreen : AppColors.textSecondary,
+            size: 22,
+          ),
+          tooltip: _showAudioDebugPanel ? 'Hide Sound Panel' : 'Show Sound Panel',
+          onPressed: () {
+            setState(() {
+              _showAudioDebugPanel = !_showAudioDebugPanel;
+            });
+          },
+        ),
         ValueListenableBuilder<bool>(
           valueListenable: ChilluSoundController.instance.soundEnabledNotifier,
           builder: (context, soundEnabled, _) {
@@ -3097,6 +3120,334 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Temporary debug sound test panel providing live diagnostics and 8 manual sound triggers.
+  Widget _buildDebugSoundPanel() {
+    return ValueListenableBuilder<ChilluAudioDiagnostics>(
+      valueListenable: ChilluSoundController.instance.diagnosticsNotifier,
+      builder: (context, diag, _) {
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: diag.lastError != null ? Colors.red.shade300 : AppColors.freshGreen.withValues(alpha: 0.35),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header bar
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _audioDebugPanelCollapsed = !_audioDebugPanelCollapsed;
+                  });
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.audiotrack_rounded,
+                        size: 20,
+                        color: diag.isSoundEnabled ? AppColors.primaryForest : Colors.grey,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Chillu Sound Test Panel',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primaryForest,
+                        ),
+                      ),
+                      const Spacer(),
+                      // Status pill
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: diag.isAudioUnlocked ? AppColors.paleMint : Colors.amber.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: diag.isAudioUnlocked ? AppColors.freshGreen : Colors.amber.shade400,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: diag.isAudioUnlocked ? AppColors.freshGreen : Colors.amber.shade700,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              diag.isAudioUnlocked ? 'Audio Unlocked' : 'Awaiting Tap',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: diag.isAudioUnlocked ? AppColors.primaryForest : Colors.amber.shade900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        _audioDebugPanelCollapsed ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_up_rounded,
+                        size: 20,
+                        color: AppColors.mutedText,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              if (!_audioDebugPanelCollapsed) ...[
+                const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Diagnostics readout row
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                _buildDiagBadge('Assets', '${diag.loadedAssetsCount}/${diag.totalAssetsCount} cached', Icons.folder_zip_rounded),
+                                const SizedBox(width: 6),
+                                _buildDiagBadge('Player', diag.isPlayerInitialized ? 'Ready' : 'Init...', Icons.play_circle_outline_rounded),
+                                const SizedBox(width: 6),
+                                _buildDiagBadge('Mute', diag.isSoundEnabled ? 'ON' : 'OFF', Icons.volume_up_rounded),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                const Text(
+                                  'Status: ',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    diag.playbackStatus,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: diag.playbackStatus.startsWith('Error')
+                                          ? Colors.red
+                                          : (diag.playbackStatus.startsWith('Playing') ? AppColors.freshGreen : const Color(0xFF334155)),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (diag.lastError != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Error: ${diag.lastError}',
+                                style: const TextStyle(fontSize: 10.5, color: Colors.red, fontWeight: FontWeight.w600),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // 8 Test Buttons Grid / Wrap
+                      const Text(
+                        'Trigger Sound & Animation Reaction:',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          _buildSoundTestButton(
+                            label: '1. Entry Jump',
+                            asset: ChilluSoundController.entryJumpAsset,
+                            onTrigger: () {
+                              ChilluSoundController.instance.testPlay(ChilluSoundController.entryJumpAsset);
+                              _chilluController.greet();
+                            },
+                          ),
+                          _buildSoundTestButton(
+                            label: '2. Attentive',
+                            asset: ChilluSoundController.attentiveAsset,
+                            onTrigger: () {
+                              ChilluSoundController.instance.testPlay(ChilluSoundController.attentiveAsset);
+                              _chilluController.attentive();
+                            },
+                          ),
+                          _buildSoundTestButton(
+                            label: '3. Listening',
+                            asset: ChilluSoundController.listeningAsset,
+                            onTrigger: () {
+                              ChilluSoundController.instance.testPlay(ChilluSoundController.listeningAsset);
+                              _chilluController.listening();
+                            },
+                          ),
+                          _buildSoundTestButton(
+                            label: '4. Thinking',
+                            asset: ChilluSoundController.thinkingAsset,
+                            onTrigger: () {
+                              ChilluSoundController.instance.testPlay(ChilluSoundController.thinkingAsset);
+                              _chilluController.think();
+                            },
+                          ),
+                          _buildSoundTestButton(
+                            label: '5. Happy',
+                            asset: ChilluSoundController.happyAsset,
+                            onTrigger: () {
+                              ChilluSoundController.instance.testPlay(ChilluSoundController.happyAsset);
+                              _chilluController.happy();
+                            },
+                          ),
+                          _buildSoundTestButton(
+                            label: '6. Excited',
+                            asset: ChilluSoundController.excitedAsset,
+                            onTrigger: () {
+                              ChilluSoundController.instance.testPlay(ChilluSoundController.excitedAsset);
+                              _chilluController.excited();
+                            },
+                          ),
+                          _buildSoundTestButton(
+                            label: '7. Celebrating',
+                            asset: ChilluSoundController.celebratingAsset,
+                            onTrigger: () {
+                              ChilluSoundController.instance.testPlay(ChilluSoundController.celebratingAsset);
+                              _chilluController.itemAdded();
+                            },
+                          ),
+                          _buildSoundTestButton(
+                            label: '8. Confused',
+                            asset: ChilluSoundController.confusedAsset,
+                            onTrigger: () {
+                              ChilluSoundController.instance.testPlay(ChilluSoundController.confusedAsset);
+                              _chilluController.confused();
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Auxiliary buttons row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton.icon(
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            ),
+                            icon: const Icon(Icons.touch_app_rounded, size: 14),
+                            label: const Text('Unlock Audio', style: TextStyle(fontSize: 11)),
+                            onPressed: () => ChilluSoundController.instance.unlockAudioContext(),
+                          ),
+                          const SizedBox(width: 4),
+                          TextButton.icon(
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            ),
+                            icon: const Icon(Icons.restart_alt_rounded, size: 14),
+                            label: const Text('Reset Session', style: TextStyle(fontSize: 11)),
+                            onPressed: () => ChilluSoundController.instance.resetSession(),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDiagBadge(String title, String val, IconData icon) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: AppColors.mutedText),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                '$title: $val',
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSoundTestButton({
+    required String label,
+    required String asset,
+    required VoidCallback onTrigger,
+  }) {
+    return OutlinedButton(
+      style: OutlinedButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        side: const BorderSide(color: Color(0xFFCBD5E1)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        backgroundColor: Colors.white,
+      ),
+      onPressed: onTrigger,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.play_arrow_rounded, size: 15, color: AppColors.freshGreen),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+          ),
+        ],
       ),
     );
   }

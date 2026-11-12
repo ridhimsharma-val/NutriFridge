@@ -86,4 +86,27 @@ void main() {
     expect(controller.isSoundEnabled, isTrue);
     expect(controller.soundEnabledNotifier.value, isTrue);
   });
+
+  test('ChilluSoundController diagnostics and web audio unlock mechanism work as expected', () async {
+    final controller = ChilluSoundController.instance;
+
+    // Diagnostics notifier is populated
+    final initialDiag = controller.diagnosticsNotifier.value;
+    expect(initialDiag.totalAssetsCount, 8);
+    expect(initialDiag.isSoundEnabled, isTrue);
+
+    // Test unlock mechanism
+    await controller.unlockAudioContext();
+    expect(controller.isAudioUnlocked, isTrue);
+    expect(controller.diagnosticsNotifier.value.isAudioUnlocked, isTrue);
+
+    // Test testPlay method with forced bypass
+    await controller.testPlay(ChilluSoundController.entryJumpAsset);
+    expect(controller.diagnosticsNotifier.value.lastPlayedAsset, ChilluSoundController.entryJumpAsset);
+
+    // Test session reset
+    controller.resetSession();
+    expect(controller.hasGreetedThisSession, isFalse);
+    expect(controller.isEntryJumpPending, isFalse);
+  });
 }
