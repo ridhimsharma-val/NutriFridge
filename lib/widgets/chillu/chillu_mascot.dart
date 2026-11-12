@@ -216,11 +216,16 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
     _attentivePerkController.stop();
     _attentiveLoopController.stop();
     _bounceController.stop();
+    _bounceController.reset();
     _tiltController.stop();
     _happyController.stop();
+    _happyController.reset();
     _excitedController.stop();
+    _excitedController.reset();
     _confusedController.stop();
+    _confusedController.reset();
     _celebrationController.stop();
+    _celebrationController.reset();
   }
 
   void _syncAnimationsWithState(ChilluState state) {
@@ -232,8 +237,13 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _thinkingCycleController.stop();
         _attentiveLoopController.stop();
         _happyController.stop();
+        _happyController.reset();
         _excitedController.stop();
+        _excitedController.reset();
         _confusedController.stop();
+        _confusedController.reset();
+        _celebrationController.stop();
+        _celebrationController.reset();
         _attentivePerkController.animateTo(0.0, duration: const Duration(milliseconds: 280), curve: Curves.easeOut);
         if (!_idleBreathingController.isAnimating) {
           _idleBreathingController.repeat(reverse: true);
@@ -753,9 +763,10 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
               lateralLean = (10.0 + (math.sin(sub * 2 * math.pi) * 7.0)) * sizeScale;
             } else {
               final sub = ((p - 0.75) / 0.25).clamp(0.0, 1.0);
-              tilt = Tween<double>(begin: 0.52, end: 0.0).transform(Curves.easeInOut.transform(sub));
-              sway = 0.0;
-              lateralLean = Tween<double>(begin: 10.0 * sizeScale, end: 0.0).transform(Curves.easeInOut.transform(sub));
+              // Settles gently into a persistent inquisitive tilt while in confused error state
+              tilt = Tween<double>(begin: 0.52, end: 0.28).transform(Curves.easeInOut.transform(sub));
+              sway = math.sin(sub * math.pi) * 0.05;
+              lateralLean = Tween<double>(begin: 10.0 * sizeScale, end: 5.5 * sizeScale).transform(Curves.easeInOut.transform(sub));
             }
             rotation = tilt + sway;
             translateX += lateralLean;
@@ -900,7 +911,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
             final progress = (p < 0.30)
                 ? Curves.easeOut.transform(p / 0.30)
                 : (p > 0.75)
-                    ? (1.0 - Curves.easeInOut.transform((p - 0.75) / 0.25))
+                    ? Tween<double>(begin: 1.0, end: 0.50).transform(Curves.easeInOut.transform((p - 0.75) / 0.25))
                     : 1.0;
             lAngle += 0.520 * progress;  // 3x from 0.180 (~30 deg straight up!)
             rAngle -= 0.620 * progress;  // 3x from 0.240 (~-35.5 deg droop low!)
@@ -934,7 +945,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
             ? ((_confusedController.value < 0.30)
                 ? (_confusedController.value / 0.30)
                 : (_confusedController.value > 0.75)
-                    ? (1.0 - ((_confusedController.value - 0.75) / 0.25))
+                    ? Tween<double>(begin: 1.0, end: 0.60).transform((_confusedController.value - 0.75) / 0.25)
                     : 1.0)
             : 0.0;
 

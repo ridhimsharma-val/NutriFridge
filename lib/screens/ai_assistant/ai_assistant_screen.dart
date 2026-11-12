@@ -123,9 +123,14 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         _chilluController.attentive();
       }
     } else {
-      // When input message is cleared, return smoothly to Idle
+      // When input message is cleared, return to Confused if latest response was an error, else return to Idle
       if (_chilluController.state == ChilluState.attentive) {
-        _chilluController.idle();
+        final int lastAssistantIdx = _messages.lastIndexWhere((m) => !m.isUser);
+        if (lastAssistantIdx != -1 && _messages[lastAssistantIdx].action == 'error') {
+          _chilluController.confused(persistent: true);
+        } else {
+          _chilluController.idle();
+        }
       }
     }
   }
@@ -227,6 +232,28 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     });
 
     _handleSend(promptOverride: text, imageOverride: image, isRetry: true);
+  }
+
+  void _dismissErrorMessage(AiChatMessage message) {
+    setState(() {
+      _messages.remove(message);
+    });
+    _syncSession();
+
+    final int lastAssistantIdx = _messages.lastIndexWhere((m) => !m.isUser);
+    final bool latestIsStillError =
+        lastAssistantIdx != -1 && _messages[lastAssistantIdx].action == 'error';
+
+    if (!latestIsStillError && _chilluController.state == ChilluState.confused) {
+      final returnState = (_inputFocusNode.hasFocus || _textController.text.trim().isNotEmpty)
+          ? ChilluState.attentive
+          : ChilluState.idle;
+      if (returnState == ChilluState.attentive) {
+        _chilluController.attentive();
+      } else {
+        _chilluController.idle();
+      }
+    }
   }
 
   Future<void> _handleSend({
@@ -446,12 +473,20 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         }
       }
 
+      final bool isAiError = _isAiResponseError(
+        action: action,
+        response: response,
+        assistantText: assistantText,
+      );
+
+      final String effectiveAction = isAiError ? 'error' : action;
+
       final assistantMessage = AiChatMessage(
         id: 'msg_ai_${DateTime.now().millisecondsSinceEpoch}',
         text: assistantText,
         isUser: false,
         timestamp: DateTime.now(),
-        action: action,
+        action: effectiveAction,
         requiresConfirmation: requiresConfirmation,
         needsClarification: needsClarification,
         clarifyingQuestion: clarifyingQuestion,
@@ -469,10 +504,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           ? ChilluState.attentive
           : ChilluState.idle;
 
-      if (needsClarification ||
-          action == 'need_clarification' ||
-          action == 'clarify') {
-        _chilluController.confused(returnState: returnState);
+      if (isAiError) {
+        // Trigger persistent Confused state when AI response fails
+        _chilluController.confused(persistent: true);
         ChilluSoundController.instance.playConfusedBoop();
       } else if (meal != null ||
           action == 'meal_recommendation' ||
@@ -488,7 +522,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       }
     } catch (e) {
       debugPrint('[AiAssistantScreen] Error processing send request: $e');
-      _chilluController.idle();
+      _chilluController.confused(persistent: true);
+      ChilluSoundController.instance.playConfusedBoop();
       if (mounted) {
         setState(() {
           _messages.add(AiChatMessage(
@@ -509,6 +544,31 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         _scrollToBottom();
       }
     }
+  }
+
+  /// Determines whether an AI response indicates a failure/error.
+  bool _isAiResponseError({
+    required String action,
+    required Map<String, dynamic> response,
+    required String assistantText,
+  }) {
+    if (action == 'error') return true;
+    if (response['ok'] == false || response['success'] == false) return true;
+    if (response['error'] != null && response['error'].toString().trim().isNotEmpty) return true;
+
+    final lower = assistantText.toLowerCase().trim();
+    if (lower.isEmpty) return true;
+
+    if (lower.contains('no response from ai')) return true;
+    if (lower.contains('timed out') || lower.contains('time out')) return true;
+    if (lower.contains('failed to receive an ai response') || lower.contains('failed to get a response')) return true;
+    if (lower.contains('service temporarily unavailable') || lower.contains('ai service unavailable') || lower.contains('service unavailable')) return true;
+    if (lower.contains('response generation failed') || lower.contains('generation failed')) return true;
+    if (lower.contains('unable to reach nutrifridge ai') || lower.contains('unable to reach ai')) return true;
+    if (lower.contains('received an empty response')) return true;
+    if (lower.contains('could not verify your session') || lower.contains('user not authenticated')) return true;
+
+    return false;
   }
 
   bool _isFullRecipeRequest(String prompt) {
@@ -2121,22 +2181,42 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                 _buildClarificationCard(message.clarifyingQuestion!),
               ],
 
-              // Embedded Error Retry Action
+              // Embedded Error Retry & Dismiss Actions
               if (message.action == 'error') ...[
                 const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _isSending ? null : _retryLastUserMessage,
-                  icon: const Icon(Icons.refresh_rounded, size: 16, color: AppColors.error),
-                  label: const Text(
-                    'Retry',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.error),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFEF2F2),
-                    side: const BorderSide(color: Color(0xFFFECACA)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _isSending ? null : _retryLastUserMessage,
+                      icon: const Icon(Icons.refresh_rounded, size: 16, color: AppColors.error),
+                      label: const Text(
+                        'Retry',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.error),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFEF2F2),
+                        side: const BorderSide(color: Color(0xFFFECACA)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: _isSending ? null : () => _dismissErrorMessage(message),
+                      icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.neutralMedium),
+                      label: const Text(
+                        'Dismiss',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.neutralMedium),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF9FAFB),
+                        side: const BorderSide(color: Color(0xFFE5E7EB)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ],

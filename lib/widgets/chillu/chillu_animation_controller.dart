@@ -202,8 +202,26 @@ class ChilluAnimationController extends ChangeNotifier {
       triggerState(ChilluState.celebrating, duration: duration, returnState: returnState);
 
   /// Triggers curious Confused reaction.
-  void confused({Duration? duration, ChilluState returnState = ChilluState.idle}) =>
-      triggerState(ChilluState.confused, duration: duration, returnState: returnState);
+  /// If [persistent] is true, Chillu remains in Confused state until explicitly transitioned
+  /// (e.g. while an AI response error remains active).
+  void confused({
+    Duration? duration,
+    ChilluState returnState = ChilluState.idle,
+    bool persistent = false,
+  }) {
+    if (_state == ChilluState.confused && _transientResetTimer == null && persistent) {
+      // Already in persistent Confused state; do not restart repeatedly for the same error
+      return;
+    }
+    if (persistent) {
+      _transientResetTimer?.cancel();
+      _transientResetTimer = null;
+      _state = ChilluState.confused;
+      notifyListeners();
+      return;
+    }
+    triggerState(ChilluState.confused, duration: duration, returnState: returnState);
+  }
 
   /// Triggers recipe found excited reaction (legacy alias for excited).
   void recipeFound({Duration? duration, ChilluState returnState = ChilluState.idle}) =>

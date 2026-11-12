@@ -472,5 +472,116 @@ void main() {
 
       controller.dispose();
     });
+
+    testWidgets('AI Response Error scenarios trigger persistent Confused state and follow transition flow', (WidgetTester tester) async {
+      final controller = ChilluAnimationController();
+
+      // SCENARIO 1: "No response from AI" triggers Confused state
+      controller.think();
+      expect(controller.state, ChilluState.thinking);
+
+      // AI response error occurs: Thinking -> Confused
+      controller.confused(persistent: true);
+      expect(controller.state, ChilluState.confused);
+
+      // Verify Confused state is persistent (does not auto-reset back to idle after 2.5s)
+      await tester.pump(const Duration(milliseconds: 2500));
+      expect(controller.state, ChilluState.confused);
+
+      // SCENARIO 2: AI request times out -> Confused (prevent duplicate restart)
+      controller.confused(persistent: true);
+      expect(controller.state, ChilluState.confused);
+
+      // SCENARIO 3: AI service becomes unavailable -> Confused
+      controller.confused(persistent: true);
+      expect(controller.state, ChilluState.confused);
+
+      // SCENARIO 6: User starts typing a new request -> Confused to Attentive
+      controller.attentive();
+      expect(controller.state, ChilluState.attentive);
+
+      // SCENARIO 5: User retries after an error -> Thinking
+      controller.think();
+      expect(controller.state, ChilluState.thinking);
+
+      // SCENARIO 4: Successful AI response -> No Confused reaction (Happy/Excited)
+      controller.happy();
+      expect(controller.state, ChilluState.happy);
+      expect(controller.state != ChilluState.confused, isTrue);
+
+      // Dismissed / completed -> Idle
+      controller.idle();
+      expect(controller.state, ChilluState.idle);
+
+      controller.dispose();
+    });
+
+    testWidgets('Chat avatars: latest avatar and mascot synchronize Confused while older avatars remain static', (WidgetTester tester) async {
+      final sharedController = ChilluAnimationController();
+
+      // Mount 3 avatars:
+      // 1. Hero / Main Mascot (110px)
+      // 2. Older assistant avatar (46px, disableAnimations: true, controller: null)
+      // 3. Latest assistant avatar (46px, disableAnimations: false, controller: sharedController)
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                ChilluMascot(
+                  controller: sharedController,
+                  size: 110,
+                ),
+                ChilluMascot(
+                  controller: null,
+                  disableAnimations: true,
+                  size: 46,
+                  showShadow: false,
+                ),
+                ChilluMascot(
+                  controller: sharedController,
+                  disableAnimations: false,
+                  size: 46,
+                  showShadow: false,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      expect(sharedController.state, ChilluState.idle);
+
+      // AI enters Thinking
+      sharedController.think();
+      await tester.pump();
+      expect(sharedController.state, ChilluState.thinking);
+
+      // AI response fails -> Thinking -> Confused
+      sharedController.confused(persistent: true);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(sharedController.state, ChilluState.confused);
+
+      // Both hero mascot and latest avatar share sharedController in Confused state
+      expect(find.byType(ChilluMascot), findsNWidgets(3));
+
+      // After settling, Confused state remains active while error is latest
+      await tester.pump(const Duration(milliseconds: 2000));
+      expect(sharedController.state, ChilluState.confused);
+
+      // User retries -> Thinking
+      sharedController.think();
+      await tester.pump();
+      expect(sharedController.state, ChilluState.thinking);
+
+      // Error dismissed -> Idle
+      sharedController.idle();
+      await tester.pump();
+      expect(sharedController.state, ChilluState.idle);
+
+      sharedController.dispose();
+    });
   });
 }
