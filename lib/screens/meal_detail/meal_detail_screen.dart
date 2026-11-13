@@ -1267,7 +1267,8 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
                 ),
                 const SizedBox(height: 16),
                 OutlinedButton(
-                  onPressed: () => _fetchPreparationSteps(meal),
+                  key: const ValueKey('generate_steps_btn'),
+                  onPressed: _isLoadingSteps ? null : () => _fetchPreparationSteps(meal),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primaryForest,
                     side: const BorderSide(color: Color(0xFFD4E7D9), width: 1.2),
@@ -1557,38 +1558,45 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
   // 6. ACTION BUTTONS AT END OF SCROLL
   // ==========================================
   Widget _buildActionButtons(BuildContext context, MealDetailInfo meal) {
+    // Start Cooking appears ONLY when preparation steps have been generated and are non-empty
+    final hasValidSteps = !_isLoadingSteps &&
+        _stepsError == null &&
+        meal.preparationSteps.isNotEmpty;
+
     return SafeArea(
       top: false,
       child: Center(
         child: Column(
           children: [
-            // Primary Action: Start Cooking
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton.icon(
-                key: const ValueKey('start_cooking_btn'),
-                onPressed: () => _openGuidedCooking(meal),
-                icon: const Icon(Icons.outdoor_grill_rounded, size: 20),
-                label: const Text(
-                  'Start Cooking',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.2,
+            // Primary Action: Start Cooking (Only when preparation steps exist)
+            if (hasValidSteps) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton.icon(
+                  key: const ValueKey('start_cooking_btn'),
+                  onPressed: () => _openGuidedCooking(meal),
+                  icon: const Icon(Icons.outdoor_grill_rounded, size: 20),
+                  label: const Text(
+                    'Start Cooking',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.2,
+                    ),
                   ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryForest,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(26),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryForest,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(26),
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
+            ],
             // Secondary Action: Log Meal Directly
             SizedBox(
               width: double.infinity,

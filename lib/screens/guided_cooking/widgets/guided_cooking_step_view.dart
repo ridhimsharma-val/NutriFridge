@@ -63,6 +63,7 @@ class GuidedCookingStepView extends StatelessWidget {
     final parsedInstruction = StepInstructionParser.parse(
       rawInstruction: step.instruction,
       stepNumber: step.stepNumber,
+      structuredTitle: step.title,
     );
 
     final isFirstStep = currentStepIndex == 0;
@@ -90,21 +91,6 @@ class GuidedCookingStepView extends StatelessWidget {
           ),
         ),
         centerTitle: true,
-        actions: [
-          TextButton.icon(
-            onPressed: onBackToPrep,
-            icon: const Icon(Icons.checklist_rounded, size: 18, color: AppColors.primaryForest),
-            label: const Text(
-              'Prep',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primaryForest,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(4),
           child: TweenAnimationBuilder<double>(
@@ -366,6 +352,7 @@ class GuidedCookingStepView extends StatelessWidget {
           Text(
             parsed.actionHeading.toUpperCase(),
             key: const ValueKey('step_action_heading'),
+            softWrap: true,
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
