@@ -9,7 +9,9 @@ import '../../services/meals/meal_tracking_service.dart';
 import '../../services/meals/models/meal_models.dart';
 import 'models/detected_food_item.dart';
 import 'models/meal_nutrition_estimate.dart';
+import 'models/cinematic_meal_data.dart';
 import 'services/fridge_inventory_service.dart';
+import 'widgets/cinematic_meal_logging_reveal_screen.dart';
 
 /// Screen 3 of the Log Meal flow: Nutrition Review & Fridge Inventory Adjustment.
 class MealNutritionReviewScreen extends StatefulWidget {
@@ -260,29 +262,30 @@ class _MealNutritionReviewScreenState extends State<MealNutritionReviewScreen> {
 
       if (!mounted) return;
 
-      // 3. Navigate back to Dashboard
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      }
-
       if (mounted) {
         setState(() {
           _isLogging = false;
         });
       }
 
-      // 4. Show friendly confirmation
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            'Meal logged successfully.',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          backgroundColor: AppColors.textPrimary,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          duration: const Duration(seconds: 3),
+      // 3. Show Cinematic Meal Logging & Nutrition Reveal Screen
+      final ingredientsList = widget.detectedFoods
+          .map((f) => '${f.name} (${f.formattedQuantity})')
+          .toList();
+
+      CinematicMealLoggingRevealScreen.show(
+        context,
+        mealData: CinematicMealData.fromNutritionEstimate(
+          mealName: _mealName.trim(),
+          nutrition: nutrition,
+          ingredients: ingredientsList,
+          mealType: _selectedMealType,
         ),
+        onDone: () {
+          if (context.mounted && Navigator.of(context).canPop()) {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          }
+        },
       );
     } catch (e) {
       if (!mounted) return;

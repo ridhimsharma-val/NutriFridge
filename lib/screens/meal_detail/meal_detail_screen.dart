@@ -17,6 +17,8 @@ import '../food_image/food_image_picker_sheet.dart';
 import '../../services/food_image/food_image_model.dart';
 import '../../services/food_image/food_image_service.dart';
 import '../../services/chillu/chillu_sound_controller.dart';
+import '../log_meal/models/cinematic_meal_data.dart';
+import '../log_meal/widgets/cinematic_meal_logging_reveal_screen.dart';
 
 /// Comprehensive, Data-Driven Recipe Experience — Meal Detail Page.
 /// Features authentic food photography, per-serving nutrition with transparent provenance,
@@ -161,33 +163,26 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
 
       if (!mounted) return;
 
-      // 5. Show clear success confirmation
+      // 5. Show clear success confirmation via Cinematic Meal Logging & Nutrition Reveal
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  isDuplicate
-                      ? 'Meal was already logged with this transaction.'
-                      : 'Logged ${meal.name}${meal.calories != null ? " (+${meal.calories} kcal)" : ""} to Today\'s Meals!',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: AppColors.primaryForest,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          duration: const Duration(seconds: 3),
-        ),
-      );
 
-      // 6. Navigate back to dashboard
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      if (!isDuplicate) {
+        CinematicMealLoggingRevealScreen.show(
+          context,
+          mealData: CinematicMealData.fromMealDetail(
+            meal: meal,
+            mealType: cleanMealType,
+          ),
+          onDone: () {
+            if (context.mounted) {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            }
+          },
+        );
+      } else {
+        // In duplicate cases, simply navigate back without relaunching animation
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {

@@ -16,6 +16,8 @@ import '../meal_detail/models/meal_ai_context.dart';
 import '../../services/chillu/chillu_sound_controller.dart';
 import '../../widgets/chillu/chillu_animation_controller.dart';
 import '../../widgets/chillu/chillu_mascot.dart';
+import '../log_meal/models/cinematic_meal_data.dart';
+import '../log_meal/widgets/cinematic_meal_logging_reveal_screen.dart';
 
 /// Full-featured, interactive AI Assistant screen for NutriFridge.
 /// Acts as the single primary entry point for natural-language food addition,
@@ -1732,27 +1734,19 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
     ChilluSoundController.instance.playCelebrating();
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  deductedCount > 0
-                      ? 'Logged $name! +$calories kcal, and deducted $deductedCount ingredients from fridge.'
-                      : 'Logged $name! +$calories kcal, +${protein}g protein.',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: AppColors.forestGreen,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          duration: const Duration(seconds: 3),
+      CinematicMealLoggingRevealScreen.show(
+        context,
+        mealData: CinematicMealData.fromAiAssistant(
+          mealName: name,
+          nutritionMap: nutrition,
+          ingredients: ingredients,
+          mealType: formattedType,
         ),
+        onDone: () {
+          if (context.mounted && Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          }
+        },
       );
     }
   }
