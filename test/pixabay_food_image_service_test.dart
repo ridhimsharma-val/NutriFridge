@@ -981,5 +981,185 @@ void main() {
       // Verify broccoli emoji 🥦 is NOT rendered for brinjal
       expect(find.text('🥦'), findsNothing);
     });
+
+    test('Cauliflower and Cabbage resolve independently to their own distinct photographs and never use carrot', () async {
+      FoodImageResolver.mockHandler = (body) async {
+        if (body['query'] == 'cauliflower') {
+          return {
+            'ok': true,
+            'action': 'resolve',
+            'bestMatch': {
+              'photoId': '10005684',
+              'imageUrl': 'https://pixabay.com/get/ge3e4b61acb134406_640.jpg',
+              'thumbnailUrl': 'https://cdn.pixabay.com/photo/2025/12/10/07/18/07-18-14-876_150.jpg',
+              'photographerName': 'VegArtist',
+              'altDescription': 'Fresh white cauliflower head',
+              'provider': 'pixabay',
+              'score': 100,
+            },
+          };
+        } else if (body['query'] == 'cabbage') {
+          return {
+            'ok': true,
+            'action': 'resolve',
+            'bestMatch': {
+              'photoId': '3722517',
+              'imageUrl': 'https://pixabay.com/get/g6ea4494101e40a0c_640.jpg',
+              'thumbnailUrl': 'https://cdn.pixabay.com/photo/2018/10/03/22/08/kohl-3722517_150.jpg',
+              'photographerName': 'CabbagePhotographer',
+              'altDescription': 'Fresh green white cabbage leaf',
+              'provider': 'pixabay',
+              'score': 100,
+            },
+          };
+        }
+        return {'ok': false, 'bestMatch': null};
+      };
+
+      // 1. Resolve Cauliflower
+      final cauliflower = await FoodImageService.instance.resolveImage(
+        name: 'Cauliflower',
+        type: FoodEntityType.ingredient,
+        category: 'Vegetables',
+      );
+      expect(cauliflower.entityKey, 'cauliflower');
+      // Verifies conversion of pixabay.com/get/ into direct cdn.pixabay.com 640px URL
+      expect(cauliflower.imageUrl, 'https://cdn.pixabay.com/photo/2025/12/10/07/18/07-18-14-876_640.jpg');
+      expect(cauliflower.imageUrl.contains('carrot'), isFalse);
+      expect(cauliflower.imageUrl.contains('pixabay.com/get/'), isFalse);
+
+      // 2. Resolve Cabbage
+      final cabbage = await FoodImageService.instance.resolveImage(
+        name: 'Cabbage',
+        type: FoodEntityType.ingredient,
+        category: 'Vegetables',
+      );
+      expect(cabbage.entityKey, 'cabbage');
+      expect(cabbage.imageUrl, 'https://cdn.pixabay.com/photo/2018/10/03/22/08/kohl-3722517_640.jpg');
+      expect(cabbage.imageUrl.contains('carrot'), isFalse);
+      expect(cabbage.imageUrl.contains('pixabay.com/get/'), isFalse);
+      expect(cabbage.imageUrl, isNot(equals(cauliflower.imageUrl)));
+
+      // 3. Resolve Carrot (Priority 3 exact curated local asset)
+      final carrot = await FoodImageService.instance.resolveImage(
+        name: 'Carrot',
+        type: FoodEntityType.ingredient,
+        category: 'Vegetables',
+      );
+      expect(carrot.entityKey, 'carrot');
+      expect(carrot.imageUrl, 'assets/images/foods/carrot.png');
+
+      // 4. Verify emojis in FoodItemAssetRegistry
+      expect(FoodItemAssetRegistry.getEmojiForItem('Cauliflower', 'Vegetables'), '🥦');
+      expect(FoodItemAssetRegistry.getEmojiForItem('Cabbage', 'Vegetables'), '🥬');
+      expect(FoodItemAssetRegistry.getEmojiForItem('Carrot', 'Vegetables'), '🥕');
+      expect(FoodItemAssetRegistry.getEmojiForItem('RandomVeg', 'Vegetables'), '🥬');
+    });
+
+    testWidgets('CategoryBottomSheet renders Cauliflower, Cabbage, and Carrot together without cross-contamination', (tester) async {
+      tester.view.physicalSize = const Size(600, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      FoodImageResolver.mockHandler = (body) async {
+        if (body['query'] == 'cauliflower') {
+          return {
+            'ok': true,
+            'action': 'resolve',
+            'bestMatch': {
+              'photoId': '10005684',
+              'imageUrl': 'https://cdn.pixabay.com/photo/cauliflower_640.jpg',
+              'thumbnailUrl': 'https://cdn.pixabay.com/photo/cauliflower_150.jpg',
+              'photographerName': 'VegArtist',
+              'provider': 'pixabay',
+              'score': 100,
+            },
+          };
+        } else if (body['query'] == 'cabbage') {
+          return {
+            'ok': true,
+            'action': 'resolve',
+            'bestMatch': {
+              'photoId': '3722517',
+              'imageUrl': 'https://cdn.pixabay.com/photo/cabbage_640.jpg',
+              'thumbnailUrl': 'https://cdn.pixabay.com/photo/cabbage_150.jpg',
+              'photographerName': 'CabbagePhotographer',
+              'provider': 'pixabay',
+              'score': 100,
+            },
+          };
+        }
+        return {'ok': false, 'bestMatch': null};
+      };
+
+      final items = [
+        const CategoryFoodItem(
+          id: 'veg_2',
+          name: 'Carrot',
+          quantity: '500 g',
+          expiryDays: 7,
+          imageAsset: 'assets/images/foods/carrot.png',
+          iconEmoji: '🥕',
+          category: 'Vegetables',
+        ),
+        const CategoryFoodItem(
+          id: 'veg_6',
+          name: 'Cauliflower',
+          quantity: '1 piece',
+          expiryDays: 4,
+          iconEmoji: '🥦',
+          category: 'Vegetables',
+        ),
+        const CategoryFoodItem(
+          id: 'veg_7',
+          name: 'Cabbage',
+          quantity: '1 piece',
+          expiryDays: 6,
+          iconEmoji: '🥬',
+          category: 'Vegetables',
+        ),
+      ];
+
+      final category = CategoryData(
+        id: 'vegetables',
+        name: 'Vegetables',
+        iconEmoji: '🥕',
+        items: items,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: CategoryBottomSheet(
+              category: category,
+              isSelectionMode: false,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // All 3 items rendered
+      expect(find.text('Carrot'), findsOneWidget);
+      expect(find.text('Cauliflower'), findsOneWidget);
+      expect(find.text('Cabbage'), findsOneWidget);
+
+      // Verify resolved models
+      final carrotModel = FoodImageService.instance.getImageSync(name: 'Carrot', type: FoodEntityType.ingredient, category: 'Vegetables');
+      final cauliModel = FoodImageService.instance.getImageSync(name: 'Cauliflower', type: FoodEntityType.ingredient, category: 'Vegetables');
+      final cabbageModel = FoodImageService.instance.getImageSync(name: 'Cabbage', type: FoodEntityType.ingredient, category: 'Vegetables');
+
+      expect(carrotModel.imageUrl, 'assets/images/foods/carrot.png');
+      expect(cauliModel.imageUrl, 'https://cdn.pixabay.com/photo/cauliflower_640.jpg');
+      expect(cabbageModel.imageUrl, 'https://cdn.pixabay.com/photo/cabbage_640.jpg');
+
+      // Ensure cauliflower and cabbage do NOT contain carrot in their image URL
+      expect(cauliModel.imageUrl.contains('carrot'), isFalse);
+      expect(cabbageModel.imageUrl.contains('carrot'), isFalse);
+    });
   });
 }

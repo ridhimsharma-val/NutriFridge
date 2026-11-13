@@ -718,9 +718,13 @@ serve(async (req: Request) => {
       }
 
       // Webformat (~640px) is ideal for inventory and cards; largeImageURL (~1280px) for recipe hero
-      const primaryUrl = entityType === 'recipe'
+      let primaryUrl = entityType === 'recipe'
         ? (p.largeImageURL || p.webformatURL)
         : (p.webformatURL || p.largeImageURL);
+
+      if (primaryUrl && primaryUrl.includes('pixabay.com/get/') && p.previewURL && p.previewURL.includes('cdn.pixabay.com/photo/')) {
+        primaryUrl = p.previewURL.replace(/_(150|60)\./, entityType === 'recipe' ? '_1280.' : '_640.');
+      }
 
       candidates.push({
         photoId: pid,

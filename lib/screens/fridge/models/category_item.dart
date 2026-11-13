@@ -422,6 +422,8 @@ class FoodItemAssetRegistry {
     if (clean.contains('brinjal') || clean.contains('eggplant') || clean.contains('aubergine')) {
       return '🍆';
     }
+    if (clean.contains('cauliflower')) return '🥦';
+    if (clean.contains('cabbage')) return '🥬';
     if (clean.contains('watermelon')) return '🍉';
     if (clean.contains('peach')) return '🍑';
     if (clean.contains('apple') && !clean.contains('pineapple')) return '🍎';
@@ -437,7 +439,10 @@ class FoodItemAssetRegistry {
     if (clean.contains('egg')) return '🥚';
     if (clean.contains('chicken')) return '🍗';
     if (clean.contains('fish')) return '🐟';
-    if (category != null) return getEmojiForCategory(category);
+    if (category != null) {
+      if (category.toLowerCase().contains('veg')) return '🥬';
+      return getEmojiForCategory(category);
+    }
     return '🍽️';
   }
 }
@@ -809,6 +814,22 @@ class FridgeCategoryRepository {
           quantity: '500 g',
           expiryDays: 5,
           iconEmoji: '🍆',
+          category: 'Vegetables',
+        ),
+        const CategoryFoodItem(
+          id: 'veg_6',
+          name: 'Cauliflower',
+          quantity: '1 piece',
+          expiryDays: 4,
+          iconEmoji: '🥦',
+          category: 'Vegetables',
+        ),
+        const CategoryFoodItem(
+          id: 'veg_7',
+          name: 'Cabbage',
+          quantity: '1 piece',
+          expiryDays: 6,
+          iconEmoji: '🥬',
           category: 'Vegetables',
         ),
       ],

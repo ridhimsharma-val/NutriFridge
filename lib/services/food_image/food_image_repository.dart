@@ -64,17 +64,17 @@ class FoodImageRepository {
       final overrideKey = _cacheKey(type, entityKey, effectiveUserId);
       if (_memoryCache.containsKey(overrideKey)) {
         final m = _memoryCache[overrideKey];
-        if (m != null && !m.isPlaceholder) return m;
+        if (m != null && !m.isPlaceholder && !m.imageUrl.contains('pixabay.com/get/')) return m;
       }
       final localUserKey = _cacheKey(type, entityKey, 'local_user');
       if (_memoryCache.containsKey(localUserKey)) {
         final m = _memoryCache[localUserKey];
-        if (m != null && !m.isPlaceholder) return m;
+        if (m != null && !m.isPlaceholder && !m.imageUrl.contains('pixabay.com/get/')) return m;
       }
     }
     final sharedKey = _cacheKey(type, entityKey);
     final m = _memoryCache[sharedKey];
-    if (m != null && !m.isPlaceholder) return m;
+    if (m != null && !m.isPlaceholder && !m.imageUrl.contains('pixabay.com/get/')) return m;
     return null;
   }
 
@@ -179,6 +179,10 @@ class FoodImageRepository {
 
       if (response != null) {
         final model = FoodImageModel.fromJson(response);
+        if (model.imageUrl.contains('pixabay.com/get/')) {
+          // Hotlink-blocked URL from legacy record; bypass so fresh CDN resolution runs
+          return null;
+        }
         putInMemoryCache(model);
         return model;
       }
@@ -468,13 +472,31 @@ class FoodImageRepository {
       if (existingJson != null) {
         final Map<String, dynamic> cacheMap =
             Map<String, dynamic>.from(jsonDecode(existingJson) as Map);
+        bool needsPruning = false;
+        final keysToRemove = <String>[];
+
         for (final entry in cacheMap.entries) {
           if (entry.value is Map) {
-            final model = FoodImageModel.fromJson(Map<String, dynamic>.from(entry.value as Map));
-            if (!model.isPlaceholder) {
+            final valMap = entry.value as Map;
+            final rawUrl = (valMap['image_url'] ?? valMap['imageUrl'] ?? '').toString();
+            if (rawUrl.contains('pixabay.com/get/')) {
+              keysToRemove.add(entry.key);
+              needsPruning = true;
+              continue;
+            }
+
+            final model = FoodImageModel.fromJson(Map<String, dynamic>.from(valMap));
+            if (!model.isPlaceholder && !model.imageUrl.contains('pixabay.com/get/')) {
               putInMemoryCache(model);
             }
           }
+        }
+
+        if (needsPruning) {
+          for (final k in keysToRemove) {
+            cacheMap.remove(k);
+          }
+          await prefs.setString(_kLocalCacheKey, jsonEncode(cacheMap));
         }
       }
     } catch (_) {}

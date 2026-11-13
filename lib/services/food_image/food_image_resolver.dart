@@ -88,6 +88,9 @@ class FoodImageResolver {
       if (canonical == 'blueberry') return 'fresh blueberries fruit';
       if (canonical == 'strawberry') return 'fresh strawberries fruit';
       if (canonical == 'broccoli') return 'whole broccoli';
+      if (canonical == 'cauliflower') return 'fresh whole cauliflower vegetable';
+      if (canonical == 'cabbage') return 'fresh cabbage vegetable';
+      if (canonical == 'carrot') return 'fresh carrot vegetable';
       if (canonical == 'milk') return 'carton of milk';
       if (canonical == 'egg' || canonical == 'eggs') return 'fresh eggs';
       if (canonical == 'paneer') return 'fresh paneer';

@@ -40,10 +40,18 @@ class FoodImageCandidate {
 
   factory FoodImageCandidate.fromJson(Map<String, dynamic> json) {
     final prov = (json['provider'] ?? 'pixabay').toString();
+    String imgUrl = (json['imageUrl'] ?? json['image_url'] ?? '').toString();
+    final thumbUrl = (json['thumbnailUrl'] ?? json['thumbnail_url'] ?? json['imageUrl'] ?? '').toString();
+
+    // Convert hotlink-protected pixabay.com/get/ URLs to unblocked cdn.pixabay.com direct CDN URLs
+    if (imgUrl.contains('pixabay.com/get/') && thumbUrl.contains('cdn.pixabay.com/photo/')) {
+      imgUrl = thumbUrl.replaceAll(RegExp(r'_(150|60)\.'), '_640.');
+    }
+
     return FoodImageCandidate(
       photoId: (json['photoId'] ?? json['id'] ?? '').toString(),
-      imageUrl: (json['imageUrl'] ?? '').toString(),
-      thumbnailUrl: (json['thumbnailUrl'] ?? json['imageUrl'] ?? '').toString(),
+      imageUrl: imgUrl,
+      thumbnailUrl: thumbUrl,
       photographerName: (json['photographerName'] ?? json['photographer'] ?? json['user'] ?? 'Pixabay Contributor').toString(),
       photographerUrl: (json['photographerUrl'] ?? json['photographer_url'] ?? 'https://pixabay.com').toString(),
       sourcePageUrl: (json['sourcePageUrl'] ?? json['url'] ?? json['pageURL'] ?? 'https://pixabay.com').toString(),
@@ -168,12 +176,18 @@ class FoodImageModel {
   }
 
   factory FoodImageModel.fromJson(Map<String, dynamic> json) {
+    String imgUrl = (json['image_url'] ?? json['imageUrl'] ?? '').toString();
+    final thumbUrl = (json['thumbnail_url'] ?? json['thumbnailUrl'] ?? '').toString();
+    if (imgUrl.contains('pixabay.com/get/') && thumbUrl.contains('cdn.pixabay.com/photo/')) {
+      imgUrl = thumbUrl.replaceAll(RegExp(r'_(150|60)\.'), '_640.');
+    }
+
     return FoodImageModel(
       id: json['id']?.toString(),
       entityType: FoodEntityType.fromString((json['entity_type'] ?? json['entityType'] ?? 'ingredient').toString()),
       entityKey: (json['entity_key'] ?? json['entityKey'] ?? '').toString(),
       displayName: (json['display_name'] ?? json['displayName'] ?? '').toString(),
-      imageUrl: (json['image_url'] ?? json['imageUrl'] ?? '').toString(),
+      imageUrl: imgUrl,
       provider: (json['provider'] ?? 'pixabay').toString(),
       providerPhotoId: json['provider_photo_id']?.toString() ?? json['providerPhotoId']?.toString(),
       photographerName: json['photographer_name']?.toString() ?? json['photographerName']?.toString(),
