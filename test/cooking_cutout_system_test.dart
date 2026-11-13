@@ -311,6 +311,33 @@ void main() {
       expect(fridgeModel.panCutoutUrl, 'https://supabase.nutrifridge.com/food-photos/cutouts/brinjal_alpha.png');
     });
 
+    // Case 11: Cauliflower uses cauliflower imagery and does not fall back to carrot
+    test('Case 11: Cauliflower uses cauliflower imagery and does not fall back to carrot', () async {
+      const cauliflowerPhoto = 'https://cdn.pixabay.com/photo/white_cauliflower.jpg';
+      final cauliflowerModel = FoodImageModel(
+        entityType: FoodEntityType.ingredient,
+        entityKey: 'cauliflower',
+        displayName: 'Cauliflower',
+        imageUrl: cauliflowerPhoto,
+        provider: 'pixabay',
+      );
+      FoodImageRepository.instance.putInMemoryCache(cauliflowerModel);
+
+      const cauliflowerItem = CategoryFoodItem(
+        id: 'cauliflower_item',
+        name: 'Cauliflower',
+        quantity: '1 head',
+        category: 'Vegetables',
+      );
+
+      final res = CookingCutoutResolver.resolveSync(cauliflowerItem);
+
+      // Must use cauliflower imagery (never carrot or unrelated vegetable)
+      expect(res.imagePath, cauliflowerPhoto);
+      expect(res.imagePath, isNot(contains('carrot')));
+      expect(res.canonicalKey, 'cauliflower');
+    });
+
     // Cooking Workspace Widget Tests: CookingPanVisual & CookingIngredientCutoutView
     testWidgets('CookingPanVisual renders transparent cutout for Apple and contained photo for Brinjal', (tester) async {
       tester.view.physicalSize = const Size(600, 1000);
