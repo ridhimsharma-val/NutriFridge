@@ -441,5 +441,99 @@ void main() {
       expect(find.text('280'), findsOneWidget);
       expect(find.text('Done'), findsOneWidget);
     });
+
+    testWidgets('13. UI Refinement: Close button is completely absent',
+        (WidgetTester tester) async {
+      final mealData = CinematicMealData(
+        mealName: 'Fruit Bowl',
+        mealType: 'Breakfast',
+        calories: 150,
+        proteinGrams: 3,
+        carbsGrams: 36,
+        fatGrams: 1,
+        loggedAt: DateTime.now(),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CinematicMealLoggingRevealScreen(
+            mealData: mealData,
+          ),
+        ),
+      );
+
+      await tester.pump(const Duration(milliseconds: 2800));
+      await tester.pumpAndSettle();
+
+      // Top-right close button (X) is absent
+      expect(find.byIcon(Icons.close_rounded), findsNothing);
+      expect(find.byTooltip('Close'), findsNothing);
+      // Done button remains the primary dismissal action
+      expect(find.text('Done'), findsOneWidget);
+    });
+
+    testWidgets('14. UI Refinement: Metadata displays meal type only (no serving quantity, no timestamp)',
+        (WidgetTester tester) async {
+      final mealData = CinematicMealData(
+        mealName: 'Banana Shake',
+        mealType: 'Snack',
+        servingSize: '1 serving',
+        loggedAt: DateTime.now(),
+        calories: 220,
+        proteinGrams: 8,
+        carbsGrams: 35,
+        fatGrams: 4,
+        ingredients: ['Banana', 'Milk'],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CinematicMealLoggingRevealScreen(
+            mealData: mealData,
+          ),
+        ),
+      );
+
+      await tester.pump(const Duration(milliseconds: 2800));
+      await tester.pumpAndSettle();
+
+      // Meal type 'Snack' is displayed
+      expect(find.text('Snack'), findsOneWidget);
+
+      // Serving size and "Logged Just now" are NOT displayed
+      expect(find.textContaining('1 serving'), findsNothing);
+      expect(find.textContaining('Logged Just now'), findsNothing);
+      expect(find.textContaining('Logged at'), findsNothing);
+      expect(find.textContaining('•'), findsNothing);
+    });
+
+    testWidgets('15. UI Refinement: All meal slots (Breakfast, Lunch, Dinner, Snack) format cleanly',
+        (WidgetTester tester) async {
+      for (final slot in ['Breakfast', 'lunch', 'DINNER', 'snack']) {
+        final mealData = CinematicMealData(
+          mealName: 'Sample Food',
+          mealType: slot,
+          calories: 200,
+          proteinGrams: 10,
+          carbsGrams: 20,
+          fatGrams: 5,
+          loggedAt: DateTime.now(),
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: CinematicMealLoggingRevealScreen(
+              mealData: mealData,
+            ),
+          ),
+        );
+
+        await tester.pump(const Duration(milliseconds: 2800));
+        await tester.pumpAndSettle();
+
+        final expected = slot[0].toUpperCase() + slot.substring(1).toLowerCase();
+        expect(find.text(expected), findsOneWidget);
+      }
+    });
   });
 }

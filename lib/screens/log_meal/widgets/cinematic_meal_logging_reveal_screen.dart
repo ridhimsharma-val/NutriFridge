@@ -237,9 +237,6 @@ class _CinematicMealLoggingRevealScreenState
                 if (t >= 0.55) ...[
                   _buildNutritionRevealDetails(t),
                 ],
-
-                // 4. Accessible Close / Dismiss Button at Top Right
-                _buildTopBar(),
               ],
             );
           },
@@ -734,15 +731,12 @@ class _CinematicMealLoggingRevealScreenState
   }
 
   String _buildMealMetadataString() {
-    final parts = <String>[];
-    if (widget.mealData.mealType != null && widget.mealData.mealType!.isNotEmpty) {
-      parts.add(widget.mealData.mealType!);
+    final type = widget.mealData.mealType;
+    if (type != null && type.trim().isNotEmpty) {
+      final clean = type.trim();
+      return clean[0].toUpperCase() + clean.substring(1).toLowerCase();
     }
-    if (widget.mealData.servingSize != null && widget.mealData.servingSize!.isNotEmpty) {
-      parts.add(widget.mealData.servingSize!);
-    }
-    parts.add('Logged ${widget.mealData.formattedLoggedTime}');
-    return parts.join(' • ');
+    return 'Meal';
   }
 
   /// Large Calories Hero Card
@@ -1026,47 +1020,6 @@ class _CinematicMealLoggingRevealScreenState
             fontSize: 16,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.2,
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Top bar with close icon button
-  Widget _buildTopBar() {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              IconButton(
-                icon: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.85),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
-                        blurRadius: 8,
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.close_rounded,
-                    size: 20,
-                    color: AppColors.darkText,
-                  ),
-                ),
-                tooltip: 'Close',
-                onPressed: _handleDone,
-              ),
-            ],
           ),
         ),
       ),
