@@ -253,6 +253,7 @@ void main() {
       // Start Timer
       final startTimerBtn = find.byKey(const ValueKey('start_timer_btn'));
       expect(startTimerBtn, findsOneWidget);
+      await tester.ensureVisible(startTimerBtn);
       await tester.tap(startTimerBtn);
       await tester.pump();
 
@@ -263,6 +264,7 @@ void main() {
       // Pause Timer
       final pauseBtn = find.byKey(const ValueKey('pause_timer_btn'));
       expect(pauseBtn, findsOneWidget);
+      await tester.ensureVisible(pauseBtn);
       await tester.tap(pauseBtn);
       await tester.pump();
 
@@ -273,6 +275,7 @@ void main() {
       // Resume Timer
       final resumeBtn = find.byKey(const ValueKey('resume_timer_btn'));
       expect(resumeBtn, findsOneWidget);
+      await tester.ensureVisible(resumeBtn);
       await tester.tap(resumeBtn);
       await tester.pump();
 
@@ -283,6 +286,7 @@ void main() {
       // Reset Timer
       final resetBtn = find.byKey(const ValueKey('reset_timer_btn'));
       expect(resetBtn, findsOneWidget);
+      await tester.ensureVisible(resetBtn);
       await tester.tap(resetBtn);
       await tester.pump();
 
@@ -309,7 +313,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('05:00'), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('start_timer_btn')));
+      final startBtn = find.byKey(const ValueKey('start_timer_btn'));
+      await tester.ensureVisible(startBtn);
+      await tester.tap(startBtn);
       await tester.pump();
 
       // Elapse 5 seconds on Step 2
@@ -473,7 +479,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('next_step_btn')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('start_timer_btn')));
+      final timerBtn = find.byKey(const ValueKey('start_timer_btn'));
+      await tester.ensureVisible(timerBtn);
+      await tester.tap(timerBtn);
       await tester.pump(const Duration(seconds: 5));
       await tester.tap(find.byKey(const ValueKey('next_step_btn')));
       await tester.pumpAndSettle();
@@ -486,6 +494,177 @@ void main() {
           .toList();
 
       expect(inventoryAfter, equals(inventoryBefore));
+    });
+
+    // 12. No bottom overflow at 320px, 360px, 390px, 430px viewport widths
+    testWidgets('12. No bottom overflow at 320px, 360px, 390px and 430px viewport widths', (WidgetTester tester) async {
+      final widths = [320.0, 360.0, 390.0, 430.0];
+
+      for (final width in widths) {
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        tester.view.physicalSize = Size(width, 700.0);
+        tester.view.devicePixelRatio = 1.0;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: GuidedCookingScreen(
+              key: UniqueKey(),
+              meal: testMeal,
+              recommendation: testRecommendation,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Advance to step-by-step cooking
+        await tester.tap(find.byKey(const ValueKey('begin_cooking_btn')));
+        await tester.pumpAndSettle();
+
+        // Previous and Next buttons must be visible
+        expect(find.byKey(const ValueKey('previous_step_btn')), findsOneWidget);
+        expect(find.byKey(const ValueKey('next_step_btn')), findsOneWidget);
+
+        expect(tester.takeException(), isNull);
+
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      }
+    });
+
+    // 13. No bottom overflow at different supported screen heights
+    testWidgets('13. No bottom overflow at different supported screen heights (568, 667, 800, 926)', (WidgetTester tester) async {
+      final heights = [568.0, 667.0, 800.0, 926.0];
+
+      for (final height in heights) {
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        tester.view.physicalSize = Size(375.0, height);
+        tester.view.devicePixelRatio = 1.0;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: GuidedCookingScreen(
+              key: UniqueKey(),
+              meal: testMeal,
+              recommendation: testRecommendation,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const ValueKey('begin_cooking_btn')));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const ValueKey('previous_step_btn')), findsOneWidget);
+        expect(find.byKey(const ValueKey('next_step_btn')), findsOneWidget);
+        expect(tester.takeException(), isNull);
+
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      }
+    });
+
+    // 14. Raw Markdown formatting markers are not displayed and heading is extracted
+    testWidgets('14. Raw Markdown formatting markers are not displayed and heading is extracted', (WidgetTester tester) async {
+      const markdownRecommendation = RecipeRecommendation(
+        id: 'rec_markdown_test',
+        title: 'Peach Yogurt Bowl',
+        imageUrl: 'assets/images/foods/curry.png',
+        calories: 250,
+        proteinGrams: 15,
+        fridgeItemsUsed: 2,
+        requiredIngredients: ['Peaches (2 pieces)', 'Yogurt (1 bowl)'],
+        missingIngredients: [],
+        preparationSteps: [
+          RecipePreparationStep(
+            stepNumber: 1,
+            instruction: '**Assemble the Bowl:** Arrange the peach slices neatly over the yogurt in a fan or circular pattern.',
+          ),
+          RecipePreparationStep(
+            stepNumber: 2,
+            instruction: '### Garnish & Serve\nSprinkle with **chia seeds** and drizzle *honey* lightly.',
+          ),
+        ],
+      );
+
+      final markdownMeal = MealDetailInfo.fromRecommendation(markdownRecommendation);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GuidedCookingScreen(
+            meal: markdownMeal,
+            recommendation: markdownRecommendation,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('begin_cooking_btn')));
+      await tester.pumpAndSettle();
+
+      // Step 1: Heading is extracted as "ASSEMBLE THE BOWL"
+      expect(find.byKey(const ValueKey('step_action_heading')), findsOneWidget);
+      expect(find.text('ASSEMBLE THE BOWL'), findsOneWidget);
+
+      // Clean instruction contains no raw asterisks
+      expect(find.text('Arrange the peach slices neatly over the yogurt in a fan or circular pattern.'), findsOneWidget);
+      expect(find.textContaining('**'), findsNothing);
+
+      // Advance to Step 2
+      await tester.tap(find.byKey(const ValueKey('next_step_btn')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('GARNISH & SERVE'), findsOneWidget);
+      expect(find.text('Sprinkle with chia seeds and drizzle honey lightly.'), findsOneWidget);
+      expect(find.textContaining('###'), findsNothing);
+      expect(find.textContaining('**'), findsNothing);
+      expect(find.textContaining('*honey*'), findsNothing);
+    });
+
+    // 15. Long cooking instructions scroll correctly without clipping footer
+    testWidgets('15. Long cooking instructions scroll correctly without clipping footer', (WidgetTester tester) async {
+      final longStepRecommendation = RecipeRecommendation(
+        id: 'rec_long_step',
+        title: 'Artisan Braised Stew',
+        imageUrl: 'assets/images/foods/curry.png',
+        calories: 450,
+        proteinGrams: 30,
+        fridgeItemsUsed: 1,
+        requiredIngredients: ['Carrots (3 pieces)'],
+        missingIngredients: [],
+        preparationSteps: [
+          RecipePreparationStep(
+            stepNumber: 1,
+            instruction: 'In a large heavy-bottomed Dutch oven, gently heat two tablespoons of extra-virgin olive oil over low heat until shimmering. ' * 10,
+          ),
+        ],
+      );
+
+      final longMeal = MealDetailInfo.fromRecommendation(longStepRecommendation);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GuidedCookingScreen(
+            meal: longMeal,
+            recommendation: longStepRecommendation,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('begin_cooking_btn')));
+      await tester.pumpAndSettle();
+
+      // Footer is still anchored and visible
+      expect(find.byKey(const ValueKey('previous_step_btn')), findsOneWidget);
+      expect(find.byKey(const ValueKey('next_step_btn')), findsOneWidget);
+
+      // Can scroll without overflowing
+      await tester.drag(find.byType(SingleChildScrollView), const Offset(0, -300));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
     });
   });
 }
