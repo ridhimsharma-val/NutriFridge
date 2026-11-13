@@ -7,6 +7,8 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../ai_assistant/services/ai_assistant_service.dart';
 import '../fridge/models/category_item.dart';
+import '../fridge/models/ingredient_addition_data.dart';
+import '../fridge/widgets/cinematic_fridge_addition_screen.dart';
 import 'widgets/food_scan_preview.dart';
 
 class _DetectedItemState {
@@ -203,16 +205,26 @@ class _MultipleFoodsPageState extends State<MultipleFoodsPage> {
       );
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Added ${selected.length} foods to your fridge!'),
-        backgroundColor: AppColors.forestGreen,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    final addedEntities = selected.map((item) {
+      return AddedIngredientItem(
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        category: item.category,
+        expiryDays: item.expiryDays,
+        imageAsset: FoodItemAssetRegistry.getAssetForItem(item.name, item.category),
+      );
+    }).toList();
 
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    CinematicFridgeAdditionScreen.show(
+      context,
+      additionData: IngredientAdditionData.multiple(items: addedEntities),
+      onDone: () {
+        if (context.mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      },
+    );
   }
 
   @override

@@ -18,6 +18,8 @@ import '../../widgets/chillu/chillu_animation_controller.dart';
 import '../../widgets/chillu/chillu_mascot.dart';
 import '../log_meal/models/cinematic_meal_data.dart';
 import '../log_meal/widgets/cinematic_meal_logging_reveal_screen.dart';
+import '../fridge/models/ingredient_addition_data.dart';
+import '../fridge/widgets/cinematic_fridge_addition_screen.dart';
 
 /// Full-featured, interactive AI Assistant screen for NutriFridge.
 /// Acts as the single primary entry point for natural-language food addition,
@@ -1270,6 +1272,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
     try {
       int addedCount = 0;
       final List<Map<String, dynamic>> successfullyAddedItems = [];
+      final List<AddedIngredientItem> addedIngredientEntities = [];
 
       for (final itemJson in message.inventoryItems) {
         final name = itemJson['name'] as String? ?? 'Food Item';
@@ -1293,6 +1296,14 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
           'quantity': qty,
           'unit': unit,
         });
+        addedIngredientEntities.add(AddedIngredientItem(
+          name: name,
+          quantity: qty,
+          unit: unit,
+          category: category,
+          expiryDays: (itemJson['expiryDaysEstimate'] as num?)?.toInt(),
+          imageAsset: imageAsset,
+        ));
       }
 
       if (addedCount == 0 || successfullyAddedItems.isEmpty) {
@@ -1308,29 +1319,13 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
         });
       }
 
-      final successMessage = _generateAdditionSuccessMessage(successfullyAddedItems);
-
       _chilluController.itemAdded();
       ChilluSoundController.instance.playCelebrating();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  successMessage,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: AppColors.forestGreen,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          duration: const Duration(seconds: 3),
+      CinematicFridgeAdditionScreen.show(
+        context,
+        additionData: IngredientAdditionData.multiple(
+          items: addedIngredientEntities,
         ),
       );
     } catch (e) {

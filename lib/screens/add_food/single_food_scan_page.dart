@@ -7,6 +7,8 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../ai_assistant/services/ai_assistant_service.dart';
 import '../fridge/models/category_item.dart';
+import '../fridge/models/ingredient_addition_data.dart';
+import '../fridge/widgets/cinematic_fridge_addition_screen.dart';
 import 'widgets/food_detection_result.dart';
 import 'widgets/food_scan_preview.dart';
 
@@ -163,17 +165,25 @@ class _SingleFoodScanPageState extends State<SingleFoodScanPage> {
       ),
     );
 
-    // Provide feedback and return to fridge/main navigation
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Added $foodName ($quantity) to $category!'),
-        backgroundColor: AppColors.forestGreen,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
+    // Provide cinematic feedback and return to fridge/main navigation
+    final addedItem = AddedIngredientItem(
+      name: foodName,
+      quantityDisplay: quantity,
+      category: category,
+      expiryDays: expiryDays,
+      imageAsset: _previewImage ??
+          FoodItemAssetRegistry.getAssetForItem(foodName, category),
     );
 
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    CinematicFridgeAdditionScreen.show(
+      context,
+      additionData: IngredientAdditionData.single(item: addedItem),
+      onDone: () {
+        if (context.mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      },
+    );
   }
 
   @override
