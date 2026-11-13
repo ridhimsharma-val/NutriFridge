@@ -19,6 +19,7 @@ import '../../services/food_image/food_image_service.dart';
 import '../../services/chillu/chillu_sound_controller.dart';
 import '../log_meal/models/cinematic_meal_data.dart';
 import '../log_meal/widgets/cinematic_meal_logging_reveal_screen.dart';
+import '../guided_cooking/screens/guided_cooking_screen.dart';
 
 /// Comprehensive, Data-Driven Recipe Experience — Meal Detail Page.
 /// Features authentic food photography, per-serving nutrition with transparent provenance,
@@ -50,6 +51,19 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
       'meal-hero-image-${widget.recommendation.title.toLowerCase().replaceAll(RegExp(r'\s+'), '-')}';
 
   String? _idempotencyKey;
+
+  /// Opens the interactive full-screen Guided Cooking Mode
+  void _openGuidedCooking(MealDetailInfo meal) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => GuidedCookingScreen(
+          meal: meal,
+          recommendation: widget.recommendation,
+          onLogMeal: (m) async => _handleLogMeal(m),
+        ),
+      ),
+    );
+  }
 
   /// Directly logs the displayed meal with ingredient deductions and updates reactive repositories
   void _handleLogMeal(MealDetailInfo meal) async {
@@ -1401,6 +1415,31 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
               },
             ),
           ),
+        if (steps.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: OutlinedButton.icon(
+              key: const ValueKey('prep_section_start_cooking_btn'),
+              onPressed: () => _openGuidedCooking(meal),
+              icon: const Icon(Icons.play_circle_outline_rounded, size: 20, color: AppColors.primaryForest),
+              label: const Text(
+                'Start Guided Cooking',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primaryForest,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFFC8E6C9), width: 1.2),
+                backgroundColor: const Color(0xFFF6FAF7),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -1521,29 +1560,61 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
     return SafeArea(
       top: false,
       child: Center(
-        child: SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton(
-            onPressed: _isLogging ? null : () => _handleLogMeal(meal),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryForest,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: AppColors.primaryForest.withValues(alpha: 0.6),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(26),
+        child: Column(
+          children: [
+            // Primary Action: Start Cooking
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                key: const ValueKey('start_cooking_btn'),
+                onPressed: () => _openGuidedCooking(meal),
+                icon: const Icon(Icons.outdoor_grill_rounded, size: 20),
+                label: const Text(
+                  'Start Cooking',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryForest,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(26),
+                  ),
+                ),
               ),
             ),
-            child: Text(
-              _isLogging ? 'Logging...' : 'Log Meal',
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.2,
+            const SizedBox(height: 12),
+            // Secondary Action: Log Meal Directly
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton(
+                key: const ValueKey('direct_log_meal_btn'),
+                onPressed: _isLogging ? null : () => _handleLogMeal(meal),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primaryForest,
+                  side: const BorderSide(color: Color(0xFFC8E6C9), width: 1.4),
+                  backgroundColor: const Color(0xFFF6FAF7),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                ),
+                child: Text(
+                  _isLogging ? 'Logging...' : 'Log Meal Directly',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                  ),
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
