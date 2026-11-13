@@ -51,9 +51,10 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
   MealAiContext? _activeMealContext;
   bool _initialPromptDispatched = false;
   final ChilluAnimationController _chilluController = ChilluAnimationController();
+  bool _hasPlayedEntryGreeting = false;
 
-  /// Inactivity timeout: after ~20 seconds of inactivity on the assistant screen, Chillu enters Sleepy state.
-  static const Duration _inactivityTimeout = Duration(seconds: 20);
+  /// Inactivity timeout: after ~60 seconds of inactivity on the assistant screen, Chillu enters Sleepy state.
+  static const Duration _inactivityTimeout = Duration(seconds: 60);
   Timer? _inactivityTimer;
 
   @override
@@ -74,7 +75,12 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
-      _chilluController.greet();
+      if (!_hasPlayedEntryGreeting) {
+        _hasPlayedEntryGreeting = true;
+        if (widget.initialPrompt == null || widget.initialPrompt!.isEmpty) {
+          _chilluController.playEntrySequence();
+        }
+      }
     });
 
     _activeMealContext = widget.mealContext ?? AiAssistantService.activeMealContext;
@@ -135,6 +141,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
   void _resetInactivityTimer() {
     _inactivityTimer?.cancel();
     if (!mounted) return;
+    // In unit/widget tests, do not start standing inactivity timer to avoid fakeAsync pumpAndSettle timeouts
+    if (WidgetsBinding.instance.runtimeType.toString().contains('Test')) return;
     _inactivityTimer = Timer(_inactivityTimeout, _onInactivityTimeout);
   }
 

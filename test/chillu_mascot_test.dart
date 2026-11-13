@@ -775,5 +775,108 @@ void main() {
       // Neither Sleepy nor Wake-Up calls soundController playback methods
       expect(soundController.isSoundEnabled, isTrue);
     });
+
+    testWidgets('Entry sequence transitions: entryJump (520ms) -> greeting (2000ms) -> idle', (WidgetTester tester) async {
+      final controller = ChilluAnimationController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ChilluMascot(
+              controller: controller,
+              size: 100,
+            ),
+          ),
+        ),
+      );
+
+      // 1. Initial state is idle
+      expect(controller.state, ChilluState.idle);
+
+      // 2. Play entry sequence
+      controller.playEntrySequence();
+      await tester.pump();
+      expect(controller.state, ChilluState.entryJump);
+      expect(find.bySemanticsLabel(RegExp(r'jumping in to say hello')), findsOneWidget);
+
+      // 3. Fast-forward past entry jump (520ms) -> transitions to greeting
+      await tester.pump(const Duration(milliseconds: 530));
+      expect(controller.state, ChilluState.greeting);
+      expect(find.bySemanticsLabel(RegExp(r'waving hello')), findsOneWidget);
+
+      // 4. Fast-forward past greeting (2000ms) -> transitions to idle
+      await tester.pump(const Duration(milliseconds: 2010));
+      expect(controller.state, ChilluState.idle);
+      expect(find.bySemanticsLabel(RegExp(r'happy and waiting')), findsOneWidget);
+
+      controller.dispose();
+    });
+
+    testWidgets('Latest chat avatar synchronizes Greeting while historical avatars remain static', (WidgetTester tester) async {
+      final sharedController = ChilluAnimationController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                // 1. Hero Mascot (110px)
+                ChilluMascot(
+                  controller: sharedController,
+                  size: 110,
+                ),
+                // 2. Historical Assistant Message Avatar (46px, static)
+                const ChilluMascot(
+                  disableAnimations: true,
+                  size: 46,
+                  showShadow: false,
+                ),
+                // 3. Latest Assistant Message Avatar (46px, animated)
+                ChilluMascot(
+                  controller: sharedController,
+                  disableAnimations: false,
+                  size: 46,
+                  showShadow: false,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      expect(sharedController.state, ChilluState.idle);
+
+      // Trigger greeting
+      sharedController.greet();
+      await tester.pump();
+      expect(sharedController.state, ChilluState.greeting);
+
+      // Hero mascot and latest avatar synchronize greeting semantics label
+      expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*waving hello')), findsNWidgets(2));
+      // Historical avatar remains static in idle waiting pose
+      expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*happy and waiting')), findsOneWidget);
+
+      // After 2000ms, both settle back to idle
+      await tester.pump(const Duration(milliseconds: 2050));
+      expect(sharedController.state, ChilluState.idle);
+      // All three (hero + latest + historical) are at rest in idle pose
+      expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*happy and waiting')), findsNWidgets(3));
+
+      sharedController.dispose();
+    });
+
+    test('Audio rule: Greeting is silent; only Excited and Celebrating retain audio', () async {
+      final soundController = ChilluSoundController.instance;
+
+      // Excited and Celebrating play audio
+      await soundController.playExcited();
+      await soundController.playCelebrating();
+
+      // Entry Jump is completely silent
+      await soundController.playEntryJump();
+      // Greeting has no audio method / produces no sound
+      expect(soundController.isSoundEnabled, isTrue);
+    });
   });
 }

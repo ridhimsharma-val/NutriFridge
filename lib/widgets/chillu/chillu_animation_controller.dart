@@ -12,7 +12,10 @@ enum ChilluState {
   /// Active listening posture when voice recording starts.
   listening,
 
-  /// Friendly bounce when greeted or welcomed.
+  /// Cheerful entry hop when the AI Assistant screen is opened.
+  entryJump,
+
+  /// Expressive friendly greeting sequence (upward lift, 3-cycle playful wave, independent sprout bounce, smiling eyes, natural settling).
   greeting,
 
   /// Subtle head/body tilt while formulating thoughts.
@@ -109,6 +112,7 @@ class ChilluAnimationController extends ChangeNotifier {
         return 3;
       case ChilluState.attentive:
       case ChilluState.greeting:
+      case ChilluState.entryJump:
         return 2;
       case ChilluState.idle:
       case ChilluState.sleepy:
@@ -140,8 +144,15 @@ class ChilluAnimationController extends ChangeNotifier {
     final effectiveDuration = duration ?? _defaultDurationForState(newState);
     if (effectiveDuration != null) {
       _transientResetTimer = Timer(effectiveDuration, () {
-        _state = returnState;
-        notifyListeners();
+        _transientResetTimer = null;
+        if (_state == newState) {
+          if (returnState != ChilluState.idle) {
+            triggerState(returnState, returnState: ChilluState.idle);
+          } else {
+            _state = ChilluState.idle;
+            notifyListeners();
+          }
+        }
       });
     }
   }
@@ -161,8 +172,10 @@ class ChilluAnimationController extends ChangeNotifier {
         return const Duration(milliseconds: 2200);
       case ChilluState.itemAdded:
         return const Duration(milliseconds: 2200);
+      case ChilluState.entryJump:
+        return const Duration(milliseconds: 520);
       case ChilluState.greeting:
-        return const Duration(milliseconds: 1600);
+        return const Duration(milliseconds: 2000);
       case ChilluState.idle:
       case ChilluState.attentive:
       case ChilluState.listening:
@@ -232,13 +245,30 @@ class ChilluAnimationController extends ChangeNotifier {
     triggerState(ChilluState.listening, duration: duration);
   }
 
-  /// Triggers friendly greeting bounce.
+  /// Triggers expressive friendly greeting sequence.
   void greet({Duration? duration}) {
     if (_state == ChilluState.sleepy || _isWakingUp) {
       wakeUp(destinationState: ChilluState.greeting);
       return;
     }
     triggerState(ChilluState.greeting, duration: duration);
+  }
+
+  /// Triggers the entry jump (elastic vertical hop).
+  void entryJump({Duration? duration, ChilluState returnState = ChilluState.greeting}) {
+    if (_state == ChilluState.sleepy || _isWakingUp) {
+      wakeUp(destinationState: ChilluState.entryJump);
+      return;
+    }
+    triggerState(ChilluState.entryJump, duration: duration, returnState: returnState);
+  }
+
+  /// Triggers the full entry sequence when user enters the AI Assistant screen:
+  /// 1. Entry Jump plays first (520ms)
+  /// 2. Automatically transitions into Greeting (2000ms)
+  /// 3. After Greeting finishes, transitions into Idle
+  void playEntrySequence() {
+    entryJump(returnState: ChilluState.greeting);
   }
 
   /// Enters thinking state while awaiting assistant reply.
