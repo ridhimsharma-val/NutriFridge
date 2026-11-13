@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../../services/food_image/cooking_cutout_resolver.dart';
 import '../models/category_item.dart';
 import '../services/cooking_basket_service.dart';
 import 'cooking_pan_visual.dart';
@@ -194,12 +195,7 @@ class _FlyingThumbnailWidgetState extends State<_FlyingThumbnailWidget>
         final String? imgAsset = CookingPanVisual.resolvePanAsset(widget.item);
         final bool hasValidImage = (imgAsset != null && imgAsset.isNotEmpty);
         final bool isNetwork = hasValidImage && (imgAsset.startsWith('http://') || imgAsset.startsWith('https://'));
-        final bool isCutout = hasValidImage &&
-            (imgAsset.toLowerCase().endsWith('.png') ||
-                imgAsset.toLowerCase().endsWith('.webp') ||
-                imgAsset.contains('.png') ||
-                imgAsset.contains('.webp') ||
-                imgAsset.contains('food-photos/cutouts'));
+        final bool isCutout = hasValidImage && CookingCutoutResolver.isCutoutAsset(imgAsset);
 
         return Positioned(
           left: x - (currentSize / 2),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../services/food_image/cooking_cutout_resolver.dart';
 import '../models/category_item.dart';
 import '../services/cooking_basket_service.dart';
 import 'cooking_pan_painter.dart';
@@ -188,60 +189,24 @@ class CookingPanVisual extends StatefulWidget {
   }
 
   /// Resolves the dedicated transparent food cutout asset for cooking pan rendering.
-  /// Prioritizes clean transparent PNG cutouts over JPGs with baked-in backgrounds.
+  /// Follows the 3-tier priority:
+  /// 1. Priority 1: Existing transparent PNG/WebP cutout.
+  /// 2. Priority 2: Automatically generated cutout with background removed.
+  /// 3. Priority 3: Exact verified Fridge photograph fallback (never an emoji or unrelated food).
   static String? resolvePanAsset(CategoryFoodItem item) {
-    // 1. Dedicated transparent cutout from item's effectivePanAsset
-    final pan = item.effectivePanAsset;
-    if (pan != null && pan.isNotEmpty) {
-      return pan;
+    // 1. Dedicated transparent cutout or Fridge photograph from CookingCutoutResolver
+    final cutoutResult = CookingCutoutResolver.resolveSync(item);
+    if (cutoutResult.imagePath.isNotEmpty) {
+      return cutoutResult.imagePath;
     }
 
-    // 2. If explicit item points to a transparent PNG/WebP cutout, use it directly
+    // 2. Fallback to explicit item asset
     final explicit = item.imageAsset;
-    if (explicit != null &&
-        explicit.isNotEmpty &&
-        (explicit.toLowerCase().endsWith('.png') || explicit.toLowerCase().endsWith('.webp'))) {
-      return explicit;
-    }
-
-    final cleanName = item.name.trim().toLowerCase();
-
-    // 3. Map food name to dedicated transparent cutout in assets/images/foods/
-    if (cleanName.contains('egg')) return 'assets/images/foods/eggs.png';
-    if (cleanName.contains('chicken')) return 'assets/images/foods/chicken.png';
-    if (cleanName.contains('apple') && !cleanName.contains('juice')) return 'assets/images/foods/apple.png';
-    if (cleanName.contains('banana')) return 'assets/images/foods/banana.png';
-    if (cleanName.contains('tomato')) return 'assets/images/foods/tomato.png';
-    if (cleanName.contains('carrot')) return 'assets/images/foods/carrot.png';
-    if (cleanName.contains('broccoli')) return 'assets/images/foods/broccoli.png';
-    if (cleanName.contains('capsicum') || cleanName.contains('pepper')) return 'assets/images/foods/capsicum.png';
-    if (cleanName.contains('orange') && !cleanName.contains('juice')) return 'assets/images/foods/orange.png';
-    if (cleanName.contains('grape')) return 'assets/images/foods/grapes.png';
-    if (cleanName.contains('milk')) return 'assets/images/foods/milk.png';
-    if (cleanName.contains('paneer') || cleanName.contains('cheese')) return 'assets/images/foods/paneer.png';
-    if (cleanName.contains('butter')) return 'assets/images/foods/butter.png';
-    if (cleanName.contains('curd') || cleanName.contains('yogurt')) return 'assets/images/foods/curd.png';
-    if (cleanName.contains('fish') || cleanName.contains('salmon')) return 'assets/images/foods/fish.png';
-    if (cleanName.contains('bread')) return 'assets/images/foods/bread.png';
-    if (cleanName.contains('pea')) return 'assets/images/foods/peas.png';
-    if (cleanName.contains('corn')) return 'assets/images/foods/frozen_corn.png';
-    if (cleanName.contains('almond')) return 'assets/images/foods/almonds.png';
-    if (cleanName.contains('cashew')) return 'assets/images/foods/cashews.png';
-    if (cleanName.contains('peanut butter')) return 'assets/images/foods/peanut_butter.png';
-    if (cleanName.contains('dry fruit') || cleanName.contains('nuts')) return 'assets/images/foods/dry_fruits_mix.png';
-    if (cleanName.contains('juice')) return 'assets/images/foods/juice.png';
-    if (cleanName.contains('avocado')) return 'assets/images/foods/avocado.png';
-    if (cleanName.contains('lemon')) return 'assets/images/foods/lemon.png';
-
-    // 4. Fallback: if explicit asset has a .png sibling in foods, use it
     if (explicit != null && explicit.isNotEmpty) {
-      if (explicit.endsWith('.jpg')) {
-        return explicit.replaceAll('.jpg', '.png');
-      }
       return explicit;
     }
 
-    return 'assets/images/foods/apple.png';
+    return null;
   }
 
   @override
@@ -518,12 +483,7 @@ class CookingPanVisualState extends State<CookingPanVisual>
     final String? imgAsset = CookingPanVisual.resolvePanAsset(item);
     final bool hasValidImage = (imgAsset != null && imgAsset.isNotEmpty);
     final bool isNetwork = hasValidImage && (imgAsset.startsWith('http://') || imgAsset.startsWith('https://'));
-    final bool isCutout = hasValidImage &&
-        (imgAsset.toLowerCase().endsWith('.png') ||
-            imgAsset.toLowerCase().endsWith('.webp') ||
-            imgAsset.contains('.png') ||
-            imgAsset.contains('.webp') ||
-            imgAsset.contains('food-photos/cutouts'));
+    final bool isCutout = hasValidImage && CookingCutoutResolver.isCutoutAsset(imgAsset);
 
     if (isCutout) {
       // Natural transparent food cutout resting directly on the dark cooking surface

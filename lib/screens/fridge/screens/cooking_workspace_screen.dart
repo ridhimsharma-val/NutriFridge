@@ -6,6 +6,7 @@ import '../../../models/nutrition_data.dart';
 import '../models/category_item.dart';
 import '../services/cooking_basket_service.dart';
 import '../widgets/cooking_pan_visual.dart';
+import '../widgets/cooking_ingredient_cutout_view.dart';
 import '../../home/services/meal_recommendation_service.dart';
 import '../../food_image/widgets/food_image_view.dart';
 import '../../../services/food_image/food_image_model.dart';
@@ -694,15 +695,11 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen>
               width: 24,
               height: 24,
               color: const Color(0xFFF3F7F5),
-              child: FoodImageView(
-                name: item.name,
-                type: FoodEntityType.ingredient,
-                category: item.category,
-                iconEmoji: item.iconEmoji,
+              child: CookingIngredientCutoutView(
+                item: item,
+                width: 24,
+                height: 24,
                 fit: BoxFit.contain,
-                fallbackWidget: Center(
-                  child: Text(item.iconEmoji ?? '🥘', style: const TextStyle(fontSize: 13)),
-                ),
               ),
             ),
           ),
@@ -843,16 +840,11 @@ class _CookingWorkspaceScreenState extends State<CookingWorkspaceScreen>
                                 clipBehavior: Clip.antiAlias,
                                 child: Padding(
                                   padding: const EdgeInsets.all(4),
-                                  child: FoodImageView(
-                                    name: item.name,
-                                    type: FoodEntityType.ingredient,
-                                    category: item.category,
-                                    iconEmoji: item.iconEmoji,
+                                  child: CookingIngredientCutoutView(
+                                    item: item,
+                                    width: 34,
+                                    height: 34,
                                     fit: BoxFit.contain,
-                                    fallbackWidget: Center(
-                                      child: Text(item.iconEmoji ?? '🥘',
-                                          style: const TextStyle(fontSize: 18)),
-                                    ),
                                   ),
                                 ),
                               ),

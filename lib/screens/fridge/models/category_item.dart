@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../models/notification_data.dart';
 import '../../../../services/auth/auth_service.dart';
+import '../../../../services/food_image/cooking_cutout_resolver.dart';
 import '../../../../services/food_image/food_image_model.dart';
 import '../../../../services/food_image/food_image_service.dart';
 import '../../../../services/inventory/fridge_inventory_repository.dart';
@@ -167,21 +168,18 @@ class CategoryFoodItem {
   }
 
   /// Returns the dedicated transparent cutout asset or URL specifically for the Interactive Cooking Pan.
-  /// Never returns a non-transparent rectangular JPG photograph with a baked-in background.
+  /// Follows the 3-tier priority (Existing cutout -> Auto-generated cutout -> Fridge photograph fallback).
   String? get effectivePanAsset {
     // 1. If explicit imageAsset is already a transparent PNG/WebP AND is an exact curated asset
     if (imageAsset != null &&
         imageAsset!.isNotEmpty &&
         FoodItemAssetRegistry.hasExactAsset(name) &&
-        (imageAsset!.toLowerCase().endsWith('.png') || imageAsset!.toLowerCase().endsWith('.webp'))) {
+        CookingCutoutResolver.isCutoutAsset(imageAsset!)) {
       return imageAsset;
     }
 
-    // 2. Lookup dedicated transparent cutout from centralized FoodImageService
-    return FoodImageService.instance.getPanCutoutSync(
-      name: name,
-      category: category,
-    );
+    // 2. Lookup dedicated transparent cutout from centralized CookingCutoutResolver
+    return CookingCutoutResolver.resolveSync(this).imagePath;
   }
 
   /// Soft background color for status tag

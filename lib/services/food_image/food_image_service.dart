@@ -11,6 +11,10 @@ class FoodImageService {
   /// Change notifier broadcasting when an image mapping is updated or overridden
   final ValueNotifier<int> changeNotifier = ValueNotifier<int>(0);
 
+  void notifyListeners() {
+    changeNotifier.value++;
+  }
+
   void _notify() {
     changeNotifier.value++;
   }

@@ -443,6 +443,11 @@ class FoodImageResolver {
     // Trigger async cutout resolution
     resolvePanCutout(name: name, category: category, userId: userId);
 
+    // Priority 3: If verified Fridge photograph is already in cache, return it as fallback
+    if (cached != null && !cached.isPlaceholder && cached.imageUrl.isNotEmpty) {
+      return cached.imageUrl;
+    }
+
     return getCleanTransparentPlaceholder(category);
   }
 
@@ -494,6 +499,11 @@ class FoodImageResolver {
       }
     } catch (e) {
       debugPrint('[FoodImageResolver] Cutout resolution error: $e');
+    }
+
+    // Priority 3: Fallback to exact verified Fridge photograph if available
+    if (saved != null && !saved.isPlaceholder && saved.imageUrl.isNotEmpty) {
+      return saved.imageUrl;
     }
 
     // 5. Fallback clean transparent placeholder (never a photographic rectangular JPG)
@@ -564,6 +574,9 @@ class FoodImageResolver {
   }
 
   /// Dispatches the request to the `food-image` Edge Function with auth credentials or mock override.
+  Future<Map<String, dynamic>> invokeEdgeFunction(Map<String, dynamic> body) =>
+      _invokeEdgeFunction(body);
+
   Future<Map<String, dynamic>> _invokeEdgeFunction(Map<String, dynamic> body) async {
     if (mockHandler != null) {
       return await mockHandler!(body);
