@@ -304,7 +304,7 @@ class FridgeInventoryRepository {
       imageAsset: resolvedImage,
       storageImagePath: storageImagePath,
       category: category,
-      iconEmoji: category != null ? FridgeCategoryRepository.categoryEmoji(category) : null,
+      iconEmoji: FoodItemAssetRegistry.getEmojiForItem(name, category),
     );
   }
 }

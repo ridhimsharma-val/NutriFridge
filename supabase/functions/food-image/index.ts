@@ -108,6 +108,13 @@ function getIngredientVariants(term: string): string[] {
     variants.add('watermelon');
     variants.add('watermelons');
   }
+  if (norm === 'brinjal' || norm === 'eggplant' || norm === 'aubergine' || norm === 'indian eggplant') {
+    variants.add('brinjal');
+    variants.add('eggplant');
+    variants.add('aubergine');
+    variants.add('indian eggplant');
+    variants.add('melanzana');
+  }
 
   return Array.from(variants);
 }
@@ -207,6 +214,15 @@ function calculateMatchScore(
   }
 
   // Ingredient scoring
+  const isBrinjalQuery = normQuery === 'brinjal' || normQuery === 'eggplant' || normQuery === 'aubergine' || normQuery === 'indian eggplant';
+  if (isBrinjalQuery) {
+    const hasBrinjalWord = text.includes('brinjal') || text.includes('eggplant') || text.includes('aubergine') || text.includes('melanzana');
+    if (!hasBrinjalWord) return 0; // Strictly reject unrelated vegetables (carrots, potatoes, etc.)
+    if (text.includes('basket') || text.includes('assorted') || text.includes('mixed vegetable')) {
+      return 25; // Downrank mixed vegetable baskets
+    }
+  }
+
   if (normQuery.includes('paneer') && text.includes('tofu') && !text.includes('paneer')) {
     return 0; // Reject tofu when looking for paneer
   }
@@ -271,7 +287,8 @@ async function mirrorImageToStorage(
     const timeout = setTimeout(() => controller.abort(), 8000);
     const imgRes = await fetch(sourceImageUrl, {
       headers: {
-        'User-Agent': 'NutriFridge-App/1.0',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
       },
       signal: controller.signal,
     }).finally(() => clearTimeout(timeout));
@@ -617,6 +634,14 @@ serve(async (req: Request) => {
       const broad = await queryPixabay(cleanQuery);
       if (broad.status === 200) {
         photos = broad.hits;
+      }
+    }
+
+    // Smart synonym expansion for brinjal / eggplant to retrieve rich purple aubergine photographs
+    if (canonicalKey === 'brinjal' || canonicalKey === 'eggplant' || canonicalKey === 'aubergine' || canonicalKey === 'indian eggplant') {
+      const eggplantHits = await queryPixabay('purple eggplant', 'food');
+      if (eggplantHits.status === 200 && eggplantHits.hits.length > 0) {
+        photos = [...photos, ...eggplantHits.hits];
       }
     }
 

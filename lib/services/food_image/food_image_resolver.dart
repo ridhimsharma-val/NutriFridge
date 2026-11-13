@@ -93,6 +93,9 @@ class FoodImageResolver {
       if (canonical == 'paneer') return 'fresh paneer';
       if (canonical == 'apple') return 'fresh red apple fruit';
       if (canonical == 'banana') return 'fresh yellow banana';
+      if (canonical == 'brinjal' || canonical == 'eggplant' || canonical == 'aubergine') {
+        return 'fresh purple eggplant brinjal aubergine';
+      }
 
       if (category != null) {
         final cat = category.toLowerCase();

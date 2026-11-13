@@ -45,6 +45,50 @@ class FoodImageService {
     );
   }
 
+  final Set<String> _errorRetrying = {};
+
+  /// Invalidates an incorrect or broken image mapping and re-resolves from Pixabay.
+  Future<FoodImageModel> invalidateAndRetry({
+    required String name,
+    required FoodEntityType type,
+    String? category,
+    String? cuisine,
+    List<String>? ingredients,
+    String? userId,
+  }) async {
+    final canonicalKey = FoodImageResolver.normalizeKey(name);
+    await FoodImageRepository.instance.invalidateMapping(type: type, entityKey: canonicalKey, userId: userId);
+    FoodImageResolver.instance.clearFailedResolution(type: type, entityKey: canonicalKey);
+    return await resolveImage(
+      name: name,
+      type: type,
+      category: category,
+      cuisine: cuisine,
+      ingredients: ingredients,
+      userId: userId,
+    );
+  }
+
+  /// Handles network load failure of a cached or resolved image URL by invalidating and retrying.
+  void handleImageLoadError({
+    required String name,
+    required FoodEntityType type,
+    String? category,
+  }) {
+    final canonicalKey = FoodImageResolver.normalizeKey(name);
+    final key = '${type.name}:$canonicalKey';
+    if (_errorRetrying.contains(key)) return;
+    _errorRetrying.add(key);
+
+    invalidateAndRetry(name: name, type: type, category: category).then((_) {
+      Future.delayed(const Duration(seconds: 10), () {
+        _errorRetrying.remove(key);
+      });
+    }).catchError((_) {
+      _errorRetrying.remove(key);
+    });
+  }
+
   /// Resolves an image asynchronously following the 5-tier priority order.
   Future<FoodImageModel> resolveImage({
     required String name,

@@ -613,14 +613,15 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
   }
 
   Widget _buildItemImage(CategoryFoodItem item) {
+    final emoji = item.iconEmoji ?? FoodItemAssetRegistry.getEmojiForItem(item.name, item.category ?? _category.name);
     return FoodImageView(
       name: item.name,
       type: FoodEntityType.ingredient,
       category: item.category ?? _category.name,
-      iconEmoji: item.iconEmoji,
+      iconEmoji: emoji,
       fit: BoxFit.contain,
       fallbackWidget: Text(
-        item.iconEmoji ?? '🍽️',
+        emoji,
         style: const TextStyle(fontSize: 24),
       ),
     );

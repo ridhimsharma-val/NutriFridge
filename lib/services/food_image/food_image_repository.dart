@@ -100,6 +100,31 @@ class FoodImageRepository {
     _memoryCache.remove(_cacheKey(type, entityKey, userId));
   }
 
+  /// Invalidates an incorrect or failed mapping from memory and local persistence.
+  Future<void> invalidateMapping({
+    required FoodEntityType type,
+    required String entityKey,
+    String? userId,
+  }) async {
+    final effectiveUserId = userId ?? AuthService.instance.currentUser?.id ?? 'local_user';
+    _memoryCache.remove(_cacheKey(type, entityKey, effectiveUserId));
+    _memoryCache.remove(_cacheKey(type, entityKey, 'local_user'));
+    _memoryCache.remove(_cacheKey(type, entityKey));
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final existingJson = prefs.getString(_kLocalCacheKey);
+      if (existingJson != null) {
+        final Map<String, dynamic> cacheMap =
+            Map<String, dynamic>.from(jsonDecode(existingJson) as Map);
+        cacheMap.remove(_cacheKey(type, entityKey, effectiveUserId));
+        cacheMap.remove(_cacheKey(type, entityKey, 'local_user'));
+        cacheMap.remove(_cacheKey(type, entityKey));
+        await prefs.setString(_kLocalCacheKey, jsonEncode(cacheMap));
+      }
+    } catch (_) {}
+  }
+
   /// Retrieves search results from 24h search cache if available and fresh.
   List<FoodImageCandidate>? getCachedSearch(String query, String orientation) {
     final key = '${query.toLowerCase().trim()}:$orientation';

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nutrifridge/models/nutrition_data.dart';
 import 'package:nutrifridge/screens/food_image/widgets/food_image_view.dart';
 import 'package:nutrifridge/screens/fridge/models/category_item.dart';
@@ -13,6 +14,7 @@ import 'package:nutrifridge/services/food_image/food_image_service.dart';
 
 void main() {
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     MockDataRepository.forceInMemoryForTesting = true;
     MockDataRepository.reset();
     FridgeCategoryRepository.reset();
@@ -20,6 +22,7 @@ void main() {
   });
 
   tearDown(() {
+    SharedPreferences.setMockInitialValues({});
     MockDataRepository.reset();
     FridgeCategoryRepository.reset();
     FoodImageService.instance.resetForTesting();
@@ -835,6 +838,148 @@ void main() {
         category: 'Fruits',
       );
       expect(appleModel.imageUrl, 'assets/images/foods/apple.png');
+    });
+
+    test('Brinjal automatically resolves to a brinjal/eggplant photograph and supports synonyms', () async {
+      final queriesSeen = <String>[];
+      FoodImageResolver.mockHandler = (body) async {
+        queriesSeen.add(body['query'].toString());
+        expect(body['query'], 'brinjal');
+        return {
+          'ok': true,
+          'action': 'resolve',
+          'bestMatch': {
+            'photoId': 'px_brinjal_89044',
+            'imageUrl': 'https://cdn.pixabay.com/photo/eggplant_purple.jpg',
+            'thumbnailUrl': 'https://cdn.pixabay.com/photo/eggplant_thumb.jpg',
+            'photographerName': 'Republica',
+            'sourcePageUrl': 'https://pixabay.com/photos/aubergine-brinjal-eggplant-89044/',
+            'altDescription': 'aubergine, brinjal, eggplant, vegetable, purple',
+            'provider': 'pixabay',
+            'score': 100,
+          },
+        };
+      };
+
+      final brinjal = await FoodImageService.instance.resolveImage(
+        name: 'Brinjal',
+        type: FoodEntityType.ingredient,
+        category: 'Vegetables',
+      );
+
+      expect(brinjal.entityKey, 'brinjal');
+      expect(brinjal.imageUrl, 'https://cdn.pixabay.com/photo/eggplant_purple.jpg');
+      expect(brinjal.isPlaceholder, isFalse);
+      expect(queriesSeen, contains('brinjal'));
+
+      // Check descriptive query supports synonyms
+      final desc = FoodImageResolver.buildDescriptiveQuery('brinjal', FoodEntityType.ingredient, 'Vegetables');
+      expect(desc, contains('eggplant'));
+      expect(desc, contains('brinjal'));
+    });
+
+    test('Invalidating incorrect mapping allows re-resolving clean photograph', () async {
+      int resolveCount = 0;
+      FoodImageResolver.mockHandler = (body) async {
+        resolveCount++;
+        return {
+          'ok': true,
+          'action': 'resolve',
+          'bestMatch': {
+            'photoId': 'px_brinjal_$resolveCount',
+            'imageUrl': 'https://cdn.pixabay.com/photo/brinjal_v$resolveCount.jpg',
+            'provider': 'pixabay',
+            'score': 100,
+          },
+        };
+      };
+
+      // 1. First resolution
+      final first = await FoodImageService.instance.resolveImage(
+        name: 'Brinjal',
+        type: FoodEntityType.ingredient,
+        category: 'Vegetables',
+      );
+      expect(first.imageUrl, 'https://cdn.pixabay.com/photo/brinjal_v1.jpg');
+      expect(resolveCount, 1);
+
+      // 2. Invalidate and re-resolve
+      final reResolved = await FoodImageService.instance.invalidateAndRetry(
+        name: 'Brinjal',
+        type: FoodEntityType.ingredient,
+        category: 'Vegetables',
+      );
+      expect(reResolved.imageUrl, 'https://cdn.pixabay.com/photo/brinjal_v2.jpg');
+      expect(resolveCount, 2);
+    });
+
+    testWidgets('CategoryBottomSheet renders FoodImageView for Brinjal in Vegetables category without broccoli emoji fallback', (tester) async {
+      tester.view.physicalSize = const Size(600, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      FoodImageResolver.mockHandler = (body) async {
+        return {
+          'ok': true,
+          'action': 'resolve',
+          'bestMatch': {
+            'photoId': 'px_brinjal_test',
+            'imageUrl': 'https://cdn.pixabay.com/photo/purple_brinjal.jpg',
+            'provider': 'pixabay',
+            'score': 100,
+          },
+        };
+      };
+
+      final items = [
+        const CategoryFoodItem(
+          id: 'veg_5',
+          name: 'Brinjal',
+          quantity: '500 g',
+          expiryDays: 5,
+          iconEmoji: '🍆',
+          category: 'Vegetables',
+        ),
+      ];
+
+      final category = CategoryData(
+        id: 'vegetables',
+        name: 'Vegetables',
+        iconEmoji: '🥕',
+        items: items,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: CategoryBottomSheet(
+              category: category,
+              isSelectionMode: false,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // FoodImageView rendered
+      expect(find.byType(FoodImageView), findsOneWidget);
+      expect(find.text('Brinjal'), findsOneWidget);
+
+      // Resolved image is the brinjal photograph
+      final model = FoodImageService.instance.getImageSync(
+        name: 'Brinjal',
+        type: FoodEntityType.ingredient,
+        category: 'Vegetables',
+      );
+      expect(model.imageUrl, 'https://cdn.pixabay.com/photo/purple_brinjal.jpg');
+      expect(model.isPlaceholder, isFalse);
+
+      // Verify broccoli emoji 🥦 is NOT rendered for brinjal
+      expect(find.text('🥦'), findsNothing);
     });
   });
 }

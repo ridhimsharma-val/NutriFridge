@@ -417,6 +417,31 @@ class FoodItemAssetRegistry {
         return '🍴';
     }
   }
+
+  /// Returns an accurate emoji for an individual food item, never an unrelated category emoji.
+  static String getEmojiForItem(String name, [String? category]) {
+    final clean = name.trim().toLowerCase();
+    if (clean.contains('brinjal') || clean.contains('eggplant') || clean.contains('aubergine')) {
+      return '🍆';
+    }
+    if (clean.contains('watermelon')) return '🍉';
+    if (clean.contains('peach')) return '🍑';
+    if (clean.contains('apple') && !clean.contains('pineapple')) return '🍎';
+    if (clean.contains('banana')) return '🍌';
+    if (clean.contains('orange')) return '🍊';
+    if (clean.contains('grape')) return '🍇';
+    if (clean.contains('tomato')) return '🍅';
+    if (clean.contains('carrot')) return '🥕';
+    if (clean.contains('broccoli')) return '🥦';
+    if (clean.contains('capsicum') || clean.contains('bell pepper')) return '🫑';
+    if (clean.contains('milk')) return '🥛';
+    if (clean.contains('paneer') || clean.contains('cheese')) return '🧀';
+    if (clean.contains('egg')) return '🥚';
+    if (clean.contains('chicken')) return '🍗';
+    if (clean.contains('fish')) return '🐟';
+    if (category != null) return getEmojiForCategory(category);
+    return '🍽️';
+  }
 }
 
 /// Data model representing a refrigerator category with its inventory
@@ -779,6 +804,14 @@ class FridgeCategoryRepository {
           expiryDays: 5,
           imageAsset: 'assets/images/foods/capsicum.png',
           iconEmoji: '🫑',
+        ),
+        const CategoryFoodItem(
+          id: 'veg_5',
+          name: 'Brinjal',
+          quantity: '500 g',
+          expiryDays: 5,
+          iconEmoji: '🍆',
+          category: 'Vegetables',
         ),
       ],
       'Fruits': [
