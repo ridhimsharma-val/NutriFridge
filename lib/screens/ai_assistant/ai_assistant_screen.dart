@@ -52,6 +52,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
   bool _initialPromptDispatched = false;
   final ChilluAnimationController _chilluController = ChilluAnimationController();
   bool _hasPlayedEntryGreeting = false;
+  bool _didDropForCurrentTurn = false;
 
   /// Inactivity timeout: after ~60 seconds of inactivity on the assistant screen, Chillu enters Sleepy state.
   static const Duration _inactivityTimeout = Duration(seconds: 60);
@@ -369,6 +370,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
 
     setState(() {
       _isSending = true;
+      _didDropForCurrentTurn = true;
       if (!isRetry) {
         final userMessage = AiChatMessage(
           id: 'msg_user_${DateTime.now().millisecondsSinceEpoch}',
@@ -609,6 +611,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
 
       setState(() {
         _messages.add(assistantMessage);
+        _didDropForCurrentTurn = false;
       });
     } catch (e) {
       debugPrint('[AiAssistantScreen] Error processing send request: $e');
@@ -1868,14 +1871,14 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
                         }
                         final msgIdx = index - 1;
                         if (msgIdx < _messages.length) {
-                          final isLatestAssistant = msgIdx == lastAssistantIdx;
+                          final isLatestAssistant = !_isSending && msgIdx == lastAssistantIdx;
                           return _buildMessageItem(_messages[msgIdx], isLatestAssistant: isLatestAssistant);
                         } else {
                           return _buildTypingIndicator();
                         }
                       } else {
                         if (index < _messages.length) {
-                          final isLatestAssistant = index == lastAssistantIdx;
+                          final isLatestAssistant = !_isSending && index == lastAssistantIdx;
                           return _buildMessageItem(_messages[index], isLatestAssistant: isLatestAssistant);
                         } else {
                           return _buildTypingIndicator();
@@ -2214,7 +2217,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
                     key: ValueKey('dropping_avatar_${message.id}'),
                     controller: _chilluController,
                     size: 46,
-                    animateDrop: hasMultipleAssistantMessages,
+                    animateDrop: !_didDropForCurrentTurn && hasMultipleAssistantMessages,
                   )
                 : const SizedBox(width: 46, height: 46),
           ),
@@ -2983,11 +2986,13 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 2),
-            child: SizedBox(
-              width: 46,
-              height: 46,
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: ChilluDroppingAvatar(
+              key: const ValueKey('dropping_avatar_typing'),
+              controller: _chilluController,
+              size: 46,
+              animateDrop: true,
             ),
           ),
           const SizedBox(width: 10),

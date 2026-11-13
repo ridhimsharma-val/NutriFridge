@@ -335,6 +335,8 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _confusedController.reset();
         _celebrationController.stop();
         _celebrationController.reset();
+        _speakingController.stop();
+        _speakingController.reset();
         _attentivePerkController.animateTo(0.0, duration: const Duration(milliseconds: 280), curve: Curves.easeOut);
         if (widget.size > 48) {
           if (!_idleBreathingController.isAnimating) {
@@ -1313,7 +1315,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           }
 
           // Speaking: gentle sprout response to conversational cadence
-          if (state == ChilluState.speaking || _speakingController.isAnimating) {
+          if (state == ChilluState.speaking) {
             final t = _speakingController.value;
             lAngle += math.sin(t * 4 * math.pi) * 0.045;
             rAngle -= math.sin((t * 4 * math.pi) + 0.9) * 0.038;
@@ -1446,7 +1448,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         // Speaking mouth opening & articulation cadence
         final double speakingProgress;
         final double speakingMouthOpening;
-        if (state == ChilluState.speaking || _speakingController.isAnimating) {
+        if (state == ChilluState.speaking) {
           speakingProgress = 1.0;
           final t = _speakingController.value;
           if (t >= 0.88) {
