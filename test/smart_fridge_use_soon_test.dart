@@ -6,6 +6,7 @@ import 'package:nutrifridge/core/theme/app_colors.dart';
 import 'package:nutrifridge/models/nutrition_data.dart';
 import 'package:nutrifridge/screens/ai_assistant/services/ai_assistant_service.dart';
 import 'package:nutrifridge/screens/fridge/models/category_item.dart';
+import 'package:nutrifridge/screens/fridge/services/cooking_basket_service.dart';
 import 'package:nutrifridge/screens/fridge/services/use_soon_service.dart';
 import 'package:nutrifridge/screens/fridge/widgets/use_soon_section.dart';
 import 'package:nutrifridge/screens/home/services/meal_recommendation_service.dart';
@@ -718,6 +719,182 @@ void main() {
 
       final itemsAfter = FridgeCategoryRepository.allItems.map((e) => '${e.id}:${e.name}:${e.decimalAmount}').toList();
       expect(itemsAfter, equals(itemsBefore));
+    });
+
+    group('Smart Fridge Intelligence — Verify Genuine AI Recipe Generation', () {
+      test('Controlled test inventory payload verification (Spinach 1d, Tomatoes 2d, Paneer 4d)', () async {
+        // Setup controlled inventory:
+        // Spinach (expires tomorrow: 1 day)
+        // Tomatoes (expire in two days: 2 days)
+        // Paneer (expires in four days: 4 days - not expiring soon)
+        final spinach = CategoryFoodItem(
+          id: 'spinach-uuid-001',
+          name: 'Spinach',
+          quantity: '1 bunch',
+          category: 'Vegetables',
+          expiryDate: fixedNow.add(const Duration(days: 1)),
+        );
+        final tomatoes = CategoryFoodItem(
+          id: 'tomatoes-uuid-002',
+          name: 'Tomatoes',
+          quantity: '2 pieces',
+          category: 'Vegetables',
+          expiryDate: fixedNow.add(const Duration(days: 2)),
+        );
+        final paneer = CategoryFoodItem(
+          id: 'paneer-uuid-003',
+          name: 'Paneer',
+          quantity: '250 g',
+          category: 'Dairy Products',
+          expiryDate: fixedNow.add(const Duration(days: 4)),
+        );
+
+        // Put into inventory
+        await FridgeCategoryRepository.addItemToCategory('Vegetables', spinach);
+        await FridgeCategoryRepository.addItemToCategory('Vegetables', tomatoes);
+        await FridgeCategoryRepository.addItemToCategory('Dairy Products', paneer);
+
+        // Get expiring items via UseSoonService
+        final expiringItems = UseSoonService.getUseSoonItems(localNow: fixedNow);
+        expect(expiringItems.length, 2);
+        expect(expiringItems.map((e) => e.name), containsAll(['Spinach', 'Tomatoes']));
+        expect(expiringItems.map((e) => e.name), isNot(contains('Paneer')));
+
+        Map<String, dynamic>? capturedPayload;
+        String? capturedMessage;
+
+        AiAssistantService.mockHandler = (request) async {
+          capturedMessage = request['message'];
+          capturedPayload = request;
+
+          return {
+            'ok': true,
+            'action': 'meal_recommendation',
+            'meal': {
+              'id': 'rec_spinach_tomato_paneer',
+              'name': 'Spinach Tomato Paneer Curry',
+              'description': 'A vibrant Indian curry prioritizing fresh spinach and ripe tomatoes.',
+              'mealType': 'dinner',
+              'calories': 380,
+              'preparationTimeMinutes': 10,
+              'cookingTimeMinutes': 20,
+              'servings': '2 servings',
+              'ingredients': [
+                {'name': 'Spinach', 'quantity': '1 bunch', 'status': 'available', 'isAvailable': true},
+                {'name': 'Tomatoes', 'quantity': '2 pieces', 'status': 'available', 'isAvailable': true},
+                {'name': 'Paneer', 'quantity': '200 g', 'status': 'available', 'isAvailable': true},
+                {'name': 'Cooking oil', 'quantity': '1 tbsp', 'status': 'pantry_staple', 'isAvailable': true},
+                {'name': 'Cumin seeds', 'quantity': '1 tsp', 'status': 'pantry_staple', 'isAvailable': true},
+                {'name': 'Salt', 'quantity': '1 tsp', 'status': 'pantry_staple', 'isAvailable': true},
+              ],
+              'missingIngredients': [],
+              'preparationSteps': [
+                {'stepNumber': 1, 'instruction': 'Wash and blanch the spinach leaves.'},
+                {'stepNumber': 2, 'instruction': 'Chop the tomatoes and sauté with spices.'},
+                {'stepNumber': 3, 'instruction': 'Puree the spinach and combine with tomatoes and paneer cubes.'},
+              ],
+              'cookingTips': ['Simmer gently to preserve spinach color.'],
+              'substitutions': ['Tofu can be substituted for paneer.'],
+            },
+          };
+        };
+
+        final rec = await MealRecommendationService.findMealsForUseSoon(
+          expiringItems: expiringItems,
+        );
+
+        // 1. Verify AI Integration & Payload
+        expect(capturedPayload, isNotNull);
+        expect(capturedPayload!['recipeMode'], 'selected_ingredients');
+        expect(capturedPayload!['isUseSoon'], true);
+
+        // Canonical names of ingredients approaching expiry
+        final expiringInPayload = capturedPayload!['expiringIngredients'] as List;
+        expect(expiringInPayload.length, 2);
+        final expiringNames = expiringInPayload.map((e) => e['name']).toList();
+        expect(expiringNames, containsAll(['Spinach', 'Tomatoes']));
+
+        // Their actual available quantities and units
+        final spinachEntry = expiringInPayload.firstWhere((e) => e['name'] == 'Spinach');
+        expect(spinachEntry['quantity'], '1 bunch');
+        expect(spinachEntry['unit'], 'bunch');
+
+        final tomatoEntry = expiringInPayload.firstWhere((e) => e['name'] == 'Tomatoes');
+        expect(tomatoEntry['quantity'], '2 pieces');
+        expect(tomatoEntry['unit'], 'pieces');
+
+        // Their expiry priority or urgency
+        expect(spinachEntry['urgencyLabel'], 'Expires tomorrow');
+        expect(spinachEntry['urgencyRank'], 1);
+        expect(tomatoEntry['urgencyLabel'], 'Expires in 2 days');
+        expect(tomatoEntry['urgencyRank'], 2);
+
+        // Other available fridge ingredients
+        final otherInPayload = capturedPayload!['otherAvailableFridgeIngredients'] as List;
+        expect(otherInPayload.length, 1);
+        expect(otherInPayload.first['name'], 'Paneer');
+        expect(otherInPayload.first['quantity'], '250 g');
+        expect(otherInPayload.first['unit'], 'g');
+
+        // 2. Verify AI Prompt instructions
+        expect(capturedMessage, isNotNull);
+        // Prioritize ingredients approaching expiry
+        expect(capturedMessage, contains('Prioritize ingredients approaching expiry'));
+        // Prefer recipes that use multiple expiring ingredients together
+        expect(capturedMessage, contains('Prefer recipes that use multiple expiring ingredients together'));
+        // Respect available ingredient quantities
+        expect(capturedMessage, contains('Respect available ingredient quantities'));
+        // Avoid claiming unavailable ingredients are in the fridge
+        expect(capturedMessage, contains('Avoid claiming unavailable ingredients are in the fridge'));
+        // Suggest practical, genuinely cookable recipes
+        expect(capturedMessage, contains('Suggest practical, genuinely cookable recipes'));
+        // Never recommend using ingredients already marked expired
+        expect(capturedMessage, contains('Never recommend using ingredients already marked expired'));
+        // Allow reasonable pantry staples as additional ingredients
+        expect(capturedMessage, contains('Allow reasonable pantry staples as additional ingredients where appropriate'));
+
+        // 3. Verify Genuine Generation & Details
+        expect(rec, isNotNull);
+        expect(rec!.title, 'Spinach Tomato Paneer Curry');
+        expect(rec.requiredIngredients.length, 6);
+        expect(rec.requiredIngredients.join(', '), contains('Spinach'));
+        expect(rec.requiredIngredients.join(', '), contains('Tomatoes'));
+        expect(rec.requiredIngredients.join(', '), contains('Paneer'));
+        expect(rec.calories, 380);
+        expect(rec.preparationSteps.length, 3);
+      });
+
+      test('Gracefully propagates AI errors without synthetic fallback when live', () async {
+        AiAssistantService.mockHandler = (request) async {
+          return {
+            'ok': false,
+            'action': 'error',
+            'assistantMessage': 'AI Assistant is currently overloaded. Please tap retry.',
+          };
+        };
+
+        MockDataRepository.forceInMemoryForTesting = false;
+
+        final rec = await MealRecommendationService.findMealsForUseSoon(
+          expiringItems: [
+            const CategoryFoodItem(
+              id: 'spinach-1',
+              name: 'Spinach',
+              quantity: '1 bunch',
+              category: 'Vegetables',
+              expiryDays: 1,
+            ),
+          ],
+        );
+
+        // Does not return a synthetic recipe fallback
+        expect(rec, isNull);
+        // Clean error message is surfaced to CookingBasketService error notifier
+        expect(
+          CookingBasketService.generationErrorNotifier.value,
+          'AI Assistant is currently overloaded. Please tap retry.',
+        );
+      });
     });
   });
 }

@@ -166,8 +166,8 @@ class _UseSoonSectionState extends State<UseSoonSection> {
     });
 
     try {
-      final rec = await MealRecommendationService.generateFromSelectedIngredients(
-        selectedItems: targetItems,
+      final rec = await MealRecommendationService.findMealsForUseSoon(
+        expiringItems: targetItems,
         context: context,
       );
 

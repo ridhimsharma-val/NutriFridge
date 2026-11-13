@@ -5,6 +5,7 @@ import '../../../services/meals/meal_tracking_service.dart';
 import '../../ai_assistant/services/ai_assistant_service.dart';
 import '../../fridge/models/category_item.dart';
 import '../../fridge/services/cooking_basket_service.dart';
+import '../../fridge/services/use_soon_service.dart';
 import '../../meal_detail/models/recipe_preparation_step.dart';
 import '../../profile/models/user_profile_data.dart';
 
@@ -764,6 +765,7 @@ class MealRecommendationService {
     bool isAlternativeRequest = false,
     Set<String>? excludedRecipeIds,
     BuildContext? context,
+    bool isUseSoon = false,
   }) async {
     ensureInitialized();
 
@@ -773,6 +775,7 @@ class MealRecommendationService {
     final List<Map<String, dynamic>> inventoryContext;
     final List<String>? selectedInventoryItemIds;
     final resolvedSelectedItems = <CategoryFoodItem>[];
+    final List<CategoryFoodItem> otherFridgeItems;
 
     if (recipeMode == 'selected_ingredients') {
       for (final item in (selectedItems ?? <CategoryFoodItem>[])) {
@@ -796,16 +799,52 @@ class MealRecommendationService {
           ? validUuidIds
           : resolvedSelectedItems.map((i) => i.id).toList();
 
-      inventoryContext = resolvedSelectedItems.map((i) => {
-        'id': i.id,
-        'name': i.name,
-        'category': i.category,
-        'quantity': i.displayQuantity,
-        'unit': i.unit,
-        'expiryDays': i.expiryDays,
+      if (isUseSoon) {
+        final selectedNames = resolvedSelectedItems.map((i) => i.name.toLowerCase().trim()).toSet();
+        final selectedIds = resolvedSelectedItems.map((i) => i.id).toSet();
+        otherFridgeItems = FridgeCategoryRepository.allItems.where((item) {
+          if (selectedIds.contains(item.id)) return false;
+          if (selectedNames.contains(item.name.toLowerCase().trim())) return false;
+          return item.decimalAmount > 0;
+        }).toList();
+      } else {
+        otherFridgeItems = const [];
+      }
+
+      final expiringPayload = resolvedSelectedItems.map((i) {
+        final effectiveDays = UseSoonService.getEffectiveExpiryDays(i, now);
+        final urgency = UseSoonService.getExpiryLabel(i, now);
+        final urgencyRank = UseSoonService.getUrgencyRank(i, now);
+        return {
+          'id': i.id,
+          'name': i.name,
+          'category': i.category,
+          'quantity': i.displayQuantity,
+          'unit': i.unit,
+          if (effectiveDays != null) 'expiryDays': effectiveDays,
+          'urgencyLabel': urgency,
+          'urgencyRank': urgencyRank,
+        };
       }).toList();
+
+      final otherPayload = otherFridgeItems.map((i) {
+        final effectiveDays = UseSoonService.getEffectiveExpiryDays(i, now);
+        return {
+          'id': i.id,
+          'name': i.name,
+          'category': i.category,
+          'quantity': i.displayQuantity,
+          'unit': i.unit,
+          if (effectiveDays != null) 'expiryDays': effectiveDays,
+        };
+      }).toList();
+
+      inventoryContext = isUseSoon
+          ? [...expiringPayload, ...otherPayload]
+          : expiringPayload;
     } else {
       selectedInventoryItemIds = null;
+      otherFridgeItems = const [];
       inventoryContext = AiAssistantService.getInventoryContext();
     }
 
@@ -830,7 +869,42 @@ class MealRecommendationService {
         .clamp(0, 999);
 
     final String message;
-    if (recipeMode == 'selected_ingredients') {
+    if (isUseSoon) {
+      final expiringSummary = resolvedSelectedItems.map((i) {
+        final label = UseSoonService.getExpiryLabel(i, now);
+        return '${i.name} (${i.displayQuantity} ${i.unit}, $label)';
+      }).join('; ');
+
+      final otherSummary = otherFridgeItems.isNotEmpty
+          ? otherFridgeItems.map((i) => '${i.name} (${i.displayQuantity} ${i.unit})').join('; ')
+          : 'None';
+
+      final prefsSummary = userPreferences.isNotEmpty
+          ? userPreferences.entries.map((e) => '${e.key}: ${e.value}').join(', ')
+          : 'None specified';
+
+      message = '''
+Smart Fridge Intelligence — Urgent Recipe Generation:
+The following ingredients in my fridge are approaching expiry and MUST be prioritized:
+$expiringSummary
+
+Other available ingredients in my fridge:
+$otherSummary
+
+User dietary preferences & restrictions:
+$prefsSummary
+
+Instructions for recipe generation:
+1. Prioritize ingredients approaching expiry: The recipe must center around the expiring ingredients listed above.
+2. Prefer recipes that use multiple expiring ingredients together in a single dish.
+3. Respect available ingredient quantities: Do not assume or require unrealistic quantities beyond what is available.
+4. Avoid claiming unavailable ingredients are in the fridge: Only use items from the expiring list and other available fridge ingredients as fridge inventory.
+5. Suggest practical, genuinely cookable recipes that a home cook can prepare.
+6. Never recommend using ingredients already marked expired.
+7. Allow reasonable pantry staples as additional ingredients where appropriate (e.g., cooking oil, salt, black pepper, basic spices, water, garlic, onion).
+Create a complete, delicious recipe meeting these criteria.
+'''.trim();
+    } else if (recipeMode == 'selected_ingredients') {
       message = (preferredDishName != null && preferredDishName.trim().isNotEmpty)
           ? 'Create a recipe for ${preferredDishName.trim()} using these selected ingredients from my fridge: ${resolvedSelectedItems.map((i) => i.name).join(", ")}.'
           : 'Create a recipe using primarily these selected ingredients from my fridge: ${resolvedSelectedItems.map((i) => i.name).join(", ")}.';
@@ -849,7 +923,28 @@ class MealRecommendationService {
           : 'guest_user',
       'actionHint': 'meal_recommendation',
       'recipeMode': recipeMode,
+      'isUseSoon': isUseSoon,
       'selectedInventoryItemIds': ?selectedInventoryItemIds,
+      if (isUseSoon) ...{
+        'expiringIngredients': resolvedSelectedItems.map((i) => {
+          'id': i.id,
+          'name': i.name,
+          'category': i.category,
+          'quantity': i.displayQuantity,
+          'unit': i.unit,
+          'expiryDays': UseSoonService.getEffectiveExpiryDays(i, now),
+          'urgencyLabel': UseSoonService.getExpiryLabel(i, now),
+          'urgencyRank': UseSoonService.getUrgencyRank(i, now),
+        }).toList(),
+        'otherAvailableFridgeIngredients': otherFridgeItems.map((i) => {
+          'id': i.id,
+          'name': i.name,
+          'category': i.category,
+          'quantity': i.displayQuantity,
+          'unit': i.unit,
+          'expiryDays': UseSoonService.getEffectiveExpiryDays(i, now),
+        }).toList(),
+      },
       if (preferredDishName != null && preferredDishName.trim().isNotEmpty)
         'preferredDishName': preferredDishName.trim(),
       'message': message,
@@ -1089,6 +1184,7 @@ class MealRecommendationService {
       selectedItems: expiringItems,
       preferredDishName: null,
       context: context,
+      isUseSoon: true,
     );
   }
 
@@ -1099,6 +1195,7 @@ class MealRecommendationService {
     String? preferredDishName,
     MealTimeSlot? targetSlot,
     BuildContext? context,
+    bool isUseSoon = false,
   }) async {
     ensureInitialized();
 
@@ -1124,6 +1221,7 @@ class MealRecommendationService {
         preferredDishName: preferredDishName,
         targetSlot: targetSlot,
         context: context,
+        isUseSoon: isUseSoon,
       );
 
       _recipeOrigin = RecipeOrigin.customIngredients;
