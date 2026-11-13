@@ -11,6 +11,7 @@ import 'widgets/expiring_soon_bottom_sheet.dart';
 import 'widgets/fridge_header.dart';
 import 'widgets/fridge_preferences_sheet.dart';
 import 'widgets/top_freezer_refrigerator.dart';
+import 'widgets/use_soon_section.dart';
 
 class FridgePage extends StatefulWidget {
   final bool isSelectionMode;
@@ -214,6 +215,10 @@ class _FridgePageState extends State<FridgePage> {
                       ],
                     ),
                   ),
+
+                // 1.5 Smart Fridge Intelligence: Use Soon Section
+                if (!widget.isSelectionMode)
+                  const UseSoonSection(),
 
                 // 2. Main Centralized Appliance Area (Positioned immediately below header, fitted without scrolling)
                 Expanded(

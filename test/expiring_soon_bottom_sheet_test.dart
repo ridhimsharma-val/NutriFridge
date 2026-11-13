@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nutrifridge/main.dart';
+import 'package:nutrifridge/models/nutrition_data.dart';
 import 'package:nutrifridge/screens/fridge/models/category_item.dart';
 import 'package:nutrifridge/screens/fridge/widgets/expiring_soon_bottom_sheet.dart';
 import 'package:nutrifridge/screens/fridge/widgets/food_details_sheet.dart';
@@ -9,6 +10,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
+    MockDataRepository.forceInMemoryForTesting = true;
     FridgeCategoryRepository.forceInMemoryForTesting = true;
     FridgeCategoryRepository.reset();
   });
@@ -62,12 +64,12 @@ void main() {
         find.descendant(of: find.byType(ExpiringSoonBottomSheet), matching: find.text('2 items')),
         findsOneWidget,
       );
-      expect(find.text('Milk'), findsOneWidget);
-      expect(find.text('1 L'), findsOneWidget);
-      expect(find.text('Expires tomorrow'), findsOneWidget);
-      expect(find.text('Apple'), findsOneWidget);
-      expect(find.text('1 kg'), findsOneWidget);
-      expect(find.text('Expires in 2 days'), findsOneWidget);
+      expect(find.descendant(of: find.byType(ExpiringSoonBottomSheet), matching: find.text('Milk')), findsOneWidget);
+      expect(find.descendant(of: find.byType(ExpiringSoonBottomSheet), matching: find.text('1 L')), findsOneWidget);
+      expect(find.descendant(of: find.byType(ExpiringSoonBottomSheet), matching: find.text('Expires tomorrow')), findsOneWidget);
+      expect(find.descendant(of: find.byType(ExpiringSoonBottomSheet), matching: find.text('Apple')), findsOneWidget);
+      expect(find.descendant(of: find.byType(ExpiringSoonBottomSheet), matching: find.text('1 kg')), findsOneWidget);
+      expect(find.descendant(of: find.byType(ExpiringSoonBottomSheet), matching: find.text('Expires in 2 days')), findsOneWidget);
     });
 
     testWidgets('2. Tap close button closes the bottom sheet', (WidgetTester tester) async {
@@ -325,7 +327,10 @@ void main() {
         find.descendant(of: find.byType(ExpiringSoonBottomSheet), matching: find.text('2 items')),
         findsOneWidget,
       );
-      expect(find.text('Strawberries'), findsOneWidget);
+      expect(
+        find.descendant(of: find.byType(ExpiringSoonBottomSheet), matching: find.text('Strawberries')),
+        findsOneWidget,
+      );
       expect(FridgeCategoryRepository.expiringSoonCount, 2);
     });
 
@@ -350,10 +355,11 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('expiring_soon_badge')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Paneer'), findsOneWidget);
+      final paneerFinder = find.descendant(of: find.byType(ExpiringSoonBottomSheet), matching: find.text('Paneer'));
+      expect(paneerFinder, findsOneWidget);
 
       // Tap on Paneer card
-      await tester.tap(find.text('Paneer'));
+      await tester.tap(paneerFinder);
       await tester.pumpAndSettle();
 
       // Existing FoodDetailsSheet opened with quantity actions

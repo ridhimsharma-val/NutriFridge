@@ -351,8 +351,11 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
               const SizedBox(height: 8),
 
               // Image Customization Actions (Regular Photo & Cooking Pan Cutout)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 4,
+                runSpacing: 4,
                 children: [
                   TextButton.icon(
                     onPressed: _handleChangePhoto,
@@ -367,14 +370,14 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                     ),
                     style: TextButton.styleFrom(
                       visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                     ),
                   ),
                   Container(
                     width: 1,
                     height: 14,
                     color: const Color(0xFFD6DDD8),
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
                   ),
                   TextButton.icon(
                     onPressed: _handleChangePanCutout,
@@ -389,7 +392,7 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                     ),
                     style: TextButton.styleFrom(
                       visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                     ),
                   ),
                 ],

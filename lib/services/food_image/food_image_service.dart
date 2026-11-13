@@ -110,7 +110,9 @@ class FoodImageService {
       ingredients: ingredients,
       userId: userId,
     );
-    _notify();
+    if (!model.isPlaceholder) {
+      _notify();
+    }
     return model;
   }
 
@@ -140,15 +142,18 @@ class FoodImageService {
       return curated;
     }
 
-    // Trigger background resolution lazily without blocking widget build
-    resolveImage(
-      name: name,
-      type: type,
-      category: category,
-      cuisine: cuisine,
-      ingredients: ingredients,
-      userId: userId,
-    );
+    // Trigger background resolution lazily without blocking widget build ONLY if not already resolving or failed recently
+    if (!FoodImageResolver.instance.isResolving(type: type, entityKey: canonicalKey) &&
+        !FoodImageResolver.instance.hasFailedRecently(type: type, entityKey: canonicalKey)) {
+      resolveImage(
+        name: name,
+        type: type,
+        category: category,
+        cuisine: cuisine,
+        ingredients: ingredients,
+        userId: userId,
+      );
+    }
 
     return FoodImageResolver.instance.buildPlaceholder(
       name: name,

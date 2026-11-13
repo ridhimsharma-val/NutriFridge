@@ -968,6 +968,20 @@ class FridgeCategoryRepository {
     return total;
   }
 
+  /// Returns a flat list of all food items currently in the fridge
+  static List<CategoryFoodItem> get allItems {
+    final all = <CategoryFoodItem>[];
+    for (final entry in _categoryStore.entries) {
+      for (final item in entry.value) {
+        final itemWithCategory = item.category != null
+            ? item
+            : item.copyWith(category: entry.key);
+        all.add(itemWithCategory);
+      }
+    }
+    return all;
+  }
+
   /// Find a food item in the fridge inventory by name (case-insensitive substring or exact match)
   static CategoryFoodItem? findItemByName(String name, {bool exact = false}) {
     final lower = name.toLowerCase().trim();

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/config/supabase_config.dart';
@@ -28,6 +29,13 @@ class FoodImageResolver {
   bool isResolving({required FoodEntityType type, required String entityKey}) {
     final inFlightKey = '${type.name}:$entityKey';
     return _inFlight.containsKey(inFlightKey);
+  }
+
+  /// Checks whether an entity resolution failed recently (within cooldown)
+  bool hasFailedRecently({required FoodEntityType type, required String entityKey}) {
+    final inFlightKey = '${type.name}:$entityKey';
+    final lastFailure = _failedResolutions[inFlightKey];
+    return lastFailure != null && DateTime.now().difference(lastFailure).inSeconds < 30;
   }
 
   /// Clears any failed resolution cooldown to allow an immediate retry
@@ -585,7 +593,8 @@ class FoodImageResolver {
       return await mockHandler!(body);
     }
 
-    if (MockDataRepository.forceInMemoryForTesting) {
+    if (MockDataRepository.forceInMemoryForTesting ||
+        WidgetsBinding.instance.runtimeType.toString().contains('Test')) {
       return {'ok': false, 'error': 'IN_MEMORY_TESTING'};
     }
 

@@ -1080,6 +1080,18 @@ class MealRecommendationService {
     );
   }
 
+  /// Discovers meals prioritizing ingredients approaching expiry (Smart Fridge Intelligence: Use Soon)
+  static Future<RecipeRecommendation?> findMealsForUseSoon({
+    required List<CategoryFoodItem> expiringItems,
+    BuildContext? context,
+  }) async {
+    return generateFromSelectedIngredients(
+      selectedItems: expiringItems,
+      preferredDishName: null,
+      context: context,
+    );
+  }
+
   /// Generates a meal recommendation based strictly on user-selected ingredients
   /// and an optional dish name (Mode B: "Use My Ingredients").
   static Future<RecipeRecommendation?> generateFromSelectedIngredients({
