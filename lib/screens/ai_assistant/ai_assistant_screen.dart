@@ -52,8 +52,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
   bool _initialPromptDispatched = false;
   final ChilluAnimationController _chilluController = ChilluAnimationController();
 
-  /// Inactivity timeout: after ~60 seconds of genuine inactivity, Chillu enters Sleepy state.
-  static const Duration _inactivityTimeout = Duration(seconds: 60);
+  /// Inactivity timeout: after ~20 seconds of inactivity on the assistant screen, Chillu enters Sleepy state.
+  static const Duration _inactivityTimeout = Duration(seconds: 20);
   Timer? _inactivityTimer;
 
   @override
@@ -126,11 +126,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _resetInactivityTimer();
-    } else if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.hidden) {
-      _inactivityTimer?.cancel();
+      if (_chilluController.state != ChilluState.sleepy && !_chilluController.isWakingUp) {
+        _resetInactivityTimer();
+      }
     }
   }
 
@@ -143,13 +141,13 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
   void _onInactivityTimeout() {
     if (!mounted) return;
 
-    // Condition 1: No unsent message is present
+    // Condition 1: No unsent message is present in text input
     if (_textController.text.trim().isNotEmpty) {
       _resetInactivityTimer();
       return;
     }
 
-    // Condition 2: AI is not processing a request
+    // Condition 2: AI is not currently sending / thinking / processing
     if (_isSending || _chilluController.state == ChilluState.thinking || _chilluController.isProcessing) {
       _resetInactivityTimer();
       return;
@@ -161,19 +159,15 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
       return;
     }
 
-    // Condition 4: No emotional reaction is currently playing
-    if (_chilluController.isReacting ||
-        _chilluController.state == ChilluState.happy ||
-        _chilluController.state == ChilluState.excited ||
-        _chilluController.state == ChilluState.celebrating ||
-        _chilluController.state == ChilluState.confused) {
+    // Condition 4: No active transient reaction is playing
+    if (_chilluController.isReacting) {
       _resetInactivityTimer();
       return;
     }
 
     // Condition 5: Screen is active & mounted
     if (kDebugMode) {
-      debugPrint('[Chillu] 60s inactivity reached -> Entering Sleepy state');
+      debugPrint('[Chillu] Inactivity reached (20s) -> Entering Sleepy state');
     }
     _chilluController.sleepy();
   }
@@ -202,22 +196,21 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
   }
 
   void _onInputFocusOrTextChanged() {
-    _resetInactivityTimer();
     if (_isSending || _isRecording) return;
     final hasNonWhitespace = _textController.text.trim().isNotEmpty;
-    final isFocused = _inputFocusNode.hasFocus;
 
-    if (hasNonWhitespace || isFocused) {
-      // First non-whitespace character or focus triggers Attentive; subsequent keystrokes maintain it without restarting.
+    if (hasNonWhitespace) {
+      _resetInactivityTimer();
+      // First non-whitespace character triggers Attentive; subsequent keystrokes maintain it without restarting.
       // Waking up from Sleepy into Attentive is handled seamlessly.
       if (_chilluController.state != ChilluState.attentive && _chilluController.state != ChilluState.thinking) {
-        if (kDebugMode && _chilluController.state == ChilluState.sleepy) {
-          debugPrint('[Chillu] Text input focused or typing started from Sleepy state -> wake up to Attentive');
+        if (kDebugMode && (_chilluController.state == ChilluState.sleepy || _chilluController.isWakingUp)) {
+          debugPrint('[Chillu] Typing started from Sleepy state -> wake up to Attentive');
         }
         _chilluController.attentive();
       }
     } else {
-      // When input message is cleared and unfocused, return to Confused if latest response was an error, else return to Idle
+      // When input message is cleared, return to Confused if latest response was an error, else return to Idle
       if (_chilluController.state == ChilluState.attentive) {
         final int lastAssistantIdx = _messages.lastIndexWhere((m) => !m.isUser);
         if (lastAssistantIdx != -1 && _messages[lastAssistantIdx].action == 'error') {
