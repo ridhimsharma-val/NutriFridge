@@ -68,9 +68,30 @@ function calculateMatchScore(
 
   if (!text.trim()) return 10;
 
-  // 1. Penalize/reject wallpapers, vectors, desktop backgrounds, and graphics
-  const isJunk = text.includes('wallpaper') || text.includes('cool backgrounds') || text.includes('desktop background') || text.includes('vector') || text.includes('illustration');
+  // 1. Penalize/reject wallpapers, vectors, desktop backgrounds, clipart, and graphics
+  const isJunk = text.includes('wallpaper') || text.includes('cool backgrounds') || text.includes('desktop background') || text.includes('vector') || text.includes('illustration') || text.includes('clipart') || text.includes('drawing');
   if (isJunk) return 0;
+
+  // Reject sweets, candies, and non-food items unless explicitly in query
+  if (!normQuery.includes('candy') && !normQuery.includes('gummy') && !normQuery.includes('sweet')) {
+    if (text.includes('gummy') || text.includes('lollipop') || text.includes('candies') || text.includes('candy')) {
+      return 0;
+    }
+  }
+
+  // Reject drinks, juices, and smoothies when searching for raw ingredients
+  if (!normQuery.includes('juice') && !normQuery.includes('drink') && !normQuery.includes('smoothie') && !normQuery.includes('cocktail')) {
+    if (text.includes('juice') || text.includes('smoothie') || text.includes('cocktail') || text.includes('beverage')) {
+      return 15; // Strongly downrank liquid drinks when searching for whole/raw food
+    }
+  }
+
+  // Downrank mixed fruit salads/baskets when searching for single fruit
+  if (!normQuery.includes('salad') && !normQuery.includes('mix') && !normQuery.includes('basket')) {
+    if (text.includes('fruit salad') || text.includes('mixed fruit') || text.includes('fruit basket')) {
+      return 25;
+    }
+  }
 
   if (entityType === 'recipe') {
     // 2. Strict vegetarian filter: If the dish is vegetarian/paneer/veg/dal, reject any meat/chicken/fish
@@ -496,6 +517,7 @@ serve(async (req: Request) => {
       pixabayUrl.searchParams.set('q', searchTerm);
       pixabayUrl.searchParams.set('image_type', 'photo');
       pixabayUrl.searchParams.set('safesearch', 'true');
+      pixabayUrl.searchParams.set('order', 'popular');
       pixabayUrl.searchParams.set('per_page', String(Math.max(perPage, 15)));
       if (categoryFilter) {
         pixabayUrl.searchParams.set('category', categoryFilter);

@@ -39,8 +39,8 @@ class FoodImageResolver {
     // 3. Remove leading numbers (e.g. "2 apples" -> "apples")
     clean = clean.replaceAll(RegExp(r'^\d+\s*'), '');
 
-    // 4. Strip common quality/preparation adjectives for ingredients (e.g. "fresh", "organic", "raw")
-    clean = clean.replaceAll(RegExp(r'\b(fresh|organic|raw|ripe|pure|extra|whole|chopped|diced|sliced)\b', caseSensitive: false), ' ');
+    // 4. Strip common quality/preparation adjectives for ingredients (e.g. "fresh", "organic", "raw", "sliced", "wedges")
+    clean = clean.replaceAll(RegExp(r'\b(fresh|organic|raw|ripe|pure|extra|whole|chopped|diced|sliced|slices|wedges|pieces|cut|seedless)\b', caseSensitive: false), ' ');
 
     // 5. Strip punctuation and non-alphanumeric characters
     clean = clean.replaceAll(RegExp(r'[^a-z0-9\s]'), ' ');
@@ -62,6 +62,37 @@ class FoodImageResolver {
     }
 
     return clean.isEmpty ? rawName.trim().toLowerCase() : clean;
+  }
+
+  /// Builds a descriptive search query tailored for Pixabay photography (Requirement 4).
+  /// E.g. "watermelon" -> "fresh watermelon fruit", "broccoli" -> "whole broccoli", "milk" -> "carton of milk".
+  static String buildDescriptiveQuery(String name, FoodEntityType type, [String? category]) {
+    final canonical = normalizeKey(name);
+    if (type == FoodEntityType.ingredient) {
+      if (canonical == 'watermelon') return 'fresh watermelon fruit';
+      if (canonical == 'broccoli') return 'whole broccoli';
+      if (canonical == 'milk') return 'carton of milk';
+      if (canonical == 'egg' || canonical == 'eggs') return 'fresh eggs';
+      if (canonical == 'paneer') return 'fresh paneer';
+      if (canonical == 'apple') return 'fresh red apple fruit';
+      if (canonical == 'banana') return 'fresh yellow banana';
+
+      if (category != null) {
+        final cat = category.toLowerCase();
+        if (cat.contains('fruit') && !canonical.contains('fruit')) {
+          return 'fresh $canonical fruit';
+        }
+        if (cat.contains('veg')) {
+          return 'fresh $canonical vegetable';
+        }
+        if (cat.contains('dairy')) {
+          return 'fresh $canonical';
+        }
+      }
+      return 'fresh $canonical food';
+    } else {
+      return '$canonical dish recipe';
+    }
   }
 
   /// Curated local transparent food cutouts for the interactive cooking pan
@@ -112,17 +143,22 @@ class FoodImageResolver {
     return null;
   }
 
-  /// Clean transparent PNG placeholder fallback. Never returns a non-transparent photographic JPG.
+  /// Clean transparent PNG placeholder fallback. Never returns an unrelated specific food photograph.
   static String getCleanTransparentPlaceholder([String? category]) {
     if (category != null) {
       final cat = category.toLowerCase();
-      if (cat.contains('dairy')) return 'assets/images/foods/milk.png';
-      if (cat.contains('veg')) return 'assets/images/foods/broccoli.png';
-      if (cat.contains('fruit')) return 'assets/images/foods/apple.png';
-      if (cat.contains('non-veg')) return 'assets/images/foods/chicken.png';
-      if (cat.contains('juice') || cat.contains('drink')) return 'assets/images/foods/juice.png';
+      if (cat.contains('dairy')) return 'assets/images/categories/dairy_products.png';
+      if (cat.contains('veg')) return 'assets/images/categories/vegetables.png';
+      if (cat.contains('fruit') && !cat.contains('dry')) return 'assets/images/categories/fruits.png';
+      if (cat.contains('non-veg') || cat.contains('non veg')) return 'assets/images/categories/non_veg.png';
+      if (cat.contains('juice') || cat.contains('drink')) return 'assets/images/categories/juices.png';
+      if (cat.contains('ice cream')) return 'assets/images/categories/ice_cream.png';
+      if (cat.contains('frozen')) return 'assets/images/categories/frozen_food.png';
+      if (cat.contains('dry fruit')) return 'assets/images/categories/dry_fruits.png';
+      if (cat.contains('package')) return 'assets/images/categories/packaged_food.png';
+      if (cat.contains('meal') || cat.contains('leftover')) return 'assets/images/categories/leftovers.png';
     }
-    return 'assets/images/foods/apple.png';
+    return 'assets/images/categories/others.png';
   }
 
   /// Checks if an exact local curated asset mapping exists.
@@ -202,39 +238,23 @@ class FoodImageResolver {
   }
 
   /// Builds a clean fallback placeholder model when no provider match or curated asset exists.
+  /// Strictly returns category-level fallbacks; NEVER substitutes an unrelated specific food photograph (e.g. never apple for watermelon).
   FoodImageModel buildPlaceholder({
     required String name,
     required FoodEntityType type,
     String? category,
   }) {
     final canonicalKey = normalizeKey(name);
-    String placeholderUrl = 'assets/images/paneer_rice_bowl.jpg';
+    String placeholderUrl = 'assets/images/categories/others.png';
 
     if (type == FoodEntityType.ingredient) {
-      if (category != null) {
-        final cat = category.toLowerCase();
-        if (cat.contains('dairy')) {
-          placeholderUrl = 'assets/images/foods/milk.png';
-        } else if (cat.contains('veg')) {
-          placeholderUrl = 'assets/images/foods/tomato.png';
-        } else if (cat.contains('fruit')) {
-          placeholderUrl = 'assets/images/foods/apple.png';
-        } else if (cat.contains('non-veg')) {
-          placeholderUrl = 'assets/images/foods/chicken.png';
-        } else if (cat.contains('drink') || cat.contains('juice')) {
-          placeholderUrl = 'assets/images/foods/juice.png';
-        } else {
-          placeholderUrl = 'assets/images/foods/apple.png';
-        }
-      } else {
-        placeholderUrl = 'assets/images/foods/apple.png';
-      }
+      placeholderUrl = getCleanTransparentPlaceholder(category);
     } else {
       placeholderUrl = MealImageRegistry.getFallbackAsset(name);
     }
 
     final panCutout = type == FoodEntityType.ingredient
-        ? (findCuratedCutout(name) ?? ((placeholderUrl.endsWith('.png') || placeholderUrl.endsWith('.webp')) ? placeholderUrl : getCleanTransparentPlaceholder(category)))
+        ? (findCuratedCutout(name) ?? getCleanTransparentPlaceholder(category))
         : null;
 
     return FoodImageModel(
@@ -248,12 +268,13 @@ class FoodImageResolver {
     );
   }
 
-  /// Resolves an image with the authoritative priority order:
-  /// 1. User-selected image override
-  /// 2. Curated / local asset mapping
-  /// 3. Previously saved automatic mapping
-  /// 4. Pixabay search & matching via Supabase Edge Function
-  /// 5. Existing category placeholder
+  /// Resolves an image with the authoritative priority order (Requirement 6):
+  /// 1. User-uploaded ingredient photograph / override
+  /// 2. Previously verified ingredient image from persistent storage
+  /// 3. Existing correct local food image (if an exact match exists)
+  /// 4. Newly retrieved and verified Pixabay image
+  /// 5. Correct category-level fallback image
+  /// *Never silently substitute an unrelated food photograph (e.g., never apple for watermelon).*
   Future<FoodImageModel> resolve({
     required String name,
     required FoodEntityType type,
@@ -288,7 +309,7 @@ class FoodImageResolver {
     try {
       final repo = FoodImageRepository.instance;
 
-      // Priority 1: User-selected override & Priority 3: Saved automatic mapping from repo/DB
+      // Priority 1: User-selected override & Priority 2: Saved / verified mapping from repo/DB
       final savedMapping = await repo.fetchMapping(
         type: type,
         entityKey: canonicalKey,
@@ -301,10 +322,21 @@ class FoodImageResolver {
         return savedMapping;
       }
 
-      // Priority 4: Search real food photography via Supabase Edge Function (Pixabay)
+      // Priority 3: Existing correct local food image (if an exact match exists, e.g. apple, banana, broccoli, milk, eggs, paneer)
+      final curated = checkCuratedAsset(canonicalKey, name, type);
+      if (curated != null) {
+        _failedResolutions.remove(inFlightKey);
+        repo.putInMemoryCache(curated);
+        completer.complete(curated);
+        return curated;
+      }
+
+      // Priority 4: Search real food photography via Pixabay (through backend proxy / Edge Function)
+      final descriptiveQuery = buildDescriptiveQuery(name, type, category);
       final searchResult = await _invokeEdgeFunction({
         'action': 'resolve',
         'query': canonicalKey,
+        'descriptiveQuery': descriptiveQuery,
         'displayName': name,
         'entityType': type.toDbString(),
         'category': category,
@@ -347,19 +379,10 @@ class FoodImageResolver {
         return resolvedModel;
       }
 
-      // Priority 5: Fallback to curated local asset when external search has no match or offline
-      final curated = checkCuratedAsset(canonicalKey, name, type);
-      if (curated != null) {
-        _failedResolutions.remove(inFlightKey);
-        repo.putInMemoryCache(curated);
-        completer.complete(curated);
-        return curated;
-      }
-
       // Mark failure cooldown if no acceptable candidate found
       _failedResolutions[inFlightKey] = DateTime.now();
 
-      // Priority 5: Fallback clean placeholder
+      // Priority 5: Fallback category placeholder (never an unrelated specific food photograph)
       final placeholder = buildPlaceholder(name: name, type: type, category: category);
       repo.putInMemoryCache(placeholder);
       completer.complete(placeholder);

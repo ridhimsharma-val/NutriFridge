@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../services/food_image/food_image_resolver.dart';
+import '../../../services/food_image/food_image_service.dart';
 import '../models/cinematic_meal_data.dart';
 
 /// Cinematic Meal Logging & Nutrition Reveal Animation Screen.
@@ -154,7 +155,8 @@ class _CinematicMealLoggingRevealScreenState
 
     _flyingIngredients = List.generate(finalDisplayList.length, (index) {
       final name = finalDisplayList[index];
-      final cutout = FoodImageResolver.findCuratedCutout(name);
+      final cutout = FoodImageResolver.findCuratedCutout(name) ??
+          FoodImageService.instance.getPanCutoutSync(name: name);
 
       // Trajectory geometry
       final double totalItems = finalDisplayList.length.toDouble();
@@ -498,6 +500,13 @@ class _CinematicMealLoggingRevealScreenState
   /// Ingredient image cutout or styled vector representation
   Widget _buildIngredientVisual(String name, String? assetPath) {
     if (assetPath != null && assetPath.isNotEmpty) {
+      if (assetPath.startsWith('http://') || assetPath.startsWith('https://')) {
+        return Image.network(
+          assetPath,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => _buildFallbackIngredientChip(name),
+        );
+      }
       return Image.asset(
         assetPath,
         fit: BoxFit.contain,

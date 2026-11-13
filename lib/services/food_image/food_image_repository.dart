@@ -55,11 +55,15 @@ class FoodImageRepository {
     required String entityKey,
     String? userId,
   }) {
-    final effectiveUserId = userId ?? AuthService.instance.currentUser?.id;
-    if (effectiveUserId != null && effectiveUserId.isNotEmpty) {
+    final effectiveUserId = userId ?? AuthService.instance.currentUser?.id ?? 'local_user';
+    if (effectiveUserId.isNotEmpty) {
       final overrideKey = _cacheKey(type, entityKey, effectiveUserId);
       if (_memoryCache.containsKey(overrideKey)) {
         return _memoryCache[overrideKey];
+      }
+      final localUserKey = _cacheKey(type, entityKey, 'local_user');
+      if (_memoryCache.containsKey(localUserKey)) {
+        return _memoryCache[localUserKey];
       }
     }
     final sharedKey = _cacheKey(type, entityKey);

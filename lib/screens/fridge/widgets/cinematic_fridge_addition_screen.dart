@@ -2,7 +2,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../services/food_image/food_image_model.dart';
 import '../../../services/food_image/food_image_resolver.dart';
+import '../../../services/food_image/food_image_service.dart';
 import '../models/category_item.dart';
 import '../models/fridge_preferences.dart';
 import '../models/ingredient_addition_data.dart';
@@ -151,9 +153,17 @@ class _CinematicFridgeAdditionScreenState
 
     _flyingItems = List.generate(visualEntities.length, (index) {
       final item = visualEntities[index];
-      final imagePath = item.imageAsset ??
-          FoodImageResolver.findCuratedCutout(item.name) ??
-          FoodItemAssetRegistry.getAssetForItem(item.name, item.category);
+      final imageModel = FoodImageService.instance.getImageSync(
+        name: item.name,
+        type: FoodEntityType.ingredient,
+        category: item.category,
+      );
+      final imagePath = (item.imageAsset != null && item.imageAsset!.isNotEmpty)
+          ? item.imageAsset!
+          : (!imageModel.isPlaceholder
+              ? imageModel.imageUrl
+              : (FoodImageResolver.findCuratedCutout(item.name) ??
+                  FoodItemAssetRegistry.getAssetForItem(item.name, item.category)));
 
       final total = visualEntities.length.toDouble();
       final double horizontalOffsetFactor = (index - (total - 1) / 2.0);
@@ -395,6 +405,13 @@ class _CinematicFridgeAdditionScreenState
 
   Widget _buildIngredientThumbnail(String name, String? assetPath) {
     if (assetPath != null && assetPath.isNotEmpty) {
+      if (assetPath.startsWith('http://') || assetPath.startsWith('https://')) {
+        return Image.network(
+          assetPath,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => _buildFallbackThumbnail(name),
+        );
+      }
       return Image.asset(
         assetPath,
         fit: BoxFit.contain,
@@ -557,9 +574,17 @@ class _CinematicFridgeAdditionScreenState
 
   /// Single Ingredient Card
   Widget _buildIngredientCard(AddedIngredientItem item) {
-    final imagePath = item.imageAsset ??
-        FoodImageResolver.findCuratedCutout(item.name) ??
-        FoodItemAssetRegistry.getAssetForItem(item.name, item.category);
+    final imageModel = FoodImageService.instance.getImageSync(
+      name: item.name,
+      type: FoodEntityType.ingredient,
+      category: item.category,
+    );
+    final imagePath = (item.imageAsset != null && item.imageAsset!.isNotEmpty)
+        ? item.imageAsset!
+        : (!imageModel.isPlaceholder
+            ? imageModel.imageUrl
+            : (FoodImageResolver.findCuratedCutout(item.name) ??
+                FoodItemAssetRegistry.getAssetForItem(item.name, item.category)));
 
     final expiryText = item.formattedExpiry;
 

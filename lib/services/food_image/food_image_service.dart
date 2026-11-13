@@ -55,13 +55,11 @@ class FoodImageService {
 
     if (cached != null) return cached;
 
-    // Fast synchronous curated local asset check (Priority 2: Milk, Paneer, Apple, Broccoli, etc.)
-    if (FoodImageResolver.mockHandler == null) {
-      final curated = FoodImageResolver.instance.checkCuratedAsset(canonicalKey, name, type);
-      if (curated != null) {
-        FoodImageRepository.instance.putInMemoryCache(curated);
-        return curated;
-      }
+    // Fast synchronous curated local asset check (Priority 3: Milk, Paneer, Apple, Broccoli, etc.)
+    final curated = FoodImageResolver.instance.checkCuratedAsset(canonicalKey, name, type);
+    if (curated != null) {
+      FoodImageRepository.instance.putInMemoryCache(curated);
+      return curated;
     }
 
     // Trigger background resolution lazily without blocking widget build

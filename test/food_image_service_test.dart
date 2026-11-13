@@ -26,23 +26,23 @@ void main() {
   });
 
   group('NutriFridge — Centralized Food Image System Scenarios', () {
-    // Scenario 1: Add Paneer for the first time -> automatically resolves a Paneer photograph
-    test('Scenario 1: Add Paneer for the first time automatically resolves a Paneer photograph', () async {
+    // Scenario 1: Add Watermelon for the first time -> automatically resolves a Watermelon photograph from Pixabay
+    test('Scenario 1: Add Watermelon for the first time automatically resolves a Watermelon photograph', () async {
       int edgeFunctionCallCount = 0;
       FoodImageResolver.mockHandler = (body) async {
         edgeFunctionCallCount++;
-        expect(body['query'], 'paneer');
+        expect(body['query'], 'watermelon');
         return {
           'ok': true,
           'action': 'resolve',
           'bestMatch': {
-            'photoId': 'px_paneer_123',
-            'imageUrl': 'https://cdn.pixabay.com/photo/123/paneer.jpg',
-            'thumbnailUrl': 'https://cdn.pixabay.com/photo/123/paneer_small.jpg',
+            'photoId': 'px_watermelon_123',
+            'imageUrl': 'https://cdn.pixabay.com/photo/123/watermelon.jpg',
+            'thumbnailUrl': 'https://cdn.pixabay.com/photo/123/watermelon_small.jpg',
             'photographerName': 'Chef Aarti',
             'photographerUrl': 'https://pixabay.com/users/aarti-123/',
-            'sourcePageUrl': 'https://pixabay.com/photos/fresh-paneer-cubes-123/',
-            'altDescription': 'Fresh organic paneer cubes on wooden board',
+            'sourcePageUrl': 'https://pixabay.com/photos/fresh-watermelon-123/',
+            'altDescription': 'Fresh sliced watermelon on wooden board',
             'provider': 'pixabay',
             'score': 95,
           },
@@ -51,13 +51,13 @@ void main() {
 
       // Raw ingredient with quantity
       final resolved = await FoodImageService.instance.resolveImage(
-        name: 'Paneer - 500 g',
+        name: 'Fresh Watermelon - 1 kg',
         type: FoodEntityType.ingredient,
-        category: 'Dairy Products',
+        category: 'Fruits',
       );
 
-      expect(resolved.entityKey, 'paneer');
-      expect(resolved.imageUrl, 'https://cdn.pixabay.com/photo/123/paneer.jpg');
+      expect(resolved.entityKey, 'watermelon');
+      expect(resolved.imageUrl, 'https://cdn.pixabay.com/photo/123/watermelon.jpg');
       expect(resolved.provider, 'pixabay');
       expect(resolved.photographerName, 'Chef Aarti');
       expect(resolved.hasAttribution, isTrue);
@@ -65,26 +65,8 @@ void main() {
       expect(edgeFunctionCallCount, 1);
     });
 
-    // Scenario 2: Add Apple -> resolves an Apple photograph
+    // Scenario 2: Add Apple -> resolves an Apple photograph (Priority 3 exact local asset)
     test('Scenario 2: Add Apple resolves an Apple photograph', () async {
-      FoodImageResolver.mockHandler = (body) async {
-        return {
-          'ok': true,
-          'action': 'resolve',
-          'bestMatch': {
-            'photoId': 'px_apple_456',
-            'imageUrl': 'https://cdn.pixabay.com/photo/456/apple.jpg',
-            'thumbnailUrl': 'https://cdn.pixabay.com/photo/456/apple_thumb.jpg',
-            'photographerName': 'John Orchard',
-            'photographerUrl': 'https://pixabay.com/users/john-456/',
-            'sourcePageUrl': 'https://pixabay.com/photos/crisp-red-apple-456/',
-            'altDescription': 'Crisp red apple on rustic table',
-            'provider': 'pixabay',
-            'score': 100,
-          },
-        };
-      };
-
       final resolved = await FoodImageService.instance.resolveImage(
         name: 'Fresh Apples (4 pcs)',
         type: FoodEntityType.ingredient,
@@ -92,7 +74,7 @@ void main() {
       );
 
       expect(resolved.entityKey, 'apple');
-      expect(resolved.imageUrl, 'https://cdn.pixabay.com/photo/456/apple.jpg');
+      expect(resolved.imageUrl, 'assets/images/foods/apple.png');
     });
 
     // Scenario 3: Add an unfamiliar ingredient -> resolves a relevant image or displays a clean placeholder
@@ -114,8 +96,8 @@ void main() {
       );
 
       expect(resolved.isPlaceholder, isTrue);
-      // Clean category placeholder for Fruits
-      expect(resolved.imageUrl, 'assets/images/foods/apple.png');
+      // Clean category placeholder for Fruits (never apple.png!)
+      expect(resolved.imageUrl, 'assets/images/categories/fruits.png');
     });
 
     // Scenario 4: Generate Shahi Paneer -> resolves a matching recipe photograph
@@ -214,7 +196,7 @@ void main() {
 
       // First time viewing
       final first = await FoodImageService.instance.resolveImage(
-        name: 'Veggie Pasta',
+        name: 'Authentic Pad Thai',
         type: FoodEntityType.recipe,
       );
       expect(first.imageUrl, 'https://cdn.pixabay.com/photo/999/pasta.jpg');
@@ -222,7 +204,7 @@ void main() {
 
       // Second time viewing (e.g., navigating back to recipe or reopening detail)
       final second = await FoodImageService.instance.resolveImage(
-        name: 'Veggie Pasta',
+        name: 'Authentic Pad Thai',
         type: FoodEntityType.recipe,
       );
       expect(second.imageUrl, 'https://cdn.pixabay.com/photo/999/pasta.jpg');
@@ -388,7 +370,7 @@ void main() {
 
       expect(resolved.isPlaceholder, isTrue);
       // Still returns a clean category asset so UI does not crash
-      expect(resolved.imageUrl, 'assets/images/foods/milk.png');
+      expect(resolved.imageUrl, 'assets/images/categories/dairy_products.png');
     });
 
     // Scenario 11: No Pixabay key configured -> no crash or fake image assignment
@@ -589,7 +571,7 @@ void main() {
 
       expect(cutout, isNotNull);
       expect(cutout.endsWith('.png') || cutout.endsWith('.webp'), isTrue);
-      expect(cutout, 'assets/images/foods/apple.png'); // clean transparent fruit fallback
+      expect(cutout, 'assets/images/categories/fruits.png'); // clean transparent fruit fallback
     });
 
     // Scenario 19: PanCutoutPickerSheet renders skillet canvas and allows selecting cutout

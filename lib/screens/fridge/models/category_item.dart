@@ -133,7 +133,12 @@ class CategoryFoodItem {
   /// Returns the item's specific food image asset path or resolved network URL.
   /// Checks centralized FoodImageService first for user overrides or mapped photographs.
   String? get effectiveImageAsset {
-    // 1. Authoritative check: User overrides & centralized resolved mappings
+    // 1. Priority 1: User-uploaded ingredient photograph if available
+    if (storageImagePath != null && storageImagePath!.isNotEmpty) {
+      return storageImagePath;
+    }
+
+    // 2. Authoritative check: User overrides & centralized resolved mappings (Priorities 2, 3, 4)
     final serviceImage = FoodImageService.instance.getImageSync(
       name: name,
       type: FoodEntityType.ingredient,
@@ -143,13 +148,8 @@ class CategoryFoodItem {
       return serviceImage.imageUrl;
     }
 
-    // 2. Storage image path if present
-    if (storageImagePath != null && storageImagePath!.isNotEmpty) {
-      return storageImagePath;
-    }
-
     // 3. Fallback to specific local asset ONLY if it is an exact curated asset for this specific item,
-    // NEVER an unrelated category fallback (e.g. do not show apple for pineapple)
+    // NEVER an unrelated category fallback (e.g. do not show apple for pineapple or watermelon)
     if (imageAsset != null &&
         imageAsset!.isNotEmpty &&
         FoodItemAssetRegistry.hasExactAsset(name)) {
@@ -346,7 +346,7 @@ class FoodItemAssetRegistry {
   }
 
   /// Resolves the dedicated asset path for an item by name and optional category.
-  /// Never returns a category collage/hero image.
+  /// Never returns an unrelated specific food photograph (e.g. never apple for watermelon).
   static String getAssetForItem(String name, [String? category]) {
     final cleanName = name.trim().toLowerCase();
 
@@ -355,30 +355,32 @@ class FoodItemAssetRegistry {
       return _itemAssetMap[cleanName]!;
     }
 
-    // Partial/keyword match
+    // Exact word/boundary match (never match substring inside unrelated word, e.g. watermelon inside watermelon juice)
     for (final entry in _itemAssetMap.entries) {
-      if (cleanName.contains(entry.key) || entry.key.contains(cleanName)) {
+      if (cleanName == entry.key ||
+          cleanName.startsWith('${entry.key} ') ||
+          cleanName.endsWith(' ${entry.key}')) {
         return entry.value;
       }
     }
 
-    // Category-specific fallback item visual (individual food, not category collage)
+    // Category-specific fallback item visual (never an unrelated specific food photograph)
     if (category != null) {
       final cat = category.toLowerCase();
-      if (cat.contains('dairy')) return 'assets/images/foods/milk.png';
-      if (cat.contains('veg')) return 'assets/images/foods/tomato.png';
-      if (cat.contains('fruit') && !cat.contains('dry')) return 'assets/images/foods/apple.png';
-      if (cat.contains('non-veg') || cat.contains('non veg')) return 'assets/images/foods/chicken.png';
-      if (cat.contains('meal') || cat.contains('leftover')) return 'assets/images/foods/paneer_curry.jpg';
-      if (cat.contains('package')) return 'assets/images/foods/bread.png';
-      if (cat.contains('drink') || cat.contains('juice')) return 'assets/images/foods/juice.png';
-      if (cat.contains('ice cream')) return 'assets/images/foods/vanilla_ice_cream.jpg';
-      if (cat.contains('frozen')) return 'assets/images/foods/frozen_peas.png';
-      if (cat.contains('dry fruit')) return 'assets/images/foods/almonds.png';
-      if (cat.contains('other')) return 'assets/images/foods/honey.jpg';
+      if (cat.contains('dairy')) return 'assets/images/categories/dairy_products.png';
+      if (cat.contains('veg')) return 'assets/images/categories/vegetables.png';
+      if (cat.contains('fruit') && !cat.contains('dry')) return 'assets/images/categories/fruits.png';
+      if (cat.contains('non-veg') || cat.contains('non veg')) return 'assets/images/categories/non_veg.png';
+      if (cat.contains('meal') || cat.contains('leftover')) return 'assets/images/categories/leftovers.png';
+      if (cat.contains('package')) return 'assets/images/categories/packaged_food.png';
+      if (cat.contains('drink') || cat.contains('juice')) return 'assets/images/categories/juices.png';
+      if (cat.contains('ice cream')) return 'assets/images/categories/ice_cream.png';
+      if (cat.contains('frozen')) return 'assets/images/categories/frozen_food.png';
+      if (cat.contains('dry fruit')) return 'assets/images/categories/dry_fruits.png';
+      if (cat.contains('other')) return 'assets/images/categories/others.png';
     }
 
-    return 'assets/images/foods/apple.png';
+    return 'assets/images/categories/others.png';
   }
 
   /// Returns a clean representative emoji for a canonical fridge category.
