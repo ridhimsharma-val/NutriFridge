@@ -4,17 +4,21 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../services/food_image/food_image_resolver.dart';
 import '../models/category_item.dart';
+import '../models/fridge_preferences.dart';
 import '../models/ingredient_addition_data.dart';
+import 'top_freezer_refrigerator.dart';
 
 /// Cinematic Refrigerator Opening & Ingredient Addition Experience.
 ///
 /// Animation lifecycle (approximately 2.5–3.2 seconds):
-/// 1. Scene 1 — Fridge Opening (~800–1000ms): The 3D refrigerator door swings open, revealing the illuminated interior and releasing a gentle cold mist.
-/// 2. Scene 2 — Ingredients Fly In (~1000–1400ms): Confirmed ingredients follow staggered, curved, rotating trajectories into the open compartment with realistic 3D perspective and depth scaling.
-/// 3. Scene 3 — Fridge Closing (~500–700ms): Interior glow settles, cold mist clears, and the door smoothly swings closed.
+/// 1. Scene 1 — Fridge Door Vanish/Fade: The exact NutriFridge refrigerator is displayed. Its door smoothly blurs and fades away, revealing the interior cavity and releasing a cool mist.
+/// 2. Scene 2 — Ingredients Fly In: Confirmed ingredients follow staggered, curved, rotating trajectories into the revealed interior with depth scaling.
+/// 3. Scene 3 — Fridge Door Re-Fade: Interior glow settles, and the refrigerator door smoothly fades back in to close the appliance.
 /// 4. Scene 4 — Addition Summary Screen: Dedicated full-screen card summary displaying real saved ingredients, quantities, categories, and optional expiry dates.
 ///
 /// Features:
+/// - Reuses the exact authentic NutriFridge [TopFreezerRefrigerator] component.
+/// - Door disappears and restores via soft blur and opacity fade (zero conventional swinging-door rotation).
 /// - Tap anywhere to skip straight to the summary screen.
 /// - "Done" button returns user to the originating screen.
 /// - Reduced-motion accessibility support.
@@ -81,7 +85,9 @@ class _CinematicFridgeAdditionScreenState
   late final AnimationController _controller;
 
   late final List<_FlyingFridgeItem> _flyingItems;
-  late final List<_MistParticle> _mistParticles;
+
+  bool _isFridgeOpen = false;
+  bool _isFreezerOpen = false;
 
   static const Duration _totalDuration = Duration(milliseconds: 3000);
 
@@ -94,7 +100,8 @@ class _CinematicFridgeAdditionScreenState
     );
 
     _initFlyingItems();
-    _initMistParticles();
+
+    _controller.addListener(_handleAnimationTick);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -108,23 +115,25 @@ class _CinematicFridgeAdditionScreenState
 
   @override
   void dispose() {
+    _controller.removeListener(_handleAnimationTick);
     _controller.dispose();
     super.dispose();
   }
 
-  void _initMistParticles() {
-    final rng = math.Random(42);
-    _mistParticles = List.generate(16, (i) {
-      return _MistParticle(
-        relativeX: (rng.nextDouble() - 0.5) * 160.0,
-        relativeY: -30.0 + rng.nextDouble() * 120.0,
-        radius: 20.0 + rng.nextDouble() * 32.0,
-        driftSpeedX: (rng.nextDouble() - 0.5) * 60.0,
-        driftSpeedY: 20.0 + rng.nextDouble() * 50.0, // Drifts downward and outward
-        opacityFactor: 0.18 + rng.nextDouble() * 0.22,
-        isMintTint: i % 3 == 0,
-      );
-    });
+  void _handleAnimationTick() {
+    final t = _controller.value;
+    // Sequence:
+    // 0.00..0.06: Complete refrigerator with door visible
+    // 0.06..0.64: Door fades away, interior fully revealed, mist emerges, ingredients fly in
+    // 0.64..0.80: Refrigerator door smoothly returns via reverse fade
+    // 0.80..1.00: Refrigerator closed, transitions to Summary screen
+    final shouldOpen = (t >= 0.06 && t < 0.64);
+    if (shouldOpen != _isFridgeOpen && mounted) {
+      setState(() {
+        _isFridgeOpen = shouldOpen;
+        _isFreezerOpen = shouldOpen;
+      });
+    }
   }
 
   void _initFlyingItems() {
@@ -156,18 +165,18 @@ class _CinematicFridgeAdditionScreenState
       // Launch positions spread from bottom corners outside fridge
       final bool startLeft = index % 2 == 0;
       final double launchX = startLeft ? -160.0 - (index * 20.0) : 160.0 + (index * 20.0);
-      final double launchY = 180.0 + (rng.nextDouble() * 40.0);
+      final double launchY = 190.0 + (rng.nextDouble() * 30.0);
 
-      // Apex curves up and high toward the open door
+      // Apex curves up and high toward the open interior
       final double apexX = startLeft ? -80.0 + horizontalOffsetFactor * 15.0 : 80.0 + horizontalOffsetFactor * 15.0;
-      final double apexY = -120.0 - (rng.nextDouble() * 60.0);
+      final double apexY = -100.0 - (rng.nextDouble() * 50.0);
 
       // Destination inside the open fridge cabinet compartment
-      final double targetX = -20.0 + (horizontalOffsetFactor * 18.0);
-      final double targetY = -40.0 + (index * 22.0) - 20.0;
+      final double targetX = (horizontalOffsetFactor * 18.0);
+      final double targetY = 10.0 + (index * 16.0);
 
       final double spinDir = (index % 2 == 0) ? 1.0 : -1.0;
-      final double spinSpeed = (rng.nextDouble() * 1.6 + 1.2) * spinDir;
+      final double spinSpeed = (rng.nextDouble() * 1.5 + 1.2) * spinDir;
 
       return _FlyingFridgeItem(
         item: item,
@@ -221,7 +230,7 @@ class _CinematicFridgeAdditionScreenState
                 // 1. Soft Sage / Mint Atmosphere Background
                 _buildSageMintBackground(t),
 
-                // 2. Scene 1, 2, 3: The 3D Refrigerator, Mist, and Flying Ingredients
+                // 2. Scene 1, 2, 3: The Authentic NutriFridge Refrigerator, Cold Mist, and Flying Ingredients
                 if (t < 0.85) ...[
                   _buildFridgeScenes(t),
                 ],
@@ -269,125 +278,44 @@ class _CinematicFridgeAdditionScreenState
     );
   }
 
-  /// Scene 1 (Opening), Scene 2 (Flying Ingredients), Scene 3 (Closing)
+  /// Scene 1, Scene 2, Scene 3: Actual NutriFridge Refrigerator with fade-reveal door
   Widget _buildFridgeScenes(double t) {
     final sceneOpacity = (1.0 - ((t - 0.72) / 0.12)).clamp(0.0, 1.0);
     if (sceneOpacity <= 0) return const SizedBox.shrink();
 
     final size = MediaQuery.of(context).size;
-    final centerX = size.width / 2;
-    final centerY = size.height * 0.46;
-
-    // Fridge Door Angle Timeline:
-    // 0.00..0.28: Door swings open (0 -> -1.35 rad ~ 77 deg)
-    // 0.28..0.64: Door stays fully open as ingredients fly in
-    // 0.64..0.80: Door swings smoothly closed (-1.35 -> 0.0 rad)
-    double doorAngle = 0.0;
-    double interiorGlow = 0.0;
-
-    if (t < 0.28) {
-      final p = Curves.easeInOutCubic.transform(t / 0.28);
-      doorAngle = -1.35 * p;
-      interiorGlow = p;
-    } else if (t < 0.64) {
-      doorAngle = -1.35;
-      interiorGlow = 1.0;
-    } else if (t < 0.80) {
-      final p = Curves.easeInOutCubic.transform((t - 0.64) / 0.16);
-      doorAngle = -1.35 * (1.0 - p);
-      interiorGlow = 1.0 - p;
-    } else {
-      doorAngle = 0.0;
-      interiorGlow = 0.0;
-    }
-
-    const double fridgeW = 230.0;
-    const double fridgeH = 340.0;
+    final double fridgeHeight = size.height * 0.58;
+    final double centerX = size.width / 2;
+    final double centerY = size.height * 0.38;
 
     return Opacity(
       opacity: sceneOpacity,
       child: Stack(
         children: [
-          // Ambient Refrigerator Drop Shadow
+          // Authentic NutriFridge Refrigerator (Fade-reveal door, shelves & cold mist)
           Positioned(
-            left: centerX - 120,
-            top: centerY + (fridgeH / 2) - 15,
-            child: Container(
-              width: 240,
-              height: 35,
-              decoration: BoxDecoration(
-                borderRadius: const BorderRadius.all(Radius.elliptical(240, 35)),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primaryForest.withOpacity(0.25),
-                    blurRadius: 36,
-                    spreadRadius: 4,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Refrigerator Interior Cabinet Body
-          Positioned(
-            left: centerX - (fridgeW / 2),
-            top: centerY - (fridgeH / 2),
-            child: SizedBox(
-              width: fridgeW,
-              height: fridgeH,
-              child: Stack(
-                children: [
-                  _buildCabinetAsset(fridgeW, fridgeH),
-
-                  // Soft Interior Illumination Glow
-                  if (interiorGlow > 0.01)
-                    Positioned.fill(
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(22),
-                          gradient: RadialGradient(
-                            center: Alignment.center,
-                            radius: 0.85,
-                            colors: [
-                              Colors.white.withOpacity(0.45 * interiorGlow),
-                              AppColors.paleMint.withOpacity(0.20 * interiorGlow),
-                              Colors.transparent,
-                            ],
-                          ),
-                        ),
-                      ),
+            top: size.height * 0.08,
+            left: 0,
+            right: 0,
+            height: fridgeHeight,
+            child: Center(
+              child: IgnorePointer(
+                child: FittedBox(
+                  fit: BoxFit.contain,
+                  alignment: Alignment.center,
+                  child: SizedBox(
+                    width: 292.0,
+                    height: 588.0,
+                    child: TopFreezerRefrigerator(
+                      isFreezerOpen: _isFreezerOpen,
+                      isFridgeOpen: _isFridgeOpen,
+                      onFreezerToggle: () {},
+                      onFridgeToggle: () {},
+                      preferences: FridgePreferencesRepository.current,
                     ),
-                ],
-              ),
-            ),
-          ),
-
-          // Cold Mist Vapor Layer (spreads outward and downward as door opens)
-          if (interiorGlow > 0.05)
-            Positioned(
-              left: centerX - (fridgeW / 2),
-              top: centerY - (fridgeH / 2),
-              child: CustomPaint(
-                size: const Size(fridgeW, fridgeH),
-                painter: _ColdMistPainter(
-                  progress: t,
-                  particles: _mistParticles,
-                  opacity: interiorGlow,
+                  ),
                 ),
               ),
-            ),
-
-          // 3D Refrigerator Door (Hinged on the left side)
-          Positioned(
-            left: centerX - (fridgeW / 2),
-            top: centerY - (fridgeH / 2),
-            child: Transform(
-              alignment: Alignment.centerLeft,
-              transform: Matrix4.identity()
-                ..setEntry(3, 2, 0.0016)
-                ..rotateY(doorAngle),
-              child: _buildDoorAsset(fridgeW, fridgeH),
             ),
           ),
 
@@ -396,93 +324,6 @@ class _CinematicFridgeAdditionScreenState
             return _buildFlyingIngredientItem(flying, t, centerX, centerY);
           }),
         ],
-      ),
-    );
-  }
-
-  /// Cabinet Interior Image Asset with procedure fallback
-  Widget _buildCabinetAsset(double w, double h) {
-    return Image.asset(
-      'assets/images/magic_fridge/fridge_cabinet.png',
-      width: w,
-      height: h,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-      errorBuilder: (_, __, ___) => _buildFallbackCabinet(w, h),
-    );
-  }
-
-  Widget _buildFallbackCabinet(double w, double h) {
-    return Container(
-      width: w,
-      height: h,
-      decoration: BoxDecoration(
-        color: const Color(0xFFA7D7A5), // Mint Green
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: const Color(0xFF8DC48A), width: 3),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFFBEF),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: List.generate(3, (_) {
-            return Container(
-              height: 4,
-              margin: const EdgeInsets.symmetric(horizontal: 8),
-              color: const Color(0xFFE0E0E0),
-            );
-          }),
-        ),
-      ),
-    );
-  }
-
-  /// Door Image Asset with procedural fallback
-  Widget _buildDoorAsset(double w, double h) {
-    return SizedBox(
-      width: w,
-      height: h,
-      child: Image.asset(
-        'assets/images/magic_fridge/fridge_door.png',
-        width: w,
-        height: h,
-        fit: BoxFit.contain,
-        filterQuality: FilterQuality.high,
-        errorBuilder: (_, __, ___) => _buildFallbackDoor(w, h),
-      ),
-    );
-  }
-
-  Widget _buildFallbackDoor(double w, double h) {
-    return Container(
-      width: w,
-      height: h,
-      decoration: BoxDecoration(
-        color: const Color(0xFFA7D7A5),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: const Color(0xFF8DC48A), width: 3),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.15),
-            blurRadius: 16,
-            offset: const Offset(4, 4),
-          ),
-        ],
-      ),
-      child: Align(
-        alignment: const Alignment(0.75, 0.0),
-        child: Container(
-          width: 8,
-          height: 60,
-          decoration: BoxDecoration(
-            color: const Color(0xFFE0E0E0),
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ),
       ),
     );
   }
@@ -894,70 +735,4 @@ class _FlyingFridgeItem {
     required this.targetY,
     required this.spinSpeed,
   });
-}
-
-/// Particle model for cold refrigerator mist
-class _MistParticle {
-  final double relativeX;
-  final double relativeY;
-  final double radius;
-  final double driftSpeedX;
-  final double driftSpeedY;
-  final double opacityFactor;
-  final bool isMintTint;
-
-  _MistParticle({
-    required this.relativeX,
-    required this.relativeY,
-    required this.radius,
-    required this.driftSpeedX,
-    required this.driftSpeedY,
-    required this.opacityFactor,
-    required this.isMintTint,
-  });
-}
-
-/// Custom painter for the expanding cold mist vapor emerging from the fridge interior
-class _ColdMistPainter extends CustomPainter {
-  final double progress;
-  final List<_MistParticle> particles;
-  final double opacity;
-
-  _ColdMistPainter({
-    required this.progress,
-    required this.particles,
-    required this.opacity,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (opacity <= 0.001) return;
-
-    final centerX = size.width * 0.45;
-    final centerY = size.height * 0.45;
-
-    for (final p in particles) {
-      // Dynamic expansion and downward/outward drift
-      final driftX = p.driftSpeedX * progress;
-      final driftY = p.driftSpeedY * progress;
-      final curX = centerX + p.relativeX + driftX;
-      final curY = centerY + p.relativeY + driftY;
-      final curRadius = p.radius * (1.0 + progress * 0.8);
-
-      final color = p.isMintTint
-          ? const Color(0xFFDDF3E7).withOpacity(p.opacityFactor * opacity)
-          : Colors.white.withOpacity(p.opacityFactor * opacity);
-
-      final paint = Paint()
-        ..color = color
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
-
-      canvas.drawCircle(Offset(curX, curY), curRadius, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _ColdMistPainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.opacity != opacity;
-  }
 }

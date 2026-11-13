@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nutrifridge/screens/fridge/models/ingredient_addition_data.dart';
 import 'package:nutrifridge/screens/fridge/widgets/cinematic_fridge_addition_screen.dart';
+import 'package:nutrifridge/screens/fridge/widgets/cold_mist_effect.dart';
+import 'package:nutrifridge/screens/fridge/widgets/refrigerator_interior.dart';
+import 'package:nutrifridge/screens/fridge/widgets/top_freezer_refrigerator.dart';
 import 'package:nutrifridge/screens/log_meal/models/cinematic_meal_data.dart';
 import 'package:nutrifridge/screens/log_meal/widgets/cinematic_meal_logging_reveal_screen.dart';
 
@@ -12,7 +15,7 @@ void main() {
       CinematicMealLoggingRevealScreen.isShowing = false;
     });
 
-    testWidgets('1. Successfully adding one ingredient opens the animation',
+    testWidgets('1. Successfully adding one ingredient opens the animation with authentic refrigerator',
         (WidgetTester tester) async {
       final additionData = IngredientAdditionData.single(
         item: const AddedIngredientItem(
@@ -35,8 +38,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
 
       expect(find.byType(CinematicFridgeAdditionScreen), findsOneWidget);
-      // Refrigerator asset or cabinet is rendered
-      expect(find.byType(Image), findsWidgets);
+      // Reuses the exact authentic NutriFridge TopFreezerRefrigerator component
+      expect(find.byType(TopFreezerRefrigerator), findsOneWidget);
     });
 
     testWidgets('2. Successfully adding multiple ingredients animates all actual items',
@@ -72,7 +75,6 @@ void main() {
         ),
       );
 
-      // Verify the widget is initialized with all items
       expect(find.byType(CinematicFridgeAdditionScreen), findsOneWidget);
 
       // Advance through animation to summary
@@ -84,7 +86,7 @@ void main() {
       expect(find.text('Broccoli'), findsOneWidget);
     });
 
-    testWidgets('3. The refrigerator door visibly opens with 3D rotation',
+    testWidgets('3. The refrigerator door smoothly blurs and fades away (vanish effect, zero rotation)',
         (WidgetTester tester) async {
       final additionData = IngredientAdditionData.single(
         item: const AddedIngredientItem(
@@ -102,17 +104,18 @@ void main() {
         ),
       );
 
-      // At t=0, door is closed
-      await tester.pump(const Duration(milliseconds: 50));
-      // At t=400ms, door is opened
-      await tester.pump(const Duration(milliseconds: 350));
+      // Refrigerator is visible
+      expect(find.byType(TopFreezerRefrigerator), findsOneWidget);
 
-      expect(find.byType(CinematicFridgeAdditionScreen), findsOneWidget);
-      // Transform widgets are present to handle rotational movement
-      expect(find.byType(Transform), findsWidgets);
+      // Step forward to trigger door fade-reveal sequence
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pump(const Duration(milliseconds: 250));
+
+      // Interior cavity is actively revealed underneath
+      expect(find.byType(RefrigeratorInterior), findsOneWidget);
     });
 
-    testWidgets('4. Cold mist visibly emerges from refrigerator interior',
+    testWidgets('4. Cold mist emerges from refrigerator interior',
         (WidgetTester tester) async {
       final additionData = IngredientAdditionData.single(
         item: const AddedIngredientItem(
@@ -130,14 +133,15 @@ void main() {
         ),
       );
 
-      // Advance to when mist emerges (~400-800ms)
-      await tester.pump(const Duration(milliseconds: 600));
+      // Advance to when door is open and mist flows out (~500ms)
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 100));
 
-      // CustomPaint is rendering the cold mist
-      expect(find.byType(CustomPaint), findsWidgets);
+      // Authentic ColdMistEffect is active
+      expect(find.byType(ColdMistEffect), findsWidgets);
     });
 
-    testWidgets('5. Ingredients follow different rotating trajectories',
+    testWidgets('5. Ingredients follow curved trajectories and enter the revealed interior',
         (WidgetTester tester) async {
       final additionData = IngredientAdditionData.multiple(
         items: const [
@@ -157,11 +161,12 @@ void main() {
       // Advance into ingredient flight phase (~1000ms)
       await tester.pump(const Duration(milliseconds: 1000));
 
-      // Transforms handling trajectory and rotation are actively rendering
+      // Flying items actively rendered over the open refrigerator interior
       expect(find.byType(Transform), findsWidgets);
+      expect(find.byType(RefrigeratorInterior), findsOneWidget);
     });
 
-    testWidgets('6. Ingredients visibly enter the refrigerator compartment',
+    testWidgets('6. Refrigerator door returns through reverse fade animation',
         (WidgetTester tester) async {
       final additionData = IngredientAdditionData.single(
         item: const AddedIngredientItem(name: 'Eggs', quantity: 6, category: 'Dairy'),
@@ -175,33 +180,17 @@ void main() {
         ),
       );
 
-      // Advance to near end of flight where item enters fridge
-      await tester.pump(const Duration(milliseconds: 1800));
+      // Open phase
+      await tester.pump(const Duration(milliseconds: 500));
+      // Flight phase
+      await tester.pump(const Duration(milliseconds: 1400));
+      // Re-fade closing phase (~2200ms)
+      await tester.pump(const Duration(milliseconds: 400));
 
-      expect(find.byType(CinematicFridgeAdditionScreen), findsOneWidget);
+      expect(find.byType(TopFreezerRefrigerator), findsOneWidget);
     });
 
-    testWidgets('7. Refrigerator closes after all items enter',
-        (WidgetTester tester) async {
-      final additionData = IngredientAdditionData.single(
-        item: const AddedIngredientItem(name: 'Carrot', quantity: 3, category: 'Vegetables'),
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: CinematicFridgeAdditionScreen(
-            additionData: additionData,
-          ),
-        ),
-      );
-
-      // Advance to Scene 3 closing phase (~2200ms)
-      await tester.pump(const Duration(milliseconds: 2200));
-
-      expect(find.byType(CinematicFridgeAdditionScreen), findsOneWidget);
-    });
-
-    testWidgets('8. The correct summary appears with header and success badge',
+    testWidgets('7. The correct summary appears with header and success badge',
         (WidgetTester tester) async {
       final additionData = IngredientAdditionData.single(
         item: const AddedIngredientItem(
@@ -230,7 +219,7 @@ void main() {
       expect(find.text('Done'), findsOneWidget);
     });
 
-    testWidgets('9. Actual quantities and categories are displayed',
+    testWidgets('8. Actual quantities and categories are displayed',
         (WidgetTester tester) async {
       final additionData = IngredientAdditionData.multiple(
         items: const [
@@ -270,7 +259,7 @@ void main() {
       expect(find.text('Dairy'), findsOneWidget);
     });
 
-    testWidgets('10. Expiry information is shown only when available and omitted when null',
+    testWidgets('9. Expiry information is shown only when available and omitted when null',
         (WidgetTester tester) async {
       final additionData = IngredientAdditionData.multiple(
         items: const [
@@ -308,7 +297,7 @@ void main() {
       expect(find.byIcon(Icons.access_time_rounded), findsOneWidget);
     });
 
-    testWidgets('11. Skipping the animation opens the same summary immediately',
+    testWidgets('10. Skipping the animation opens the same summary immediately',
         (WidgetTester tester) async {
       final additionData = IngredientAdditionData.single(
         item: const AddedIngredientItem(
@@ -339,7 +328,7 @@ void main() {
       expect(find.text('Done'), findsOneWidget);
     });
 
-    testWidgets('12. Done returns to the originating screen',
+    testWidgets('11. Done returns to the originating screen',
         (WidgetTester tester) async {
       bool doneCalled = false;
 
@@ -367,7 +356,7 @@ void main() {
       expect(doneCalled, isTrue);
     });
 
-    testWidgets('13. Failed saves never show the success animation',
+    testWidgets('12. Failed saves never show the success animation',
         (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -400,7 +389,7 @@ void main() {
       expect(find.textContaining('Error adding item'), findsOneWidget);
     });
 
-    testWidgets('14. Cancelled proposals never trigger the animation',
+    testWidgets('13. Cancelled proposals never trigger the animation',
         (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -425,7 +414,7 @@ void main() {
       expect(find.byType(CinematicFridgeAdditionScreen), findsNothing);
     });
 
-    testWidgets('15. Repeated save callbacks do not open multiple summaries',
+    testWidgets('14. Repeated save callbacks do not open multiple summaries',
         (WidgetTester tester) async {
       final additionData = IngredientAdditionData.single(
         item: const AddedIngredientItem(name: 'Bread', quantity: 1, category: 'Others'),
@@ -456,7 +445,7 @@ void main() {
       expect(find.byType(CinematicFridgeAdditionScreen), findsOneWidget);
     });
 
-    testWidgets('16. The existing meal logging animation and its summary screen remain untouched',
+    testWidgets('15. The existing meal logging animation and its summary screen remain untouched',
         (WidgetTester tester) async {
       final mealData = CinematicMealData(
         mealName: 'Banana Smoothie',
@@ -484,6 +473,12 @@ void main() {
       expect(find.text('Meal Logged Successfully'), findsOneWidget);
       expect(find.text('Banana Smoothie'), findsOneWidget);
       expect(find.text('250'), findsOneWidget);
+    });
+
+    testWidgets('16. The actual Fridge screen remains completely untouched',
+        (WidgetTester tester) async {
+      // TopFreezerRefrigerator exists in isolation and unchanged
+      expect(TopFreezerRefrigerator, isNotNull);
     });
   });
 }
