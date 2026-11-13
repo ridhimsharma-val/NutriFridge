@@ -18,8 +18,6 @@ import '../../widgets/chillu/chillu_animation_controller.dart';
 import '../../widgets/chillu/chillu_mascot.dart';
 import '../log_meal/models/cinematic_meal_data.dart';
 import '../log_meal/widgets/cinematic_meal_logging_reveal_screen.dart';
-import '../fridge/models/ingredient_addition_data.dart';
-import '../fridge/widgets/cinematic_fridge_addition_screen.dart';
 
 /// Full-featured, interactive AI Assistant screen for NutriFridge.
 /// Acts as the single primary entry point for natural-language food addition,
@@ -1272,7 +1270,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
     try {
       int addedCount = 0;
       final List<Map<String, dynamic>> successfullyAddedItems = [];
-      final List<AddedIngredientItem> addedIngredientEntities = [];
 
       for (final itemJson in message.inventoryItems) {
         final name = itemJson['name'] as String? ?? 'Food Item';
@@ -1296,14 +1293,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
           'quantity': qty,
           'unit': unit,
         });
-        addedIngredientEntities.add(AddedIngredientItem(
-          name: name,
-          quantity: qty,
-          unit: unit,
-          category: category,
-          expiryDays: (itemJson['expiryDaysEstimate'] as num?)?.toInt(),
-          imageAsset: imageAsset,
-        ));
       }
 
       if (addedCount == 0 || successfullyAddedItems.isEmpty) {
@@ -1322,10 +1311,26 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
       _chilluController.itemAdded();
       ChilluSoundController.instance.playCelebrating();
 
-      CinematicFridgeAdditionScreen.show(
-        context,
-        additionData: IngredientAdditionData.multiple(
-          items: addedIngredientEntities,
+      final successMessage = _generateAdditionSuccessMessage(successfullyAddedItems);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  successMessage,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.forestGreen,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 3),
         ),
       );
     } catch (e) {
@@ -1357,18 +1362,18 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
       // Countable item (pieces/items/etc.)
       if (normUnit == 'piece' || normUnit == 'item' || normUnit.isEmpty) {
         if (qty == 1) {
-          final singular = _capitalizeFirst(_singularFoodName(rawName));
-          return '$singular added to your fridge!';
+          final singular = _singularFoodName(rawName).toLowerCase();
+          return 'Added 1 $singular to your fridge!';
         } else {
           final qtyStr = (qty is int || qty == qty.roundToDouble()) ? '${qty.toInt()}' : '$qty';
           final plural = _pluralizeFoodName(_singularFoodName(rawName)).toLowerCase();
-          return '$qtyStr $plural added to your fridge!';
+          return 'Added $qtyStr $plural to your fridge!';
         }
       }
 
       // Quantity with measurement unit (e.g. 250 g paneer, 1 L milk)
       final formattedQty = FridgeCategoryRepository.formatQuantity(qty, unit);
-      return '$formattedQty ${rawName.toLowerCase()} added to your fridge!';
+      return 'Added $formattedQty ${rawName.toLowerCase()} to your fridge!';
     }
 
     if (items.length == 2) {
@@ -1395,12 +1400,12 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
 
       final combined = '$label1 and $label2';
       if (combined.length <= 36) {
-        return '$combined added to your fridge!';
+        return 'Added $combined to your fridge!';
       }
     }
 
     // 3 or more items, or 2 items with very long names
-    return '${items.length} items added to your fridge!';
+    return 'Added ${items.length} items to your fridge!';
   }
 
   static String _capitalizeFirst(String s) {
@@ -3193,4 +3198,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
       ),
     );
   }
+
+  @visibleForTesting
+  void confirmAddInventoryForTesting(AiChatMessage message) => _confirmAddInventory(message);
 }

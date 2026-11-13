@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../fridge/models/category_item.dart';
-import '../fridge/models/ingredient_addition_data.dart';
-import '../fridge/widgets/cinematic_fridge_addition_screen.dart';
 import 'widgets/manual_food_form.dart';
 
 /// Clean mobile Manual Entry screen for adding food items
@@ -30,23 +28,17 @@ class ManualEntryPage extends StatelessWidget {
       ),
     );
 
-    final addedItem = AddedIngredientItem(
-      name: foodName,
-      quantityDisplay: quantity,
-      category: category,
-      expiryDays: expiryDays,
-      imageAsset: FoodItemAssetRegistry.getAssetForItem(foodName, category),
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Added $foodName ($quantity) to your fridge!'),
+        backgroundColor: AppColors.forestGreen,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 2),
+      ),
     );
 
-    CinematicFridgeAdditionScreen.show(
-      context,
-      additionData: IngredientAdditionData.single(item: addedItem),
-      onDone: () {
-        if (context.mounted) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
-        }
-      },
-    );
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   String _getEmojiForCategory(String category) {

@@ -6,8 +6,6 @@ import '../../food_image/pan_cutout_picker_sheet.dart';
 import '../../food_image/widgets/food_image_view.dart';
 import '../../../../services/food_image/food_image_model.dart';
 import '../models/category_item.dart';
-import '../models/ingredient_addition_data.dart';
-import 'cinematic_fridge_addition_screen.dart';
 import 'animated_quantity_text.dart';
 
 /// Reusable Food Details Bottom Sheet
@@ -246,19 +244,15 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
     widget.onAddFood?.call(updatedItem);
     widget.onInventoryChanged?.call();
 
-    final addedItem = AddedIngredientItem(
-      name: _item.name,
-      category: widget.categoryName,
-      unit: _unit,
-      addedQuantity: addedAmount,
-      totalQuantity: newTotal,
-      expiryDays: _item.expiryDays,
-      imageAsset: _item.imageAsset,
-    );
-
-    CinematicFridgeAdditionScreen.show(
-      context,
-      additionData: IngredientAdditionData.single(item: addedItem),
+    final successMsg = 'Added ${_formatAmount(addedAmount, _unit)} ${_item.name} to your fridge!';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(successMsg),
+        backgroundColor: AppColors.forestGreen,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 3),
+      ),
     );
 
     // Update in-place so user immediately sees increased stock
