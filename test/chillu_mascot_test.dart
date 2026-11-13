@@ -655,51 +655,59 @@ void main() {
       // Enter Sleepy
       controller.sleepy();
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 1900));
+      await tester.pump(const Duration(milliseconds: 2200));
       expect(controller.state, ChilluState.sleepy);
 
       // 1. Wake-up to Attentive (e.g. user starts typing)
       controller.attentive();
       await tester.pump();
-      expect(controller.state, ChilluState.attentive); // Destination state is preserved immediately
+      expect(controller.isWakingUp, isTrue);
+      expect(controller.wakeUpDestination, ChilluState.attentive);
 
-      // Upward stretch & cheerful bounce progress through 650ms window
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(controller.state, ChilluState.attentive);
-      await tester.pump(const Duration(milliseconds: 400));
+      // Upward stretch & cheerful bounce progress through 1000ms window without being interrupted
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(controller.isWakingUp, isTrue);
+      await tester.pump(const Duration(milliseconds: 550));
+      expect(controller.isWakingUp, isFalse);
       expect(controller.state, ChilluState.attentive);
 
       // 2. Return to Sleepy then wake up to Listening (mic tap)
       controller.sleepy();
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 2200));
       expect(controller.state, ChilluState.sleepy);
 
       controller.listening();
       await tester.pump();
-      expect(controller.state, ChilluState.listening);
-      await tester.pump(const Duration(milliseconds: 700));
+      expect(controller.isWakingUp, isTrue);
+      expect(controller.wakeUpDestination, ChilluState.listening);
+      await tester.pump(const Duration(milliseconds: 1050));
       expect(controller.state, ChilluState.listening);
 
       // 3. Return to Sleepy then wake up to Thinking (message send)
       controller.sleepy();
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 2200));
       expect(controller.state, ChilluState.sleepy);
 
       controller.think();
       await tester.pump();
-      expect(controller.state, ChilluState.thinking);
-      await tester.pump(const Duration(milliseconds: 700));
+      expect(controller.isWakingUp, isTrue);
+      expect(controller.wakeUpDestination, ChilluState.thinking);
+      await tester.pump(const Duration(milliseconds: 1050));
       expect(controller.state, ChilluState.thinking);
 
       // 4. Return to Sleepy then wake up to Idle (tap on screen)
       controller.sleepy();
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 2200));
       expect(controller.state, ChilluState.sleepy);
 
       controller.idle();
       await tester.pump();
-      expect(controller.state, ChilluState.idle);
-      await tester.pump(const Duration(milliseconds: 700));
+      expect(controller.isWakingUp, isTrue);
+      expect(controller.wakeUpDestination, ChilluState.idle);
+      await tester.pump(const Duration(milliseconds: 1050));
       expect(controller.state, ChilluState.idle);
 
       controller.dispose();
@@ -753,6 +761,8 @@ void main() {
       // Wake-up to Attentive
       sharedController.attentive();
       await tester.pump();
+      expect(sharedController.isWakingUp, isTrue);
+      await tester.pump(const Duration(milliseconds: 1050));
       expect(sharedController.state, ChilluState.attentive);
       expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*attentive')), findsNWidgets(2));
 

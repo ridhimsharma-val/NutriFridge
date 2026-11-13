@@ -53,6 +53,9 @@ enum ChilluState {
 class ChilluAnimationController extends ChangeNotifier {
   ChilluState _state;
   Timer? _transientResetTimer;
+  Timer? _wakeUpFallbackTimer;
+  ChilluState? _wakeUpDestination;
+  bool _isWakingUp = false;
 
   ChilluAnimationController({ChilluState initialState = ChilluState.idle})
       : _state = initialState;
@@ -69,6 +72,12 @@ class ChilluAnimationController extends ChangeNotifier {
 
   /// Whether Chillu is currently playing a transient reaction.
   bool get isReacting => _transientResetTimer != null;
+
+  /// Whether Chillu is currently performing its dedicated wake-up reaction from Sleepy.
+  bool get isWakingUp => _isWakingUp;
+
+  /// Target destination state to enter once wake-up completes.
+  ChilluState? get wakeUpDestination => _wakeUpDestination;
 
   /// Priority scale for states:
   /// 1. Celebrating (8)
@@ -165,24 +174,81 @@ class ChilluAnimationController extends ChangeNotifier {
     }
   }
 
+  /// Initiates a visible wake-up reaction from Sleepy state before landing in [destinationState].
+  void wakeUp({ChilluState destinationState = ChilluState.idle}) {
+    if (_state != ChilluState.sleepy && !_isWakingUp) return;
+    if (kDebugMode) {
+      debugPrint('[Chillu] Initiating wake-up reaction -> target destination: $destinationState');
+    }
+    _transientResetTimer?.cancel();
+    _transientResetTimer = null;
+    _wakeUpDestination = destinationState;
+    _isWakingUp = true;
+    _wakeUpFallbackTimer?.cancel();
+    // Safety fallback timer if no mounted mascot drives completion (e.g. headless unit tests)
+    _wakeUpFallbackTimer = Timer(const Duration(milliseconds: 1050), completeWakeUp);
+    notifyListeners();
+  }
+
+  /// Concludes the wake-up reaction and transitions into the target destination state.
+  void completeWakeUp() {
+    _wakeUpFallbackTimer?.cancel();
+    _wakeUpFallbackTimer = null;
+    if (!_isWakingUp) return;
+    _isWakingUp = false;
+    final dest = _wakeUpDestination ?? ChilluState.idle;
+    _wakeUpDestination = null;
+    _state = dest;
+    if (kDebugMode) {
+      debugPrint('[Chillu] Wake-up reaction completed -> entered destination: $dest');
+    }
+    notifyListeners();
+  }
+
   /// Sets Chillu to idle gentle breathing.
-  void idle({bool force = true}) => triggerState(ChilluState.idle, duration: Duration.zero, force: force);
+  void idle({bool force = true}) {
+    if (_state == ChilluState.sleepy || _isWakingUp) {
+      wakeUp(destinationState: ChilluState.idle);
+      return;
+    }
+    triggerState(ChilluState.idle, duration: Duration.zero, force: force);
+  }
 
   /// Sets Chillu to attentive posture (focused on chat input/typing).
-  void attentive({Duration? duration}) =>
-      triggerState(ChilluState.attentive, duration: duration);
+  void attentive({Duration? duration}) {
+    if (_state == ChilluState.sleepy || _isWakingUp) {
+      wakeUp(destinationState: ChilluState.attentive);
+      return;
+    }
+    triggerState(ChilluState.attentive, duration: duration);
+  }
 
   /// Sets Chillu to active listening posture during voice recording.
-  void listening({Duration? duration}) =>
-      triggerState(ChilluState.listening, duration: duration);
+  void listening({Duration? duration}) {
+    if (_state == ChilluState.sleepy || _isWakingUp) {
+      wakeUp(destinationState: ChilluState.listening);
+      return;
+    }
+    triggerState(ChilluState.listening, duration: duration);
+  }
 
   /// Triggers friendly greeting bounce.
-  void greet({Duration? duration}) =>
-      triggerState(ChilluState.greeting, duration: duration);
+  void greet({Duration? duration}) {
+    if (_state == ChilluState.sleepy || _isWakingUp) {
+      wakeUp(destinationState: ChilluState.greeting);
+      return;
+    }
+    triggerState(ChilluState.greeting, duration: duration);
+  }
 
   /// Enters thinking state while awaiting assistant reply.
-  void think({Duration? duration}) =>
-      triggerState(ChilluState.thinking, duration: duration);
+  void think({Duration? duration}) {
+    if (_state == ChilluState.sleepy || _isWakingUp) {
+      wakeUp(destinationState: ChilluState.thinking);
+      return;
+    }
+    triggerState(ChilluState.thinking, duration: duration);
+  }
 
   /// Enters continuous processing floating state while request is active.
   void process() {
@@ -240,8 +306,15 @@ class ChilluAnimationController extends ChangeNotifier {
 
   /// Sets sleepy idle state.
   void sleepy() {
+    if (kDebugMode) {
+      debugPrint('[Chillu] Transitioning into Sleepy state');
+    }
     _transientResetTimer?.cancel();
     _transientResetTimer = null;
+    _wakeUpFallbackTimer?.cancel();
+    _wakeUpFallbackTimer = null;
+    _isWakingUp = false;
+    _wakeUpDestination = null;
     _state = ChilluState.sleepy;
     notifyListeners();
   }
@@ -249,6 +322,7 @@ class ChilluAnimationController extends ChangeNotifier {
   @override
   void dispose() {
     _transientResetTimer?.cancel();
+    _wakeUpFallbackTimer?.cancel();
     super.dispose();
   }
 }

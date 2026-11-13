@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/services/app_image_picker.dart';
@@ -171,12 +172,18 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
     }
 
     // Condition 5: Screen is active & mounted
+    if (kDebugMode) {
+      debugPrint('[Chillu] 60s inactivity reached -> Entering Sleepy state');
+    }
     _chilluController.sleepy();
   }
 
   void _handleUserInteraction({bool fromTyping = false, bool fromVoice = false, bool fromSend = false}) {
     _resetInactivityTimer();
-    if (_chilluController.state == ChilluState.sleepy) {
+    if (_chilluController.state == ChilluState.sleepy || _chilluController.isWakingUp) {
+      if (kDebugMode) {
+        debugPrint('[Chillu] Interaction detected (typing=$fromTyping, voice=$fromVoice, send=$fromSend) -> waking up');
+      }
       if (fromTyping) {
         _chilluController.attentive();
       } else if (fromVoice) {
@@ -198,15 +205,19 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
     _resetInactivityTimer();
     if (_isSending || _isRecording) return;
     final hasNonWhitespace = _textController.text.trim().isNotEmpty;
+    final isFocused = _inputFocusNode.hasFocus;
 
-    if (hasNonWhitespace) {
-      // First non-whitespace character triggers Attentive; subsequent keystrokes maintain it without restarting.
+    if (hasNonWhitespace || isFocused) {
+      // First non-whitespace character or focus triggers Attentive; subsequent keystrokes maintain it without restarting.
       // Waking up from Sleepy into Attentive is handled seamlessly.
       if (_chilluController.state != ChilluState.attentive && _chilluController.state != ChilluState.thinking) {
+        if (kDebugMode && _chilluController.state == ChilluState.sleepy) {
+          debugPrint('[Chillu] Text input focused or typing started from Sleepy state -> wake up to Attentive');
+        }
         _chilluController.attentive();
       }
     } else {
-      // When input message is cleared, return to Confused if latest response was an error, else return to Idle
+      // When input message is cleared and unfocused, return to Confused if latest response was an error, else return to Idle
       if (_chilluController.state == ChilluState.attentive) {
         final int lastAssistantIdx = _messages.lastIndexWhere((m) => !m.isUser);
         if (lastAssistantIdx != -1 && _messages[lastAssistantIdx].action == 'error') {
