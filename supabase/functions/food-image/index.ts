@@ -53,6 +53,65 @@ function normalizeKey(str: string): string {
     .trim();
 }
 
+function getIngredientVariants(term: string): string[] {
+  const norm = term.toLowerCase().trim();
+  const variants = new Set<string>([norm]);
+
+  // Handle common plurals & singulars
+  if (norm.endsWith('y')) {
+    variants.add(`${norm.slice(0, -1)}ies`);
+  }
+  if (norm.endsWith('ies')) {
+    variants.add(`${norm.slice(0, -3)}y`);
+  }
+  if (norm.endsWith('ches') || norm.endsWith('shes') || norm.endsWith('xes')) {
+    variants.add(norm.slice(0, -2));
+  }
+  if (norm.endsWith('ch') || norm.endsWith('sh') || norm.endsWith('x')) {
+    variants.add(`${norm}es`);
+  }
+  if (norm.endsWith('oes')) {
+    variants.add(norm.slice(0, -2));
+  }
+  if (norm.endsWith('o')) {
+    variants.add(`${norm}es`);
+    variants.add(`${norm}s`);
+  }
+  if (norm.endsWith('s') && !norm.endsWith('ss') && norm.length > 3) {
+    variants.add(norm.slice(0, -1));
+  }
+  if (!norm.endsWith('s')) {
+    variants.add(`${norm}s`);
+  }
+
+  // Food-specific culinary synonyms
+  if (norm === 'peach' || norm === 'peaches') {
+    variants.add('peach');
+    variants.add('peaches');
+    variants.add('nectarine');
+  }
+  if (norm === 'bell pepper' || norm === 'capsicum' || norm === 'pepper') {
+    variants.add('capsicum');
+    variants.add('bell pepper');
+    variants.add('sweet pepper');
+  }
+  if (norm === 'curd' || norm === 'yogurt' || norm === 'yoghurt') {
+    variants.add('curd');
+    variants.add('yogurt');
+    variants.add('yoghurt');
+  }
+  if (norm === 'egg' || norm === 'eggs') {
+    variants.add('egg');
+    variants.add('eggs');
+  }
+  if (norm === 'watermelon' || norm === 'watermelons') {
+    variants.add('watermelon');
+    variants.add('watermelons');
+  }
+
+  return Array.from(variants);
+}
+
 function calculateMatchScore(
   query: string,
   alt: string,
@@ -157,9 +216,12 @@ function calculateMatchScore(
     }
   }
 
-  // Exact phrase match for ingredient
-  if (text.includes(normQuery)) {
-    return 100;
+  // Check ingredient variants (handles peaches <-> peach, blueberries <-> blueberry, etc.)
+  const variants = getIngredientVariants(normQuery);
+  for (const variant of variants) {
+    if (text.includes(variant)) {
+      return 100;
+    }
   }
 
   const queryTokens = normQuery.split(' ').filter((t) => t.length > 2);
@@ -167,7 +229,10 @@ function calculateMatchScore(
 
   let matched = 0;
   for (const token of queryTokens) {
-    if (text.includes(token)) matched++;
+    const tokenVariants = getIngredientVariants(token);
+    if (tokenVariants.some((v) => text.includes(v))) {
+      matched++;
+    }
   }
   const matchRatio = matched / queryTokens.length;
   return Math.max(10, Math.round(matchRatio * 85));
@@ -618,7 +683,14 @@ serve(async (req: Request) => {
       if (seenPhotoIds.has(pid)) continue;
       seenPhotoIds.add(pid);
 
-      const score = calculateMatchScore(query, p.tags, p.pageURL, entityType, body.cuisine, body.ingredients);
+      let score = calculateMatchScore(query, p.tags, p.pageURL, entityType, body.cuisine, body.ingredients);
+
+      // Quality & popularity bonuses
+      if (score > 0) {
+        if (p.likes > 100) score += 5;
+        if (p.downloads > 500) score += 5;
+        if (p.imageWidth >= 640 && p.imageHeight >= 480) score += 5;
+      }
 
       // Webformat (~640px) is ideal for inventory and cards; largeImageURL (~1280px) for recipe hero
       const primaryUrl = entityType === 'recipe'
@@ -638,7 +710,7 @@ serve(async (req: Request) => {
       });
     }
 
-    // Sort descending by score
+    // Sort descending by score, tie-breaking by popularity
     candidates.sort((a, b) => b.score - a.score);
 
     // Filter acceptable matches for automatic resolution (threshold is entity-specific)

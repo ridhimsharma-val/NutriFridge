@@ -15,6 +15,36 @@ class FoodImageService {
     changeNotifier.value++;
   }
 
+  /// Checks whether an entity image is currently in the process of being resolved.
+  bool isResolving({
+    required String name,
+    required FoodEntityType type,
+  }) {
+    final canonicalKey = FoodImageResolver.normalizeKey(name);
+    return FoodImageResolver.instance.isResolving(type: type, entityKey: canonicalKey);
+  }
+
+  /// Retries resolution for a previously failed or un-resolved food image.
+  Future<FoodImageModel> retryResolution({
+    required String name,
+    required FoodEntityType type,
+    String? category,
+    String? cuisine,
+    List<String>? ingredients,
+    String? userId,
+  }) async {
+    final canonicalKey = FoodImageResolver.normalizeKey(name);
+    FoodImageResolver.instance.clearFailedResolution(type: type, entityKey: canonicalKey);
+    return await resolveImage(
+      name: name,
+      type: type,
+      category: category,
+      cuisine: cuisine,
+      ingredients: ingredients,
+      userId: userId,
+    );
+  }
+
   /// Resolves an image asynchronously following the 5-tier priority order.
   Future<FoodImageModel> resolveImage({
     required String name,

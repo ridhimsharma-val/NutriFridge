@@ -244,10 +244,10 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
     widget.onAddFood?.call(updatedItem);
     widget.onInventoryChanged?.call();
 
-    final successMsg = 'Added ${_formatAmount(addedAmount, _unit)} ${_item.name} to your fridge!';
+    final snackbarText = 'Added ${_formatAmount(addedAmount, _unit)} ${_item.name} to your fridge!';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(successMsg),
+        content: Text(snackbarText),
         backgroundColor: AppColors.forestGreen,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -343,12 +343,7 @@ class _FoodDetailsSheetState extends State<FoodDetailsSheet> {
                   ),
                   padding: const EdgeInsets.all(8),
                   child: Center(
-                    child: (_item.effectiveImageAsset != null || _item.imageAsset != null)
-                        ? _buildItemImage()
-                        : Text(
-                            _item.iconEmoji ?? '🍽️',
-                            style: const TextStyle(fontSize: 44),
-                          ),
+                    child: _buildItemImage(),
                   ),
                 ),
               ),

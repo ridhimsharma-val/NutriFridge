@@ -495,12 +495,7 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
                   ),
                   padding: const EdgeInsets.all(4),
                   child: Center(
-                    child: (item.effectiveImageAsset != null || item.imageAsset != null)
-                        ? _buildItemImage(item)
-                        : Text(
-                            item.iconEmoji ?? '🍽️',
-                            style: const TextStyle(fontSize: 24),
-                          ),
+                    child: _buildItemImage(item),
                   ),
                 ),
 
@@ -621,7 +616,7 @@ class _CategoryBottomSheetState extends State<CategoryBottomSheet> {
     return FoodImageView(
       name: item.name,
       type: FoodEntityType.ingredient,
-      category: item.category,
+      category: item.category ?? _category.name,
       iconEmoji: item.iconEmoji,
       fit: BoxFit.contain,
       fallbackWidget: Text(

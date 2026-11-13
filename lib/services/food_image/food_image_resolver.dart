@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/config/supabase_config.dart';
 import '../../models/nutrition_data.dart';
@@ -21,6 +23,18 @@ class FoodImageResolver {
 
   /// Cooldown cache for failed resolutions to avoid repeated requests on rebuilds
   final Map<String, DateTime> _failedResolutions = {};
+
+  /// Checks whether an entity image is currently being resolved in the background
+  bool isResolving({required FoodEntityType type, required String entityKey}) {
+    final inFlightKey = '${type.name}:$entityKey';
+    return _inFlight.containsKey(inFlightKey);
+  }
+
+  /// Clears any failed resolution cooldown to allow an immediate retry
+  void clearFailedResolution({required FoodEntityType type, required String entityKey}) {
+    final inFlightKey = '${type.name}:$entityKey';
+    _failedResolutions.remove(inFlightKey);
+  }
 
   /// Normalizes ingredient or recipe names into canonical search keys.
   /// Removes quantity strings, metric/imperial units, parenthesized comments, and special characters.
@@ -70,6 +84,9 @@ class FoodImageResolver {
     final canonical = normalizeKey(name);
     if (type == FoodEntityType.ingredient) {
       if (canonical == 'watermelon') return 'fresh watermelon fruit';
+      if (canonical == 'peach') return 'fresh peach fruit';
+      if (canonical == 'blueberry') return 'fresh blueberries fruit';
+      if (canonical == 'strawberry') return 'fresh strawberries fruit';
       if (canonical == 'broccoli') return 'whole broccoli';
       if (canonical == 'milk') return 'carton of milk';
       if (canonical == 'egg' || canonical == 'eggs') return 'fresh eggs';
@@ -291,9 +308,9 @@ class FoodImageResolver {
       return _inFlight[inFlightKey]!;
     }
 
-    // Check failure cooldown (60 seconds) to avoid repeated API pounding
+    // Check failure cooldown (30 seconds) to avoid rapid pounding while allowing timely retry
     final lastFailure = _failedResolutions[inFlightKey];
-    if (lastFailure != null && DateTime.now().difference(lastFailure).inSeconds < 60) {
+    if (lastFailure != null && DateTime.now().difference(lastFailure).inSeconds < 30) {
       final cached = FoodImageRepository.instance.getCachedMapping(
         type: type,
         entityKey: canonicalKey,
@@ -379,12 +396,11 @@ class FoodImageResolver {
         return resolvedModel;
       }
 
-      // Mark failure cooldown if no acceptable candidate found
+      // Mark failure cooldown if no acceptable candidate found (do not permanently cache placeholder)
       _failedResolutions[inFlightKey] = DateTime.now();
 
       // Priority 5: Fallback category placeholder (never an unrelated specific food photograph)
       final placeholder = buildPlaceholder(name: name, type: type, category: category);
-      repo.putInMemoryCache(placeholder);
       completer.complete(placeholder);
       return placeholder;
     } catch (e) {
@@ -555,30 +571,71 @@ class FoodImageResolver {
     }
 
     try {
-      final client = Supabase.instance.client;
-      final session = client.auth.currentSession;
-      final token = session?.accessToken;
-
-      final headers = <String, String>{};
-      if (token != null && token.isNotEmpty) {
-        headers['Authorization'] = 'Bearer $token';
-      } else if (SupabaseConfig.isConfigured && SupabaseConfig.supabasePublishableKey.isNotEmpty) {
-        headers['Authorization'] = 'Bearer ${SupabaseConfig.supabasePublishableKey}';
-      }
-      if (SupabaseConfig.isConfigured && SupabaseConfig.supabasePublishableKey.isNotEmpty) {
-        headers['apikey'] = SupabaseConfig.supabasePublishableKey;
+      SupabaseClient? client;
+      try {
+        client = Supabase.instance.client;
+      } catch (_) {
+        client = null;
       }
 
-      final res = await client.functions
-          .invoke('food-image', body: body, headers: headers)
-          .timeout(const Duration(seconds: 10));
+      if (client != null) {
+        final session = client.auth.currentSession;
+        final token = session?.accessToken;
 
-      final dynamic data = res.data;
-      if (data is Map) {
-        return Map<String, dynamic>.from(data);
+        final headers = <String, String>{};
+        if (token != null && token.isNotEmpty) {
+          headers['Authorization'] = 'Bearer $token';
+        } else if (SupabaseConfig.isConfigured && SupabaseConfig.supabasePublishableKey.isNotEmpty) {
+          headers['Authorization'] = 'Bearer ${SupabaseConfig.supabasePublishableKey}';
+        }
+        if (SupabaseConfig.isConfigured && SupabaseConfig.supabasePublishableKey.isNotEmpty) {
+          headers['apikey'] = SupabaseConfig.supabasePublishableKey;
+        }
+
+        final res = await client.functions
+            .invoke('food-image', body: body, headers: headers)
+            .timeout(const Duration(seconds: 10));
+
+        final dynamic data = res.data;
+        if (data is Map) {
+          return Map<String, dynamic>.from(data);
+        } else if (data is String) {
+          try {
+            final decoded = jsonDecode(data);
+            if (decoded is Map) {
+              return Map<String, dynamic>.from(decoded);
+            }
+          } catch (_) {}
+        }
       }
     } catch (e) {
       debugPrint('[FoodImageResolver] _invokeEdgeFunction warning: $e');
+    }
+
+    // Direct HTTP fallback to Supabase Edge Function URL
+    if (SupabaseConfig.isConfigured && SupabaseConfig.supabasePublishableKey.isNotEmpty) {
+      try {
+        final uri = Uri.parse('${SupabaseConfig.supabaseUrl}/functions/v1/food-image');
+        final httpHeaders = <String, String>{
+          'Content-Type': 'application/json',
+          'apikey': SupabaseConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${SupabaseConfig.supabasePublishableKey}',
+        };
+        final response = await http.post(
+          uri,
+          headers: httpHeaders,
+          body: jsonEncode(body),
+        ).timeout(const Duration(seconds: 10));
+
+        if (response.statusCode == 200) {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map) {
+            return Map<String, dynamic>.from(decoded);
+          }
+        }
+      } catch (httpErr) {
+        debugPrint('[FoodImageResolver] direct http fallback error: $httpErr');
+      }
     }
 
     return {'ok': false, 'error': 'EDGE_FUNCTION_UNAVAILABLE'};

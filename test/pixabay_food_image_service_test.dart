@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nutrifridge/models/nutrition_data.dart';
 import 'package:nutrifridge/screens/food_image/widgets/food_image_view.dart';
 import 'package:nutrifridge/screens/fridge/models/category_item.dart';
+import 'package:nutrifridge/screens/fridge/widgets/category_bottom_sheet.dart';
 import 'package:nutrifridge/services/food_image/food_image_model.dart';
 import 'package:nutrifridge/services/food_image/food_image_repository.dart';
 import 'package:nutrifridge/services/food_image/food_image_resolver.dart';
@@ -485,6 +487,354 @@ void main() {
 
       // Verify attribution pill
       expect(find.text('Photo by Pixabay Artist on Pixabay'), findsOneWidget);
+    });
+
+    // v2 Targeted Verification Tests: Requirements 1-10
+    test('v2-1 & 3: Peaches and Watermelon automatically resolve to their specific photographs from Pixabay', () async {
+      final requestedQueries = <String>[];
+      FoodImageResolver.mockHandler = (body) async {
+        requestedQueries.add(body['query'].toString());
+        if (body['query'] == 'peach') {
+          return {
+            'ok': true,
+            'action': 'resolve',
+            'bestMatch': {
+              'photoId': 'px_peach_777',
+              'imageUrl': 'https://cdn.pixabay.com/photo/peaches_fresh.jpg',
+              'thumbnailUrl': 'https://cdn.pixabay.com/photo/peaches_thumb.jpg',
+              'photographerName': 'Orchardist',
+              'sourcePageUrl': 'https://pixabay.com/photos/peaches-777/',
+              'altDescription': 'Fresh ripe juicy peaches in basket',
+              'provider': 'pixabay',
+              'score': 100,
+            },
+          };
+        } else if (body['query'] == 'watermelon') {
+          return {
+            'ok': true,
+            'action': 'resolve',
+            'bestMatch': {
+              'photoId': 'px_watermelon_888',
+              'imageUrl': 'https://cdn.pixabay.com/photo/watermelon_fresh.jpg',
+              'thumbnailUrl': 'https://cdn.pixabay.com/photo/watermelon_thumb.jpg',
+              'photographerName': 'SummerFarm',
+              'sourcePageUrl': 'https://pixabay.com/photos/watermelon-888/',
+              'altDescription': 'Fresh red watermelon slice',
+              'provider': 'pixabay',
+              'score': 100,
+            },
+          };
+        }
+        return {'ok': false, 'bestMatch': null};
+      };
+
+      // 1. Watermelon resolves to watermelon photo
+      final watermelon = await FoodImageService.instance.resolveImage(
+        name: 'Watermelon',
+        type: FoodEntityType.ingredient,
+        category: 'Fruits',
+      );
+      expect(watermelon.entityKey, 'watermelon');
+      expect(watermelon.imageUrl, 'https://cdn.pixabay.com/photo/watermelon_fresh.jpg');
+      expect(watermelon.provider, 'pixabay');
+
+      // 2. Apple resolves to apple photo (Priority 3 exact local asset)
+      final apple = await FoodImageService.instance.resolveImage(
+        name: 'Apple',
+        type: FoodEntityType.ingredient,
+        category: 'Fruits',
+      );
+      expect(apple.entityKey, 'apple');
+      expect(apple.imageUrl, 'assets/images/foods/apple.png');
+
+      // 3. Peaches resolves to peaches photo from Pixabay
+      final peaches = await FoodImageService.instance.resolveImage(
+        name: 'Peaches',
+        type: FoodEntityType.ingredient,
+        category: 'Fruits',
+      );
+      expect(peaches.entityKey, 'peach');
+      expect(peaches.imageUrl, 'https://cdn.pixabay.com/photo/peaches_fresh.jpg');
+      expect(peaches.provider, 'pixabay');
+      expect(peaches.isPlaceholder, isFalse);
+    });
+
+    test('v2-4 & 5: Adding a completely new ingredient triggers automatic retrieval and resolves missing image', () async {
+      int newIngredientCalls = 0;
+      FoodImageResolver.mockHandler = (body) async {
+        newIngredientCalls++;
+        expect(body['query'], 'blueberry');
+        return {
+          'ok': true,
+          'action': 'resolve',
+          'bestMatch': {
+            'photoId': 'px_blueberry_101',
+            'imageUrl': 'https://cdn.pixabay.com/photo/blueberries.jpg',
+            'provider': 'pixabay',
+            'score': 100,
+          },
+        };
+      };
+
+      final blueberries = await FoodImageService.instance.resolveImage(
+        name: 'Fresh Blueberries (250g)',
+        type: FoodEntityType.ingredient,
+        category: 'Fruits',
+      );
+
+      expect(blueberries.entityKey, 'blueberry');
+      expect(blueberries.imageUrl, 'https://cdn.pixabay.com/photo/blueberries.jpg');
+      expect(newIngredientCalls, 1);
+    });
+
+    test('v2-6 & 7: Repeated requests use cache and never reuse incorrect mappings', () async {
+      int apiCalls = 0;
+      FoodImageResolver.mockHandler = (body) async {
+        apiCalls++;
+        return {
+          'ok': true,
+          'action': 'resolve',
+          'bestMatch': {
+            'photoId': 'px_peach_001',
+            'imageUrl': 'https://cdn.pixabay.com/photo/peach_cached.jpg',
+            'provider': 'pixabay',
+            'score': 100,
+          },
+        };
+      };
+
+      final first = await FoodImageService.instance.resolveImage(
+        name: 'Peaches',
+        type: FoodEntityType.ingredient,
+        category: 'Fruits',
+      );
+      final second = await FoodImageService.instance.resolveImage(
+        name: 'peaches',
+        type: FoodEntityType.ingredient,
+        category: 'Fruits',
+      );
+      final third = await FoodImageService.instance.resolveImage(
+        name: 'fresh peach',
+        type: FoodEntityType.ingredient,
+        category: 'Fruits',
+      );
+
+      expect(first.imageUrl, 'https://cdn.pixabay.com/photo/peach_cached.jpg');
+      expect(second.imageUrl, 'https://cdn.pixabay.com/photo/peach_cached.jpg');
+      expect(third.imageUrl, 'https://cdn.pixabay.com/photo/peach_cached.jpg');
+      expect(apiCalls, 1, reason: 'Must hit cache and normalize peach/peaches/fresh peach to same key');
+    });
+
+    test('v2-8 & 9: Failed retrieval shows placeholder, does not cache placeholder as resolved, and supports retry', () async {
+      int attempt = 0;
+      FoodImageResolver.mockHandler = (body) async {
+        attempt++;
+        if (attempt == 1) {
+          // First attempt fails (e.g. timeout / network error)
+          return {'ok': false, 'bestMatch': null};
+        }
+        // Second attempt succeeds
+        return {
+          'ok': true,
+          'action': 'resolve',
+          'bestMatch': {
+            'photoId': 'px_retry_success',
+            'imageUrl': 'https://cdn.pixabay.com/photo/retry_peach.jpg',
+            'provider': 'pixabay',
+            'score': 100,
+          },
+        };
+      };
+
+      final failed = await FoodImageService.instance.resolveImage(
+        name: 'Peaches',
+        type: FoodEntityType.ingredient,
+        category: 'Fruits',
+      );
+
+      // Verify clean placeholder on failure
+      expect(failed.isPlaceholder, isTrue);
+      expect(failed.imageUrl, 'assets/images/categories/fruits.png');
+
+      // Verify placeholder was NOT saved to cache
+      final cached = FoodImageRepository.instance.getCachedMapping(
+        type: FoodEntityType.ingredient,
+        entityKey: 'peach',
+      );
+      expect(cached, isNull, reason: 'Failed placeholder must not be cached as a resolved photo');
+
+      // Retry resolution
+      final retried = await FoodImageService.instance.retryResolution(
+        name: 'Peaches',
+        type: FoodEntityType.ingredient,
+        category: 'Fruits',
+      );
+
+      expect(retried.isPlaceholder, isFalse);
+      expect(retried.imageUrl, 'https://cdn.pixabay.com/photo/retry_peach.jpg');
+      expect(attempt, 2);
+    });
+
+    testWidgets('v2-10: FoodImageView automatically updates visible UI when image resolves', (tester) async {
+      final completer = Completer<Map<String, dynamic>>();
+      FoodImageResolver.mockHandler = (body) => completer.future;
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: FoodImageView(
+              name: 'Peaches',
+              type: FoodEntityType.ingredient,
+              category: 'Fruits',
+              iconEmoji: '🍑',
+            ),
+          ),
+        ),
+      );
+
+      // Initial build: background resolution triggered, temporary loading container shown
+      await tester.pump();
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      // Complete async Pixabay resolution
+      completer.complete({
+        'ok': true,
+        'action': 'resolve',
+        'bestMatch': {
+          'photoId': 'px_peach_live',
+          'imageUrl': 'https://cdn.pixabay.com/photo/live_peaches.jpg',
+          'provider': 'pixabay',
+          'score': 100,
+        },
+      });
+
+      // Pump to process microtasks and animation duration
+      await tester.pumpAndSettle();
+
+      // UI automatically transitioned to the network photograph!
+      final imageFinder = find.byType(Image);
+      expect(imageFinder, findsOneWidget);
+      final imageWidget = tester.widget<Image>(imageFinder);
+      expect(imageWidget.image, isA<NetworkImage>());
+      final networkImage = imageWidget.image as NetworkImage;
+      expect(networkImage.url, 'https://cdn.pixabay.com/photo/live_peaches.jpg');
+    });
+
+    testWidgets('CategoryBottomSheet renders FoodImageView for Watermelon, Apple, and Peaches in Fruits category', (tester) async {
+      tester.view.physicalSize = const Size(600, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      // Mock Pixabay handler resolving watermelon and peaches
+      FoodImageResolver.mockHandler = (body) async {
+        final q = body['query'].toString();
+        if (q == 'watermelon') {
+          return {
+            'ok': true,
+            'action': 'resolve',
+            'bestMatch': {
+              'photoId': 'px_wm',
+              'imageUrl': 'https://cdn.pixabay.com/photo/wm_slice.jpg',
+              'provider': 'pixabay',
+              'score': 100,
+            },
+          };
+        } else if (q == 'peach') {
+          return {
+            'ok': true,
+            'action': 'resolve',
+            'bestMatch': {
+              'photoId': 'px_peach',
+              'imageUrl': 'https://cdn.pixabay.com/photo/peach_orchard.jpg',
+              'provider': 'pixabay',
+              'score': 100,
+            },
+          };
+        }
+        return {'ok': false, 'bestMatch': null};
+      };
+
+      final items = [
+        const CategoryFoodItem(
+          id: 'frt_1',
+          name: 'Apple',
+          quantity: '4 pieces',
+          expiryDays: 6,
+          imageAsset: 'assets/images/foods/apple.png',
+          iconEmoji: '🍎',
+          category: 'Fruits',
+        ),
+        const CategoryFoodItem(
+          id: 'frt_2',
+          name: 'Watermelon',
+          quantity: '1 piece',
+          expiryDays: 5,
+          iconEmoji: '🍉',
+          category: 'Fruits',
+        ),
+        const CategoryFoodItem(
+          id: 'frt_3',
+          name: 'Peaches',
+          quantity: '3 pieces',
+          expiryDays: 4,
+          iconEmoji: '🍑',
+          category: 'Fruits',
+        ),
+      ];
+
+      final category = CategoryData(
+        id: 'fruits',
+        name: 'Fruits',
+        iconEmoji: '🍎',
+        items: items,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: CategoryBottomSheet(
+              category: category,
+              isSelectionMode: false,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Verify all 3 items render FoodImageView widgets
+      final foodImageViews = find.byType(FoodImageView);
+      expect(foodImageViews, findsNWidgets(3));
+
+      // Verify Apple, Watermelon, and Peaches names are rendered
+      expect(find.text('Apple'), findsOneWidget);
+      expect(find.text('Watermelon'), findsOneWidget);
+      expect(find.text('Peaches'), findsOneWidget);
+
+      // Verify each item resolves to its specific photograph
+      final watermelonModel = FoodImageService.instance.getImageSync(
+        name: 'Watermelon',
+        type: FoodEntityType.ingredient,
+        category: 'Fruits',
+      );
+      expect(watermelonModel.imageUrl, 'https://cdn.pixabay.com/photo/wm_slice.jpg');
+
+      final peachesModel = FoodImageService.instance.getImageSync(
+        name: 'Peaches',
+        type: FoodEntityType.ingredient,
+        category: 'Fruits',
+      );
+      expect(peachesModel.imageUrl, 'https://cdn.pixabay.com/photo/peach_orchard.jpg');
+
+      final appleModel = FoodImageService.instance.getImageSync(
+        name: 'Apple',
+        type: FoodEntityType.ingredient,
+        category: 'Fruits',
+      );
+      expect(appleModel.imageUrl, 'assets/images/foods/apple.png');
     });
   });
 }

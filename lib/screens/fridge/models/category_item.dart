@@ -138,6 +138,12 @@ class CategoryFoodItem {
       return storageImagePath;
     }
 
+    if (imageAsset != null &&
+        imageAsset!.isNotEmpty &&
+        (imageAsset!.startsWith('http://') || imageAsset!.startsWith('https://'))) {
+      return imageAsset;
+    }
+
     // 2. Authoritative check: User overrides & centralized resolved mappings (Priorities 2, 3, 4)
     final serviceImage = FoodImageService.instance.getImageSync(
       name: name,
@@ -807,6 +813,22 @@ class FridgeCategoryRepository {
           expiryDays: 4,
           imageAsset: 'assets/images/foods/grapes.png',
           iconEmoji: '🍇',
+        ),
+        const CategoryFoodItem(
+          id: 'frt_5',
+          name: 'Watermelon',
+          quantity: '1 piece',
+          expiryDays: 5,
+          iconEmoji: '🍉',
+          category: 'Fruits',
+        ),
+        const CategoryFoodItem(
+          id: 'frt_6',
+          name: 'Peaches',
+          quantity: '3 pieces',
+          expiryDays: 4,
+          iconEmoji: '🍑',
+          category: 'Fruits',
         ),
       ],
       'Ice Cream': [

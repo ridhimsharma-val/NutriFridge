@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/nutrition_data.dart';
 import '../auth/auth_service.dart';
@@ -18,7 +20,9 @@ class _CachedSearchResults {
 /// Central repository handling image mapping persistence and multi-level caching.
 class FoodImageRepository {
   static final FoodImageRepository instance = FoodImageRepository._internal();
-  FoodImageRepository._internal();
+  FoodImageRepository._internal() {
+    loadLocalCache();
+  }
 
   /// In-memory cache for resolved image mappings.
   /// Keys: "entityType:entityKey" (shared) or "userId:entityType:entityKey" (user-override)
@@ -59,19 +63,27 @@ class FoodImageRepository {
     if (effectiveUserId.isNotEmpty) {
       final overrideKey = _cacheKey(type, entityKey, effectiveUserId);
       if (_memoryCache.containsKey(overrideKey)) {
-        return _memoryCache[overrideKey];
+        final m = _memoryCache[overrideKey];
+        if (m != null && !m.isPlaceholder) return m;
       }
       final localUserKey = _cacheKey(type, entityKey, 'local_user');
       if (_memoryCache.containsKey(localUserKey)) {
-        return _memoryCache[localUserKey];
+        final m = _memoryCache[localUserKey];
+        if (m != null && !m.isPlaceholder) return m;
       }
     }
     final sharedKey = _cacheKey(type, entityKey);
-    return _memoryCache[sharedKey];
+    final m = _memoryCache[sharedKey];
+    if (m != null && !m.isPlaceholder) return m;
+    return null;
   }
 
   /// Saves image model into in-memory cache.
   void putInMemoryCache(FoodImageModel model) {
+    if (model.isPlaceholder) {
+      // NEVER permanently cache a placeholder or category emoji as a resolved photograph
+      return;
+    }
     if (model.isUserOverride && model.userId != null) {
       _memoryCache[_cacheKey(model.entityType, model.entityKey, model.userId)] = model;
     } else {
@@ -407,9 +419,46 @@ class FoodImageRepository {
     }
   }
 
-  /// Saves a shared automatic catalog mapping in memory and optionally in DB.
+  static const String _kLocalCacheKey = 'nutrifridge_food_images_v1';
+
+  Future<void> _persistToLocalPreferences(FoodImageModel model) async {
+    if (model.isPlaceholder) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final existingJson = prefs.getString(_kLocalCacheKey);
+      final Map<String, dynamic> cacheMap = existingJson != null
+          ? Map<String, dynamic>.from(jsonDecode(existingJson) as Map)
+          : {};
+      final key = _cacheKey(model.entityType, model.entityKey, model.userId);
+      cacheMap[key] = model.toJson();
+      await prefs.setString(_kLocalCacheKey, jsonEncode(cacheMap));
+    } catch (_) {}
+  }
+
+  /// Loads locally cached verified food image mappings into memory.
+  Future<void> loadLocalCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final existingJson = prefs.getString(_kLocalCacheKey);
+      if (existingJson != null) {
+        final Map<String, dynamic> cacheMap =
+            Map<String, dynamic>.from(jsonDecode(existingJson) as Map);
+        for (final entry in cacheMap.entries) {
+          if (entry.value is Map) {
+            final model = FoodImageModel.fromJson(Map<String, dynamic>.from(entry.value as Map));
+            if (!model.isPlaceholder) {
+              putInMemoryCache(model);
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  /// Saves a shared automatic catalog mapping in memory, local storage, and optionally in DB.
   Future<void> saveSharedMapping(FoodImageModel model) async {
     putInMemoryCache(model);
+    _persistToLocalPreferences(model);
 
     final client = _client;
     if (client != null &&

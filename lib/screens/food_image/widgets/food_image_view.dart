@@ -46,6 +46,7 @@ class FoodImageView extends StatelessWidget {
           cuisine: cuisine,
           ingredients: ingredients,
         );
+        final isResolving = FoodImageService.instance.isResolving(name: name, type: type);
 
         Widget imageWidget;
         if (imageModel.isNetwork) {
@@ -72,7 +73,11 @@ class FoodImageView extends StatelessWidget {
             errorBuilder: (context, error, stackTrace) =>
                 fallbackWidget ?? _buildDefaultFallback(),
           );
+        } else if (isResolving) {
+          // Show temporary loading indicator while automatic retrieval is underway
+          imageWidget = _buildLoadingContainer();
         } else {
+          // Image retrieval genuinely failed or returned no acceptable photo -> show category/emoji placeholder
           imageWidget = fallbackWidget ?? _buildCleanPlaceholder();
         }
 
