@@ -180,11 +180,12 @@ class ChilluAnimationController extends ChangeNotifier {
         return const Duration(milliseconds: 520);
       case ChilluState.greeting:
         return const Duration(milliseconds: 2000);
+      case ChilluState.speaking:
+        return const Duration(seconds: 5);
       case ChilluState.idle:
       case ChilluState.attentive:
       case ChilluState.listening:
       case ChilluState.thinking:
-      case ChilluState.speaking:
       case ChilluState.processing:
       case ChilluState.sleepy:
         // Persistent states driven by actual application state
@@ -289,9 +290,9 @@ class ChilluAnimationController extends ChangeNotifier {
     triggerState(ChilluState.thinking, duration: duration);
   }
 
-  /// Enters speaking state while assistant delivers its response.
+  /// Enters speaking state while assistant delivers its response (~5 seconds by default).
   /// Does not restart the animation if already speaking (e.g. across streamed text chunks).
-  void speak({Duration? duration, ChilluState returnState = ChilluState.idle}) {
+  void speak({Duration? duration = const Duration(seconds: 5), ChilluState returnState = ChilluState.idle}) {
     if (_state == ChilluState.sleepy || _isWakingUp) {
       wakeUp(destinationState: ChilluState.speaking);
       return;

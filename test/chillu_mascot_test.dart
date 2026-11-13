@@ -1064,6 +1064,37 @@ void main() {
         // Speaking produces no sound effects and does not affect sound controller
         expect(soundController.isSoundEnabled, isTrue);
       });
+
+      testWidgets('Speaking duration runs for 5 seconds and auto-resets to Idle', (tester) async {
+        final controller = ChilluAnimationController();
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: ChilluMascot(
+                controller: controller,
+                size: 110,
+              ),
+            ),
+          ),
+        );
+
+        controller.speak();
+        await tester.pump();
+        expect(controller.state, ChilluState.speaking);
+        expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*speaking to you')), findsOneWidget);
+
+        // At 2.5s, Chillu is still actively speaking
+        await tester.pump(const Duration(milliseconds: 2500));
+        expect(controller.state, ChilluState.speaking);
+        expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*speaking to you')), findsOneWidget);
+
+        // At 5.05s, speaking duration completes and Chillu settles back into Idle
+        await tester.pump(const Duration(milliseconds: 2550));
+        expect(controller.state, ChilluState.idle);
+        expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*happy and waiting')), findsOneWidget);
+
+        controller.dispose();
+      });
     });
   });
 }

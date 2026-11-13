@@ -592,38 +592,24 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
         selectedDeductionIngredients: initialSelectedDeductions,
       );
 
+      final returnState = (_inputFocusNode.hasFocus || _textController.text.trim().isNotEmpty)
+          ? ChilluState.attentive
+          : ChilluState.idle;
+
       if (isAiError) {
         // Trigger persistent Confused state when AI response fails
         _chilluController.confused(persistent: true);
       } else {
-        // Transition Chillu from Thinking to Speaking as AI response delivery begins
-        _chilluController.speak();
+        // Transition Chillu from Thinking to Speaking for 5 seconds as AI response is delivered
+        _chilluController.speak(
+          duration: const Duration(seconds: 5),
+          returnState: returnState,
+        );
       }
 
       setState(() {
         _messages.add(assistantMessage);
       });
-
-      final returnState = (_inputFocusNode.hasFocus || _textController.text.trim().isNotEmpty)
-          ? ChilluState.attentive
-          : ChilluState.idle;
-
-      if (!isAiError) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          if (meal != null ||
-              action == 'meal_recommendation' ||
-              action == 'recipe_ideas' ||
-              (_activeMealContext != null && _isFullRecipeRequest(text)) ||
-              assistantText.contains('Preparation') ||
-              assistantText.contains('Step 1')) {
-            _chilluController.excited(returnState: returnState);
-            ChilluSoundController.instance.playExcited();
-          } else {
-            _chilluController.finishSpeaking(returnState: returnState);
-          }
-        });
-      }
     } catch (e) {
       debugPrint('[AiAssistantScreen] Error processing send request: $e');
       _chilluController.confused(persistent: true);
