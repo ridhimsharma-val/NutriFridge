@@ -2614,3 +2614,133 @@ class _ChilluSleepingZPainter extends CustomPainter {
     return oldDelegate.progress != progress || oldDelegate.opacity != opacity;
   }
 }
+
+/// Animated dropping avatar that transitions the Chillu mascot from a previous chat position
+/// down to the latest chat bubble with a subtle gravitational drop and an elastic gooey bounce
+/// on landing, seamlessly continuing whatever mascot animation is currently active.
+class ChilluDroppingAvatar extends StatefulWidget {
+  final ChilluAnimationController? controller;
+  final double size;
+  final bool animateDrop;
+
+  const ChilluDroppingAvatar({
+    super.key,
+    this.controller,
+    this.size = 46,
+    this.animateDrop = true,
+  });
+
+  @override
+  State<ChilluDroppingAvatar> createState() => _ChilluDroppingAvatarState();
+}
+
+class _ChilluDroppingAvatarState extends State<ChilluDroppingAvatar>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _dropController;
+
+  @override
+  void initState() {
+    super.initState();
+    _dropController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
+    );
+    if (widget.animateDrop) {
+      _dropController.forward(from: 0.0);
+    } else {
+      _dropController.value = 1.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _dropController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final disableAnimations = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (disableAnimations || !widget.animateDrop) {
+      return SizedBox(
+        width: widget.size,
+        height: widget.size,
+        child: ChilluMascot(
+          controller: widget.controller,
+          size: widget.size,
+          showShadow: false,
+        ),
+      );
+    }
+
+    return AnimatedBuilder(
+      animation: _dropController,
+      builder: (context, child) {
+        final double t = _dropController.value;
+        final double translateY;
+        final double scaleY;
+        final double scaleX;
+        final double opacity;
+
+        if (t < 0.42) {
+          // Phase 1: Gravitational accelerating drop from previous message height
+          final double dropSub = (t / 0.42).clamp(0.0, 1.0);
+          final double dropEase = Curves.easeInQuad.transform(dropSub);
+          translateY = Tween<double>(begin: -85.0, end: 0.0).transform(dropEase);
+          // Vertical stretch while falling under gravity
+          scaleY = 1.0 + (dropSub * 0.22);
+          scaleX = 1.0 - (dropSub * 0.12);
+          // Smooth fade in over the first 10%
+          opacity = (t / 0.10).clamp(0.0, 1.0);
+        } else if (t < 0.65) {
+          // Phase 2: Impact landing & Gooey squash on the floor
+          final double squashSub = ((t - 0.42) / 0.23).clamp(0.0, 1.0);
+          final double squashSin = math.sin(squashSub * math.pi);
+          translateY = 4.0 * squashSin;
+          // Gooey horizontal spread & vertical compression
+          scaleY = 1.0 - (0.35 * squashSin);
+          scaleX = 1.0 + (0.38 * squashSin);
+          opacity = 1.0;
+        } else if (t < 0.85) {
+          // Phase 3: Elastic gooey rebound & spring overshoot
+          final double reboundSub = ((t - 0.65) / 0.20).clamp(0.0, 1.0);
+          final double reboundSin = math.sin(reboundSub * math.pi);
+          translateY = -5.0 * reboundSin;
+          scaleY = 1.0 + (0.15 * reboundSin);
+          scaleX = 1.0 - (0.10 * reboundSin);
+          opacity = 1.0;
+        } else {
+          // Phase 4: Soft settling cushion back to rest
+          final double settleSub = ((t - 0.85) / 0.15).clamp(0.0, 1.0);
+          final double settleSin = math.sin(settleSub * math.pi);
+          translateY = 0.0;
+          scaleY = 1.0 - (0.04 * settleSin);
+          scaleX = 1.0 + (0.04 * settleSin);
+          opacity = 1.0;
+        }
+
+        return Opacity(
+          opacity: opacity,
+          child: Transform.translate(
+            offset: Offset(0, translateY),
+            child: Transform.scale(
+              scaleX: scaleX,
+              scaleY: scaleY,
+              alignment: Alignment.bottomCenter,
+              child: SizedBox(
+                width: widget.size,
+                height: widget.size,
+                child: child,
+              ),
+            ),
+          ),
+        );
+      },
+      child: ChilluMascot(
+        controller: widget.controller,
+        size: widget.size,
+        showShadow: false,
+      ),
+    );
+  }
+}

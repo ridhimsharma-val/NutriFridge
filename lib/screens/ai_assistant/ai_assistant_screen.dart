@@ -2200,6 +2200,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
 
   Widget _buildAssistantBubble(AiChatMessage message, {bool isLatest = false}) {
     final bool isMealMessage = message.meal != null || message.action == 'log_meal';
+    final bool hasMultipleAssistantMessages = _messages.where((m) => !m.isUser).length > 1;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -2207,12 +2209,14 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
         children: [
           Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: ChilluMascot(
-              controller: isLatest ? _chilluController : null,
-              disableAnimations: !isLatest,
-              size: 46,
-              showShadow: false,
-            ),
+            child: isLatest
+                ? ChilluDroppingAvatar(
+                    key: ValueKey('dropping_avatar_${message.id}'),
+                    controller: _chilluController,
+                    size: 46,
+                    animateDrop: hasMultipleAssistantMessages,
+                  )
+                : const SizedBox(width: 46, height: 46),
           ),
           const SizedBox(width: 10),
           Flexible(
@@ -2979,12 +2983,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: ChilluMascot(
-              controller: _chilluController,
-              size: 46,
-              showShadow: false,
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: SizedBox(
+              width: 46,
+              height: 46,
             ),
           ),
           const SizedBox(width: 10),

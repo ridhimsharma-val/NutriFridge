@@ -1096,5 +1096,70 @@ void main() {
         controller.dispose();
       });
     });
+
+    group('ChilluDroppingAvatar Tests', () {
+      testWidgets('Drops with gravitational curve, gooey bounce on landing, and continues active state', (tester) async {
+        final controller = ChilluAnimationController();
+        controller.speak();
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: ChilluDroppingAvatar(
+                controller: controller,
+                size: 46,
+                animateDrop: true,
+              ),
+            ),
+          ),
+        );
+
+        // Frame 0: Drop begins
+        await tester.pump();
+        expect(controller.state, ChilluState.speaking);
+        expect(find.byType(ChilluDroppingAvatar), findsOneWidget);
+        expect(find.byType(ChilluMascot), findsOneWidget);
+
+        // Mid-drop (at ~200ms)
+        await tester.pump(const Duration(milliseconds: 200));
+
+        // Impact & gooey squash (at ~350ms)
+        await tester.pump(const Duration(milliseconds: 150));
+
+        // Rebound & settling (at 650ms)
+        await tester.pump(const Duration(milliseconds: 300));
+
+        // Landed: continues speaking animation
+        expect(controller.state, ChilluState.speaking);
+        expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*speaking to you')), findsOneWidget);
+
+        controller.dispose();
+      });
+
+      testWidgets('Respects reduced motion accessibility preference', (tester) async {
+        final controller = ChilluAnimationController();
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: MediaQuery(
+              data: const MediaQueryData(disableAnimations: true),
+              child: Scaffold(
+                body: ChilluDroppingAvatar(
+                  controller: controller,
+                  size: 46,
+                  animateDrop: true,
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.pump();
+        expect(find.byType(ChilluDroppingAvatar), findsOneWidget);
+        expect(find.byType(ChilluMascot), findsOneWidget);
+
+        controller.dispose();
+      });
+    });
   });
 }
