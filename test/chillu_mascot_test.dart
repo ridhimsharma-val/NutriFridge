@@ -597,7 +597,7 @@ void main() {
       sharedController.dispose();
     });
 
-    testWidgets('Renders Sleepy state with half-closed eyes, drooped leaves, and slow breathing', (WidgetTester tester) async {
+    testWidgets('Renders Sleepy state with full lying-down horizontal pose, closed eyes, and floating Zs', (WidgetTester tester) async {
       final controller = ChilluAnimationController();
 
       await tester.pumpWidget(
@@ -619,17 +619,17 @@ void main() {
       await tester.pump();
       expect(controller.state, ChilluState.sleepy);
 
-      // Relaxing and yawn entrance transition (0 to 1800ms)
-      await tester.pump(const Duration(milliseconds: 600)); // In yawn phase
+      // Lying-down entrance transition (0 to 2400ms): bends, rotates 85° horizontally, settles onto ground
+      await tester.pump(const Duration(milliseconds: 1000));
       expect(find.byType(ChilluMascot), findsOneWidget);
 
-      await tester.pump(const Duration(milliseconds: 1400)); // Settled into continuous sleepy idle
+      await tester.pump(const Duration(milliseconds: 1500)); // Settled into continuous horizontal sleep
       expect(controller.state, ChilluState.sleepy);
 
-      // Verify semantics description
-      expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*sleepy')), findsOneWidget);
+      // Verify semantics description reflects lying down asleep
+      expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*lying down asleep')), findsOneWidget);
 
-      // Continuous sleepy breathing and slow blinking over multiple seconds
+      // Continuous horizontal sleeping breathing and subtle dream shifts over multiple seconds
       await tester.pump(const Duration(milliseconds: 2500));
       expect(controller.state, ChilluState.sleepy);
 
@@ -655,7 +655,7 @@ void main() {
       // Enter Sleepy
       controller.sleepy();
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 2200));
+      await tester.pump(const Duration(milliseconds: 2500));
       expect(controller.state, ChilluState.sleepy);
 
       // 1. Wake-up to Attentive (e.g. user starts typing)
@@ -664,7 +664,7 @@ void main() {
       expect(controller.isWakingUp, isTrue);
       expect(controller.wakeUpDestination, ChilluState.attentive);
 
-      // Upward stretch & cheerful bounce progress through 1000ms window without being interrupted
+      // Upward leap arc & cheerful bounce progress through 1000ms window without being interrupted
       await tester.pump(const Duration(milliseconds: 500));
       expect(controller.isWakingUp, isTrue);
       await tester.pump(const Duration(milliseconds: 550));
@@ -674,7 +674,7 @@ void main() {
       // 2. Return to Sleepy then wake up to Listening (mic tap)
       controller.sleepy();
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 2200));
+      await tester.pump(const Duration(milliseconds: 2500));
       expect(controller.state, ChilluState.sleepy);
 
       controller.listening();
@@ -687,7 +687,7 @@ void main() {
       // 3. Return to Sleepy then wake up to Thinking (message send)
       controller.sleepy();
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 2200));
+      await tester.pump(const Duration(milliseconds: 2500));
       expect(controller.state, ChilluState.sleepy);
 
       controller.think();
@@ -700,7 +700,7 @@ void main() {
       // 4. Return to Sleepy then wake up to Idle (tap on screen)
       controller.sleepy();
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 2200));
+      await tester.pump(const Duration(milliseconds: 2500));
       expect(controller.state, ChilluState.sleepy);
 
       controller.idle();
@@ -752,11 +752,11 @@ void main() {
       // Enter Sleepy
       sharedController.sleepy();
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 2500));
       expect(sharedController.state, ChilluState.sleepy);
 
-      // Both hero and latest avatar reflect Sleepy state semantics
-      expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*sleepy')), findsNWidgets(2));
+      // Both hero and latest avatar reflect lying down asleep semantics
+      expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*lying down asleep')), findsNWidgets(2));
 
       // Wake-up to Attentive
       sharedController.attentive();

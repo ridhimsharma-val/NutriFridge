@@ -32,11 +32,15 @@ class ChilluMascot extends StatefulWidget {
   /// Optional explicit override for disabling animations (e.g. for static historical message avatars).
   final bool? disableAnimations;
 
+  /// Optional long-press handler (e.g. for developer debug shortcuts).
+  final VoidCallback? onLongPress;
+
   const ChilluMascot({
     super.key,
     this.controller,
     this.size = 100.0,
     this.onTap,
+    this.onLongPress,
     this.message,
     this.showShadow = true,
     this.disableAnimations,
@@ -184,19 +188,19 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
       duration: const Duration(milliseconds: 2600),
     );
 
-    // 17. Sleepy entrance relaxation & yawn reaction (2200ms)
+    // 17. Sleepy entrance: bending, lowering, rotating 85° horizontally, settling bounce (2400ms)
     _sleepyTransitionController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2200),
+      duration: const Duration(milliseconds: 2400),
     );
 
-    // 18. Sleepy continuous idle: slow breathing (4400ms) & gentle swaying
+    // 18. Sleepy continuous idle: horizontal sleep breathing (4400ms) & floating Z's
     _sleepyLoopController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 4400),
     );
 
-    // 19. Wake-up reaction: stretch hop (-14px), cheerful bounce, eye opening, leaf spring-up (1000ms)
+    // 19. Wake-up reaction: 4-stage jump (eyes open, crouch, 22px leap arc, landing cushion) (1000ms)
     _wakeUpController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
@@ -493,6 +497,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
       image: true,
       child: GestureDetector(
         onTap: widget.onTap ?? () => _controller.greet(),
+        onLongPress: widget.onLongPress,
         behavior: HitTestBehavior.opaque,
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -682,43 +687,49 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           if (state == ChilluState.idle) {
             translateY += -2.0 * floatSin;
           } else if (state == ChilluState.sleepy) {
-            // SLEEPY (Noticeably relaxed, heavy, adorable sleepy posture v2):
-            // 1. Visibly relaxed downward settling movement (+7 to +9px, tuned to 8.5px * sizeScale)
-            // 2. Squash-and-relax effect (scaleY 0.94, scaleX 1.05)
-            // 3. Slow, noticeable, deep chest breathing (~4400ms cycle)
-            // 4. Prominent gentle sleepy body sway (~3.55 deg / 0.062 rad)
-            // 5. Clearly noticeable yawn entrance reaction (p: 0.35 -> 0.75) with deep breath inhale
-            final double wakeFade = _wakeUpController.isAnimating
-                ? (1.0 - (_wakeUpController.value / 0.30)).clamp(0.0, 1.0)
-                : 1.0;
-            final p = _sleepyTransitionController.isAnimating ? _sleepyTransitionController.value : 1.0;
-            final dropProgress = Curves.easeInOut.transform(p.clamp(0.0, 1.0)) * wakeFade;
-            final loopVal = _sleepyLoopController.value;
+            // SLEEPY (Full Lying-Down Sleeping Pose v3):
+            // Chillu physically lies down sideways on its side (rotates ~85° / 1.484 rad onto the bottom surface)
+            if (!_wakeUpController.isAnimating) {
+              final p = _sleepyTransitionController.isAnimating ? _sleepyTransitionController.value : 1.0;
+              final loopVal = _sleepyLoopController.value;
 
-            // 1. Noticeable downward body settling (+8.5px on 110px, scaled)
-            final double baseDrop = 8.5 * sizeScale * dropProgress;
-            translateY += baseDrop;
-
-            // 2. Relaxed sleepy squash posture
-            final double relaxSquashY = Tween<double>(begin: 1.0, end: 0.94).transform(dropProgress);
-            final double relaxSquashX = Tween<double>(begin: 1.0, end: 1.05).transform(dropProgress);
-
-            // 3. Slow, deep, noticeable chest breathing
-            final sleepyBreath = Curves.easeInOut.transform((math.sin(loopVal * 2 * math.pi) + 1.0) * 0.5) * wakeFade;
-            scaleY = relaxSquashY + (sleepyBreath * 0.045);
-            scaleX = relaxSquashX - (sleepyBreath * 0.025);
-            translateY -= sleepyBreath * (2.2 * sizeScale);
-
-            // 4. Clearly noticeable sleepy body swaying: 3.55 degrees (0.062 rad)
-            rotation = math.sin(loopVal * 2 * math.pi) * 0.062 * wakeFade;
-
-            // 5. Adorable deep yawn inhalation & body reaction during initial entrance transition
-            if (_sleepyTransitionController.isAnimating && p >= 0.35 && p <= 0.75 && !_wakeUpController.isAnimating) {
-              final sub = (p - 0.35) / 0.40;
-              final yawnSin = math.sin(sub * math.pi);
-              translateY -= 3.5 * sizeScale * yawnSin; // Inhale lift
-              scaleY += 0.050 * yawnSin;
-              scaleX -= 0.030 * yawnSin;
+              if (p < 0.25) {
+                // Stage 1: Slowly bends, lowers body, moves sideways
+                final sub = p / 0.25;
+                final tEase = Curves.easeInOut.transform(sub);
+                translateY += 5.0 * sizeScale * tEase;
+                translateX += 3.0 * sizeScale * tEase;
+                rotation = 0.26 * tEase; // ~15° tilt
+                scaleY = 1.0 - (0.04 * tEase);
+                scaleX = 1.0 + (0.04 * tEase);
+              } else if (p < 0.75) {
+                // Stage 2: Rotates into horizontal sleeping position (~85°) and settles onto bottom surface
+                final sub = (p - 0.25) / 0.50;
+                final rotEase = Curves.easeInOutCubic.transform(sub);
+                rotation = Tween<double>(begin: 0.26, end: 1.484).transform(rotEase); // ~85°
+                translateY += Tween<double>(begin: 5.0, end: 12.0).transform(rotEase) * sizeScale;
+                translateX += Tween<double>(begin: 3.0, end: -2.0).transform(rotEase) * sizeScale;
+                scaleY = Tween<double>(begin: 0.96, end: 0.98).transform(rotEase);
+                scaleX = Tween<double>(begin: 1.04, end: 1.02).transform(rotEase);
+              } else if (p < 1.0) {
+                // Stage 3: Subtle final settling cushion bounce onto bottom surface
+                final sub = (p - 0.75) / 0.25;
+                final bounceSin = math.sin(sub * math.pi);
+                rotation = 1.484;
+                translateY += (12.0 + (2.5 * bounceSin)) * sizeScale;
+                translateX += -2.0 * sizeScale;
+                scaleY = 0.98 - (0.04 * bounceSin);
+                scaleX = 1.02 + (0.04 * bounceSin);
+              } else {
+                // Sleeping Idle: stays horizontally asleep with gentle chest breathing & peaceful dream shifts
+                final breath = (math.sin(loopVal * 2 * math.pi) + 1.0) * 0.5;
+                final dreamShift = math.sin(loopVal * 4 * math.pi) * 0.012;
+                rotation = 1.484 + dreamShift;
+                translateY += (12.0 - (breath * 1.5)) * sizeScale;
+                translateX += -2.0 * sizeScale;
+                scaleX = 1.02 + (breath * 0.025);
+                scaleY = 0.98 - (breath * 0.015);
+              }
             }
           } else if (state == ChilluState.attentive) {
             // ATTENTIVE:
@@ -947,40 +958,55 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           }
         }
 
-        // 6. Wake-Up Reaction: upward stretch (-14.0px, scaleY 1.10), cheerful bounce, and smooth transition
+        // 6. Wake-Up Jump: 4 distinct stages (Stage 1 wake up -> Stage 2 crouch -> Stage 3 22px leap & 0° rotate -> Stage 4 landing cushion)
         if (_wakeUpController.isAnimating) {
           final double sizeScale = (widget.size / 100.0).clamp(0.46, 1.25);
           final w = _wakeUpController.value;
-          final double wakeHop;
-          final double wakeScaleY;
-          final double wakeScaleX;
 
-          if (w < 0.38) {
-            // Phase 1: Upward stretch & buoyant hop into the air (-14px * sizeScale, scaleY 1.10)
-            final sub = (w / 0.38).clamp(0.0, 1.0);
-            final tEase = Curves.easeOutBack.transform(sub);
-            wakeHop = -14.0 * sizeScale * tEase;
-            wakeScaleY = 1.0 + (0.10 * tEase);
-            wakeScaleX = 1.0 - (0.06 * tEase);
+          if (w < 0.20) {
+            // Stage 1: Wake up - eyes open, reacts as if just woken up, leaves begin lifting, body still lying down
+            rotation = 1.484;
+            translateY += 12.0 * sizeScale;
+            translateX += -2.0 * sizeScale;
+            scaleX = 1.02;
+            scaleY = 0.98;
+          } else if (w < 0.35) {
+            // Stage 2: Prepare to jump - anticipatory squash, body compresses into ground
+            final sub = ((w - 0.20) / 0.15).clamp(0.0, 1.0);
+            final crouchSin = math.sin(sub * math.pi);
+            rotation = 1.484 - (0.08 * crouchSin);
+            translateY += (12.0 + (3.5 * crouchSin)) * sizeScale;
+            translateX += -2.0 * sizeScale;
+            scaleX = 1.02 + (0.14 * crouchSin);
+            scaleY = 0.98 - (0.12 * crouchSin);
           } else if (w < 0.72) {
-            // Phase 2: Descents from peak and lands with cheerful bounce into cushion squash (+3.5px, scaleY 0.93)
-            final sub = ((w - 0.38) / 0.34).clamp(0.0, 1.0);
-            final landEase = Curves.easeInCubic.transform(sub);
-            wakeHop = (-14.0 * sizeScale * (1.0 - landEase)) + (3.5 * sizeScale * landEase);
-            wakeScaleY = Tween<double>(begin: 1.10, end: 0.93).transform(landEase);
-            wakeScaleX = Tween<double>(begin: 0.94, end: 1.06).transform(landEase);
+            // Stage 3: THE JUMP - clearly noticeable upward jump (18-24px, tuned to 22px), smooth rotation back to 0°
+            final sub = ((w - 0.35) / 0.37).clamp(0.0, 1.0);
+            final arcSin = math.sin(sub * math.pi);
+            final rotEase = Curves.easeInOutCubic.transform(sub);
+            rotation = Tween<double>(begin: 1.484, end: 0.0).transform(rotEase);
+            final jumpY = Tween<double>(begin: 12.0 * sizeScale, end: 0.0).transform(sub) - (22.0 * sizeScale * arcSin);
+            translateY += jumpY;
+            translateX += Tween<double>(begin: -2.0 * sizeScale, end: 0.0).transform(sub);
+            scaleY = 1.0 + (0.18 * arcSin);
+            scaleX = 1.0 - (0.10 * arcSin);
+          } else if (w < 0.88) {
+            // Stage 4A: Landing impact cushion squash
+            final sub = ((w - 0.72) / 0.16).clamp(0.0, 1.0);
+            final cushionSin = math.sin(sub * math.pi);
+            rotation = 0.0;
+            translateY += 4.5 * sizeScale * cushionSin;
+            scaleY = 1.0 - (0.14 * cushionSin);
+            scaleX = 1.0 + (0.12 * cushionSin);
           } else {
-            // Phase 3: Elastic recovery from cushion back to neutral ready posture
-            final sub = ((w - 0.72) / 0.28).clamp(0.0, 1.0);
-            final cushionEase = Curves.easeOut.transform(sub);
-            wakeHop = (3.5 * sizeScale) * (1.0 - cushionEase);
-            wakeScaleY = 0.93 + (0.07 * cushionEase);
-            wakeScaleX = 1.06 - (0.06 * cushionEase);
+            // Stage 4B: Secondary settling bounce & smooth restore of upright standing posture
+            final sub = ((w - 0.88) / 0.12).clamp(0.0, 1.0);
+            final settleSin = math.sin(sub * math.pi);
+            rotation = 0.0;
+            translateY += -2.5 * sizeScale * settleSin;
+            scaleY = 1.0 + (0.04 * settleSin);
+            scaleX = 1.0 - (0.03 * settleSin);
           }
-
-          translateY += wakeHop;
-          scaleY *= wakeScaleY;
-          scaleX *= wakeScaleX;
         }
 
         // 7. Independent leaf sprout sway calculation
@@ -1069,28 +1095,46 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
             final thinkSway = math.sin(cycle * 2 * math.pi);
             lAngle += (rotation * 0.35) + (thinkSway * 0.025);
             rAngle += (rotation * 0.35) - (thinkSway * 0.020);
-          } else if (state == ChilluState.sleepy) {
-            // Sleepy: both leafy sprouts droop noticeably (-0.520 rad left, +0.580 rad right) with slow soothing rustle
+          } else if (state == ChilluState.sleepy && !_wakeUpController.isAnimating) {
+            // Sleepy: both leafy sprouts fall sideways naturally with the body
             final p = _sleepyTransitionController.isAnimating ? _sleepyTransitionController.value : 1.0;
             final droopFactor = Curves.easeInOut.transform(p.clamp(0.0, 1.0));
             final loopVal = _sleepyLoopController.value;
-            final loopRustleL = math.sin(loopVal * 2 * math.pi) * 0.035;
-            final loopRustleR = math.sin(loopVal * 2 * math.pi + 1.2) * -0.030;
+            final loopRustleL = math.sin(loopVal * 2 * math.pi) * 0.025;
+            final loopRustleR = math.sin(loopVal * 2 * math.pi + 1.2) * -0.025;
 
-            final double wakeFade = _wakeUpController.isAnimating
-                ? (1.0 - (_wakeUpController.value / 0.35)).clamp(0.0, 1.0)
-                : 1.0;
-
-            lAngle += (-0.520 * droopFactor * wakeFade) + (loopRustleL * wakeFade);
-            rAngle += (0.580 * droopFactor * wakeFade) + (loopRustleR * wakeFade);
+            // Sprout leaves droop naturally sideways with gravity as body lies horizontal
+            lAngle += (-0.220 * droopFactor) + loopRustleL;
+            rAngle += (0.180 * droopFactor) + loopRustleR;
           }
 
-          // Wake-Up Reaction: both leaves spring back upright with elastic spring pop & overshoot (+0.32 rad)
+          // Wake-Up Reaction: 4-stage leaf kinematics
           if (_wakeUpController.isAnimating) {
             final w = _wakeUpController.value;
-            final springPop = math.sin(w * 2.5 * math.pi) * 0.32 * (1.0 - w);
-            lAngle += springPop;
-            rAngle -= springPop;
+            if (w < 0.20) {
+              // Stage 1: leaves begin lifting from sleep droop
+              final sub = (w / 0.20).clamp(0.0, 1.0);
+              lAngle += Tween<double>(begin: -0.220, end: 0.0).transform(sub);
+              rAngle += Tween<double>(begin: 0.180, end: 0.0).transform(sub);
+            } else if (w < 0.35) {
+              // Stage 2: preparing to jump, leaves coil slightly
+              final sub = ((w - 0.20) / 0.15).clamp(0.0, 1.0);
+              final coil = math.sin(sub * math.pi) * 0.10;
+              lAngle += -coil;
+              rAngle += coil;
+            } else if (w < 0.72) {
+              // Stage 3: jump whip with elastic spring-back overshoot (+0.35 rad)
+              final sub = ((w - 0.35) / 0.37).clamp(0.0, 1.0);
+              final whip = math.sin(sub * math.pi) * 0.35;
+              lAngle += whip;
+              rAngle -= whip;
+            } else {
+              // Stage 4: landing cushion and natural leaf settling
+              final sub = ((w - 0.72) / 0.28).clamp(0.0, 1.0);
+              final settle = math.sin(sub * 2 * math.pi) * 0.12 * (1.0 - sub);
+              lAngle += settle;
+              rAngle -= settle;
+            }
           }
 
           leftLeafAngle = lAngle;
@@ -1183,62 +1227,65 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           gazeEyelid = 0.0;
         }
 
-        // Calculate sleepy half-closed eyelid coverage (target 75-90% eye closure)
+        // Calculate sleepy 100% eye closure
         double sleepyEyelid = 0.0;
-        if (state == ChilluState.sleepy) {
+        if (state == ChilluState.sleepy && !_wakeUpController.isAnimating) {
           final p = _sleepyTransitionController.value;
           if (_sleepyTransitionController.isAnimating) {
-            final baseDroop = 0.75 * Curves.easeInOut.transform(p.clamp(0.0, 1.0));
-            final double yawnPinch;
-            if (p >= 0.35 && p <= 0.75) {
-              final sub = (p - 0.35) / 0.40;
-              yawnPinch = math.sin(sub * math.pi) * 0.13; // Squeezes up to 0.88 (~88% closure)
-            } else {
-              yawnPinch = 0.0;
-            }
-            sleepyEyelid = baseDroop + yawnPinch;
+            // Eyelids close completely into peaceful sleep (0.0 -> 1.0)
+            sleepyEyelid = Curves.easeInOut.transform((p / 0.30).clamp(0.0, 1.0));
           } else {
-            sleepyEyelid = 0.75; // Settled half-closed at 75%
+            sleepyEyelid = 1.0; // 100% closed during sleep
           }
         }
 
-        // Handle natural wake-up eye opening (first 250ms opens fully: w: 0.0 -> 0.25)
+        // Natural wake-up eye opening during Stage 1 (0.0 to 0.18)
         if (_wakeUpController.isAnimating) {
           final w = _wakeUpController.value;
-          final openProgress = (w / 0.25).clamp(0.0, 1.0);
-          sleepyEyelid = 0.75 * (1.0 - Curves.easeOut.transform(openProgress));
+          if (w < 0.18) {
+            final openProgress = (w / 0.18).clamp(0.0, 1.0);
+            sleepyEyelid = 1.0 - Curves.easeOut.transform(openProgress);
+          } else {
+            sleepyEyelid = 0.0;
+          }
         }
 
         final double baseLid = math.max(gazeEyelid, sleepyEyelid);
-        final double effectiveBlinkProgress;
-        if (state == ChilluState.sleepy && baseLid > 0.0) {
-          // Slow blink dips from half-closed base (0.75) to fully closed (1.0) and reopens to base
-          effectiveBlinkProgress = baseLid + ((1.0 - baseLid) * _blinkController.value);
-        } else {
-          effectiveBlinkProgress = math.max(_blinkController.value, baseLid);
-        }
+        final double effectiveBlinkProgress = (state == ChilluState.sleepy && !_wakeUpController.isAnimating)
+            ? 1.0
+            : math.max(_blinkController.value, baseLid);
 
-        // Calculate sleepy expression progress (soft eyebrows and warm blush)
+        // Calculate sleepy expression progress (soft sleeping eyebrows and warm cheek blush)
         final double sleepyProgress;
-        if (state == ChilluState.sleepy) {
+        if (state == ChilluState.sleepy && !_wakeUpController.isAnimating) {
           final p = _sleepyTransitionController.isAnimating ? _sleepyTransitionController.value : 1.0;
           sleepyProgress = Curves.easeInOut.transform(p.clamp(0.0, 1.0));
-        } else if (_wakeUpController.isAnimating) {
-          final w = _wakeUpController.value;
-          sleepyProgress = (1.0 - (w / 0.25)).clamp(0.0, 1.0);
         } else {
           sleepyProgress = 0.0;
         }
+
+        // Floating Z symbols opacity (fades in once lying down, vanishes on wake-up)
+        final double zOpacity;
+        if (state == ChilluState.sleepy && !_wakeUpController.isAnimating) {
+          final p = _sleepyTransitionController.isAnimating ? _sleepyTransitionController.value : 1.0;
+          zOpacity = ((p - 0.40) / 0.60).clamp(0.0, 1.0);
+        } else {
+          zOpacity = 0.0;
+        }
+
+        final Alignment rotationAlignment = (state == ChilluState.sleepy || _wakeUpController.isAnimating)
+            ? const Alignment(0.0, 0.35)
+            : Alignment.bottomCenter;
 
         return Transform.translate(
           offset: Offset(translateX, translateY),
           child: Transform.rotate(
             angle: rotation,
-            alignment: Alignment.bottomCenter,
+            alignment: rotationAlignment,
             child: Transform.scale(
               scaleX: scaleX,
               scaleY: scaleY,
-              alignment: Alignment.bottomCenter,
+              alignment: rotationAlignment,
               child: SizedBox(
                 width: widget.size,
                 height: widget.size,
@@ -1334,6 +1381,17 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
                           glanceProgress: glanceShift,
                           yawnProgress: yawnProgress,
                           sleepyProgress: sleepyProgress,
+                        ),
+                      ),
+
+                    // 6. Floating 'Z' symbols while Chillu is lying down asleep
+                    if (zOpacity > 0.0)
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: _ChilluSleepingZPainter(
+                            progress: _sleepyLoopController.value,
+                            opacity: zOpacity,
+                          ),
                         ),
                       ),
                   ],
@@ -1441,21 +1499,54 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           final thinkFloat = (math.sin(thinkVal * 2 * math.pi) + 1.0) * 0.5;
           shadowScale = 0.88 - (0.05 * thinkFloat);
           shadowOpacity = 0.09 - (0.02 * thinkFloat);
-        } else if (state == ChilluState.idle || state == ChilluState.sleepy) {
+        } else if (state == ChilluState.idle) {
           final breath = Curves.easeInOut.transform(_idleBreathingController.value);
           final floatVal = _floatingController.value;
           final floatSin = math.sin(floatVal * 2 * math.pi);
-          // Gently reacts to breathing and floating
           shadowScale = 1.0 + (breath * 0.03) - (floatSin * 0.03);
           shadowOpacity = 0.11 + (breath * 0.02) - (floatSin * 0.02);
+        } else if (state == ChilluState.sleepy) {
+          if (!_wakeUpController.isAnimating) {
+            // Lying down shadow: wider horizontally (1.55x) to support horizontal body
+            final p = _sleepyTransitionController.isAnimating ? _sleepyTransitionController.value : 1.0;
+            final t = Curves.easeInOut.transform(p.clamp(0.0, 1.0));
+            shadowScale = Tween<double>(begin: 1.0, end: 1.55).transform(t);
+            shadowOpacity = Tween<double>(begin: 0.11, end: 0.13).transform(t);
+          }
         }
 
-        // React to wake-up stretch hop on shadow
+        // React to 4-stage wake-up reaction on ground shadow
         if (_wakeUpController.isAnimating) {
-          final wVal = _wakeUpController.value;
-          final hop = math.sin(wVal * math.pi);
-          shadowScale = (shadowScale - (0.35 * hop)).clamp(0.20, 1.15);
-          shadowOpacity = (shadowOpacity - (0.07 * hop)).clamp(0.02, 0.15);
+          final w = _wakeUpController.value;
+          if (w < 0.20) {
+            // Stage 1: lying down shadow
+            shadowScale = 1.55;
+            shadowOpacity = 0.13;
+          } else if (w < 0.35) {
+            // Stage 2: crouch press into floor - shadow expands
+            final sub = ((w - 0.20) / 0.15).clamp(0.0, 1.0);
+            final crouch = math.sin(sub * math.pi);
+            shadowScale = 1.55 + (0.15 * crouch);
+            shadowOpacity = 0.13 + (0.02 * crouch);
+          } else if (w < 0.72) {
+            // Stage 3: THE JUMP - shadow contracts to 0.45 and fades to 0.03 as Chillu leaps 22px high!
+            final sub = ((w - 0.35) / 0.37).clamp(0.0, 1.0);
+            final jumpSin = math.sin(sub * math.pi);
+            shadowScale = Tween<double>(begin: 1.55, end: 1.0).transform(sub) - (0.55 * jumpSin);
+            shadowOpacity = Tween<double>(begin: 0.13, end: 0.11).transform(sub) - (0.08 * jumpSin);
+          } else if (w < 0.88) {
+            // Stage 4A: landing impact cushion - shadow expands
+            final sub = ((w - 0.72) / 0.16).clamp(0.0, 1.0);
+            final impactSin = math.sin(sub * math.pi);
+            shadowScale = 1.0 + (0.22 * impactSin);
+            shadowOpacity = 0.11 + (0.03 * impactSin);
+          } else {
+            // Stage 4B: secondary settle to normal standing shadow
+            final sub = ((w - 0.88) / 0.12).clamp(0.0, 1.0);
+            final settleSin = math.sin(sub * math.pi);
+            shadowScale = 1.0 - (0.05 * settleSin);
+            shadowOpacity = 0.11;
+          }
         }
 
         return Container(
@@ -1504,7 +1595,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
 
   String _stateDescription(ChilluState s) {
     if (_controller.isWakingUp) {
-      return 'waking up cheerfully';
+      return 'waking up with a jump';
     }
     switch (s) {
       case ChilluState.idle:
@@ -1536,7 +1627,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
       case ChilluState.error:
         return 'confused';
       case ChilluState.sleepy:
-        return 'sleepy';
+        return 'lying down asleep';
     }
   }
 }
@@ -2148,5 +2239,69 @@ class _ChilluCelebrationSparklesPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _ChilluCelebrationSparklesPainter oldDelegate) {
     return oldDelegate.progress != progress;
+  }
+}
+
+/// Renders 3 delicate floating 'Z' symbols drifting upward-right above Chillu while lying down asleep.
+class _ChilluSleepingZPainter extends CustomPainter {
+  final double progress; // 0.0 to 1.0 driving the float cycle
+  final double opacity;  // 0.0 to 1.0 (smooth fade in/out)
+
+  const _ChilluSleepingZPainter({
+    required this.progress,
+    required this.opacity,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (opacity <= 0.01) return;
+
+    // 3 floating Z symbols of increasing size drifting above Chillu's head
+    final zSpecs = [
+      // (baseOffsetX, baseOffsetY, driftX, driftY, fontSize, phase)
+      (0.66, 0.44, 0.05, -0.16, math.max(8.0, size.width * 0.09), 0.0),
+      (0.72, 0.35, 0.07, -0.18, math.max(10.0, size.width * 0.12), 0.33),
+      (0.78, 0.25, 0.09, -0.20, math.max(12.0, size.width * 0.15), 0.66),
+    ];
+
+    for (final spec in zSpecs) {
+      final bx = spec.$1;
+      final by = spec.$2;
+      final dx = spec.$3;
+      final dy = spec.$4;
+      final fontSize = spec.$5;
+      final phase = spec.$6;
+
+      final t = (progress + phase) % 1.0;
+      final alpha = (math.sin(t * math.pi) * opacity).clamp(0.0, 1.0);
+      if (alpha <= 0.02) continue;
+
+      final posX = (bx + (dx * t)) * size.width;
+      final posY = (by + (dy * t)) * size.height;
+
+      final textSpan = TextSpan(
+        text: 'Z',
+        style: TextStyle(
+          color: const Color(0xFF2D6A4F).withValues(alpha: alpha * 0.85),
+          fontSize: fontSize,
+          fontWeight: FontWeight.w800,
+        ),
+      );
+
+      final textPainter = TextPainter(
+        text: textSpan,
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      textPainter.paint(
+        canvas,
+        Offset(posX - (textPainter.width / 2), posY - (textPainter.height / 2)),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ChilluSleepingZPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.opacity != opacity;
   }
 }
