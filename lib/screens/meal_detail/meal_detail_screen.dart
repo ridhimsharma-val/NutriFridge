@@ -1349,7 +1349,7 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              step.instruction,
+                              _cleanInstructionText(step.instruction),
                               style: const TextStyle(
                                 fontSize: 13,
                                 height: 1.4,
@@ -1416,33 +1416,17 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
               },
             ),
           ),
-        if (steps.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 46,
-            child: OutlinedButton.icon(
-              key: const ValueKey('prep_section_start_cooking_btn'),
-              onPressed: () => _openGuidedCooking(meal),
-              icon: const Icon(Icons.play_circle_outline_rounded, size: 20, color: AppColors.primaryForest),
-              label: const Text(
-                'Start Guided Cooking',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primaryForest,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFC8E6C9), width: 1.2),
-                backgroundColor: const Color(0xFFF6FAF7),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-            ),
-          ),
-        ],
       ],
     );
+  }
+
+  static String _cleanInstructionText(String raw) {
+    return raw
+        .replaceAllMapped(RegExp(r'\*\*(.*?)\*\*'), (m) => m.group(1) ?? '')
+        .replaceAllMapped(RegExp(r'\*(.*?)\*'), (m) => m.group(1) ?? '')
+        .replaceAll(RegExp(r'[\*#_`~]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
   }
 
   // ==========================================
