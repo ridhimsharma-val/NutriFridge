@@ -2016,8 +2016,12 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
             controller: _chilluController,
             size: 110,
             onTap: () {
-              _handleUserInteraction();
-              _chilluController.greet();
+              if (_chilluController.state == ChilluState.sleepy || _chilluController.isWakingUp) {
+                _handleUserInteraction();
+              } else {
+                _handleUserInteraction();
+                _chilluController.greet();
+              }
             },
           ),
           const SizedBox(height: 10),

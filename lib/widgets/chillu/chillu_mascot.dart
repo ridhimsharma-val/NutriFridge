@@ -270,17 +270,25 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
     final isWakingUp = _controller.isWakingUp;
 
     if (isWakingUp) {
-      if (!_wakeUpController.isAnimating) {
+      if (_wakeUpController.status != AnimationStatus.forward &&
+          _wakeUpController.status != AnimationStatus.completed) {
         debugPrint('[Chillu] Mascot received wake-up signal: starting 1000ms upward stretch & bounce');
         _wakeUpController.forward(from: 0.0);
       }
+      setState(() {});
       return;
     } else if (_previousState == ChilluState.sleepy && newState != ChilluState.sleepy) {
-      if (!_wakeUpController.isAnimating) {
+      if (_wakeUpController.status != AnimationStatus.forward &&
+          _wakeUpController.status != AnimationStatus.completed) {
         debugPrint('[Chillu] Mascot transition out of sleepy: playing wake-up animation');
         _wakeUpController.forward(from: 0.0);
       }
     }
+
+    if (_wakeUpController.status == AnimationStatus.completed) {
+      _wakeUpController.reset();
+    }
+
     _previousState = newState;
     _syncAnimationsWithState(newState);
     setState(() {});

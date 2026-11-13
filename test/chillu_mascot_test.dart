@@ -713,6 +713,48 @@ void main() {
       controller.dispose();
     });
 
+    testWidgets('Wake-up animation plays strictly once and does not repeat or trigger twice', (WidgetTester tester) async {
+      final controller = ChilluAnimationController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ChilluMascot(
+              controller: controller,
+              size: 110,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      controller.sleepy();
+      await tester.pump(const Duration(milliseconds: 2500));
+      expect(controller.state, ChilluState.sleepy);
+
+      // Trigger wake-up
+      controller.idle();
+      await tester.pump();
+      expect(controller.isWakingUp, isTrue);
+
+      // Verify waking up semantics label is present during the jump
+      expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*waking up with a jump')), findsOneWidget);
+
+      // Progress past 1000ms jump to complete wake-up
+      await tester.pump(const Duration(milliseconds: 1050));
+      expect(controller.isWakingUp, isFalse);
+      expect(controller.state, ChilluState.idle);
+      expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*happy and waiting')), findsOneWidget);
+
+      // Pump several frames in idle to ensure wake-up animation does NOT trigger a second time
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*waking up with a jump')), findsNothing);
+      expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*happy and waiting')), findsOneWidget);
+
+      controller.dispose();
+    });
+
     testWidgets('Chat avatars synchronize Sleepy and Wake-Up while historical avatars remain static', (WidgetTester tester) async {
       final sharedController = ChilluAnimationController();
 

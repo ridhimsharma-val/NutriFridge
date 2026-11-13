@@ -201,6 +201,10 @@ class ChilluAnimationController extends ChangeNotifier {
     _transientResetTimer?.cancel();
     _transientResetTimer = null;
     _wakeUpDestination = destinationState;
+    if (_isWakingUp) {
+      // Already actively waking up; update destination state without restarting sequence
+      return;
+    }
     _isWakingUp = true;
     _wakeUpFallbackTimer?.cancel();
     // Safety fallback timer if no mounted mascot drives completion (e.g. headless unit tests)
