@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -32,7 +33,7 @@ class AiAssistantScreen extends StatefulWidget {
   State<AiAssistantScreen> createState() => _AiAssistantScreenState();
 }
 
-class _AiAssistantScreenState extends State<AiAssistantScreen> {
+class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindingObserver {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
@@ -50,9 +51,16 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   bool _initialPromptDispatched = false;
   final ChilluAnimationController _chilluController = ChilluAnimationController();
 
+  /// Inactivity timeout: after ~60 seconds of genuine inactivity, Chillu enters Sleepy state.
+  static const Duration _inactivityTimeout = Duration(seconds: 60);
+  Timer? _inactivityTimer;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _resetInactivityTimer();
+
     // Load session messages to ensure conversation is preserved across navigations
     if (AiAssistantService.sessionMessages.isEmpty) {
       AiAssistantService.resetSession();
@@ -103,6 +111,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   @override
   void dispose() {
+    _inactivityTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _inputFocusNode.removeListener(_onInputFocusOrTextChanged);
     _textController.removeListener(_onInputFocusOrTextChanged);
     _inputFocusNode.dispose();
@@ -112,12 +122,86 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _resetInactivityTimer();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      _inactivityTimer?.cancel();
+    }
+  }
+
+  void _resetInactivityTimer() {
+    _inactivityTimer?.cancel();
+    if (!mounted) return;
+    _inactivityTimer = Timer(_inactivityTimeout, _onInactivityTimeout);
+  }
+
+  void _onInactivityTimeout() {
+    if (!mounted) return;
+
+    // Condition 1: No unsent message is present
+    if (_textController.text.trim().isNotEmpty) {
+      _resetInactivityTimer();
+      return;
+    }
+
+    // Condition 2: AI is not processing a request
+    if (_isSending || _chilluController.state == ChilluState.thinking || _chilluController.isProcessing) {
+      _resetInactivityTimer();
+      return;
+    }
+
+    // Condition 3: Microphone recording is not active
+    if (_isRecording || _chilluController.state == ChilluState.listening) {
+      _resetInactivityTimer();
+      return;
+    }
+
+    // Condition 4: No emotional reaction is currently playing
+    if (_chilluController.isReacting ||
+        _chilluController.state == ChilluState.happy ||
+        _chilluController.state == ChilluState.excited ||
+        _chilluController.state == ChilluState.celebrating ||
+        _chilluController.state == ChilluState.confused) {
+      _resetInactivityTimer();
+      return;
+    }
+
+    // Condition 5: Screen is active & mounted
+    _chilluController.sleepy();
+  }
+
+  void _handleUserInteraction({bool fromTyping = false, bool fromVoice = false, bool fromSend = false}) {
+    _resetInactivityTimer();
+    if (_chilluController.state == ChilluState.sleepy) {
+      if (fromTyping) {
+        _chilluController.attentive();
+      } else if (fromVoice) {
+        _chilluController.listening();
+      } else if (fromSend) {
+        _chilluController.think();
+      } else {
+        final hasDraft = _textController.text.trim().isNotEmpty;
+        if (hasDraft) {
+          _chilluController.attentive();
+        } else {
+          _chilluController.idle();
+        }
+      }
+    }
+  }
+
   void _onInputFocusOrTextChanged() {
+    _resetInactivityTimer();
     if (_isSending || _isRecording) return;
     final hasNonWhitespace = _textController.text.trim().isNotEmpty;
 
     if (hasNonWhitespace) {
-      // First non-whitespace character triggers Attentive; subsequent keystrokes maintain it without restarting
+      // First non-whitespace character triggers Attentive; subsequent keystrokes maintain it without restarting.
+      // Waking up from Sleepy into Attentive is handled seamlessly.
       if (_chilluController.state != ChilluState.attentive && _chilluController.state != ChilluState.thinking) {
         _chilluController.attentive();
       }
@@ -171,6 +255,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   }
 
   void _handleVoiceInput() {
+    _handleUserInteraction(fromVoice: true);
     if (_isSending) return;
 
     if (!_isRecording) {
@@ -261,6 +346,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     bool isRetry = false,
     Map<String, dynamic>? extraPayload,
   }) async {
+    _handleUserInteraction(fromSend: true);
     if (_isSending) return;
 
     final text = (promptOverride ?? _textController.text).trim();
@@ -1666,6 +1752,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       behavior: HitTestBehavior.translucent,
       onPointerDown: (_) {
         ChilluSoundController.instance.unlockAudioContext();
+        _handleUserInteraction();
       },
       child: Scaffold(
         backgroundColor: AppColors.warmCream,
@@ -1907,6 +1994,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             controller: _chilluController,
             size: 110,
             onTap: () {
+              _handleUserInteraction();
               _chilluController.greet();
             },
           ),

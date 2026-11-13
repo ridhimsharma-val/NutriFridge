@@ -67,6 +67,9 @@ class ChilluAnimationController extends ChangeNotifier {
   /// Whether Chillu is currently floating in the processing state.
   bool get isProcessing => _state == ChilluState.processing;
 
+  /// Whether Chillu is currently playing a transient reaction.
+  bool get isReacting => _transientResetTimer != null;
+
   /// Priority scale for states:
   /// 1. Celebrating (8)
   /// 2. Excited (7)

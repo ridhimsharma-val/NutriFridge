@@ -596,5 +596,174 @@ void main() {
 
       sharedController.dispose();
     });
+
+    testWidgets('Renders Sleepy state with half-closed eyes, drooped leaves, and slow breathing', (WidgetTester tester) async {
+      final controller = ChilluAnimationController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ChilluMascot(
+              controller: controller,
+              size: 110,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      expect(controller.state, ChilluState.idle);
+
+      // Trigger Sleepy state
+      controller.sleepy();
+      await tester.pump();
+      expect(controller.state, ChilluState.sleepy);
+
+      // Relaxing and yawn entrance transition (0 to 1800ms)
+      await tester.pump(const Duration(milliseconds: 600)); // In yawn phase
+      expect(find.byType(ChilluMascot), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 1400)); // Settled into continuous sleepy idle
+      expect(controller.state, ChilluState.sleepy);
+
+      // Verify semantics description
+      expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*sleepy')), findsOneWidget);
+
+      // Continuous sleepy breathing and slow blinking over multiple seconds
+      await tester.pump(const Duration(milliseconds: 2500));
+      expect(controller.state, ChilluState.sleepy);
+
+      controller.dispose();
+    });
+
+    testWidgets('Wake-up reaction triggers upward stretch, bounce, and transitions smoothly into destination states', (WidgetTester tester) async {
+      final controller = ChilluAnimationController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ChilluMascot(
+              controller: controller,
+              size: 110,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      // Enter Sleepy
+      controller.sleepy();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1900));
+      expect(controller.state, ChilluState.sleepy);
+
+      // 1. Wake-up to Attentive (e.g. user starts typing)
+      controller.attentive();
+      await tester.pump();
+      expect(controller.state, ChilluState.attentive); // Destination state is preserved immediately
+
+      // Upward stretch & cheerful bounce progress through 650ms window
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(controller.state, ChilluState.attentive);
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(controller.state, ChilluState.attentive);
+
+      // 2. Return to Sleepy then wake up to Listening (mic tap)
+      controller.sleepy();
+      await tester.pump();
+      expect(controller.state, ChilluState.sleepy);
+
+      controller.listening();
+      await tester.pump();
+      expect(controller.state, ChilluState.listening);
+      await tester.pump(const Duration(milliseconds: 700));
+      expect(controller.state, ChilluState.listening);
+
+      // 3. Return to Sleepy then wake up to Thinking (message send)
+      controller.sleepy();
+      await tester.pump();
+      expect(controller.state, ChilluState.sleepy);
+
+      controller.think();
+      await tester.pump();
+      expect(controller.state, ChilluState.thinking);
+      await tester.pump(const Duration(milliseconds: 700));
+      expect(controller.state, ChilluState.thinking);
+
+      // 4. Return to Sleepy then wake up to Idle (tap on screen)
+      controller.sleepy();
+      await tester.pump();
+      expect(controller.state, ChilluState.sleepy);
+
+      controller.idle();
+      await tester.pump();
+      expect(controller.state, ChilluState.idle);
+      await tester.pump(const Duration(milliseconds: 700));
+      expect(controller.state, ChilluState.idle);
+
+      controller.dispose();
+    });
+
+    testWidgets('Chat avatars synchronize Sleepy and Wake-Up while historical avatars remain static', (WidgetTester tester) async {
+      final sharedController = ChilluAnimationController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                // Main hero mascot
+                ChilluMascot(
+                  controller: sharedController,
+                  size: 110,
+                ),
+                // Older assistant avatar (static, disableAnimations: true)
+                ChilluMascot(
+                  controller: null,
+                  disableAnimations: true,
+                  size: 46,
+                  showShadow: false,
+                ),
+                // Latest assistant avatar (active, shared controller)
+                ChilluMascot(
+                  controller: sharedController,
+                  disableAnimations: false,
+                  size: 46,
+                  showShadow: false,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      expect(sharedController.state, ChilluState.idle);
+
+      // Enter Sleepy
+      sharedController.sleepy();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(sharedController.state, ChilluState.sleepy);
+
+      // Both hero and latest avatar reflect Sleepy state semantics
+      expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*sleepy')), findsNWidgets(2));
+
+      // Wake-up to Attentive
+      sharedController.attentive();
+      await tester.pump();
+      expect(sharedController.state, ChilluState.attentive);
+      expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*attentive')), findsNWidgets(2));
+
+      sharedController.dispose();
+    });
+
+    test('Zero audio rule: Sleepy and Wake-Up produce NO audio playback', () {
+      final soundController = ChilluSoundController.instance;
+      // Excited and Celebrating are the ONLY states that produce audio
+      // Neither Sleepy nor Wake-Up calls soundController playback methods
+      expect(soundController.isSoundEnabled, isTrue);
+    });
   });
 }

@@ -67,7 +67,11 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
   late AnimationController _excitedController;
   late AnimationController _confusedController;
   late AnimationController _celebrationController;
+  late AnimationController _sleepyTransitionController;
+  late AnimationController _sleepyLoopController;
+  late AnimationController _wakeUpController;
 
+  ChilluState _previousState = ChilluState.idle;
   Timer? _blinkTimer;
   Timer? _doubleBlinkTimer;
   final math.Random _random = math.Random();
@@ -81,6 +85,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
       _controller = ChilluAnimationController();
       _ownsController = true;
     }
+    _previousState = _controller.state;
     _controller.addListener(_onControllerStateChanged);
 
     // 1. Idle breathing: gentle 1-2% organic body expansion & contraction (3000ms)
@@ -179,6 +184,24 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
       duration: const Duration(milliseconds: 2600),
     );
 
+    // 17. Sleepy entrance relaxation & yawn reaction (1800ms)
+    _sleepyTransitionController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    );
+
+    // 18. Sleepy continuous idle: slow breathing (4800ms) & gentle swaying
+    _sleepyLoopController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 4800),
+    );
+
+    // 19. Wake-up reaction: stretch hop, cheerful bounce, eye opening, leaf spring-up (650ms)
+    _wakeUpController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
+    );
+
     _syncAnimationsWithState(_controller.state);
     _scheduleNextBlink();
   }
@@ -198,6 +221,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _controller = ChilluAnimationController();
         _ownsController = true;
       }
+      _previousState = _controller.state;
       _controller.addListener(_onControllerStateChanged);
       _syncAnimationsWithState(_controller.state);
     }
@@ -205,7 +229,12 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
 
   void _onControllerStateChanged() {
     if (!mounted) return;
-    _syncAnimationsWithState(_controller.state);
+    final newState = _controller.state;
+    if (_previousState == ChilluState.sleepy && newState != ChilluState.sleepy) {
+      _wakeUpController.forward(from: 0.0);
+    }
+    _previousState = newState;
+    _syncAnimationsWithState(newState);
     setState(() {});
   }
 
@@ -226,6 +255,8 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
     _confusedController.reset();
     _celebrationController.stop();
     _celebrationController.reset();
+    _sleepyTransitionController.stop();
+    _sleepyLoopController.stop();
   }
 
   void _syncAnimationsWithState(ChilluState state) {
@@ -347,36 +378,47 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         break;
 
       case ChilluState.sleepy:
+        _wakeUpController.stop();
+        _wakeUpController.reset();
         _stopActiveInteractionControllers();
-        _tiltController.animateTo(0.2, curve: Curves.easeOut);
-        if (!_idleBreathingController.isAnimating) {
-          _idleBreathingController.repeat(reverse: true);
+        _sleepyTransitionController.forward(from: 0.0);
+        if (!_sleepyLoopController.isAnimating) {
+          _sleepyLoopController.repeat();
         }
-        if (!_floatingController.isAnimating) {
-          _floatingController.repeat();
+        if (!_leftLeafController.isAnimating) {
+          _leftLeafController.repeat();
+        }
+        if (!_rightLeafController.isAnimating) {
+          _rightLeafController.repeat();
         }
         break;
     }
   }
 
-  /// Schedules the next natural eye blink with irregular timing (3.0s to 6.0s).
+  /// Schedules the next natural eye blink with irregular timing (3.0s to 6.0s for idle, 4.5s to 7.5s for sleepy).
   void _scheduleNextBlink() {
     _blinkTimer?.cancel();
     _doubleBlinkTimer?.cancel();
     if (!mounted) return;
 
-    final nextInterval = 3000 + _random.nextInt(3000);
+    final isSleepy = _controller.state == ChilluState.sleepy;
+    final nextInterval = isSleepy ? (4500 + _random.nextInt(3000)) : (3000 + _random.nextInt(3000));
     _blinkTimer = Timer(Duration(milliseconds: nextInterval), () {
       if (!mounted) return;
 
       // Only blink in non-celebration states
       if (!_controller.isCelebrationJump) {
+        final blinkDuration = isSleepy
+            ? const Duration(milliseconds: 280)
+            : const Duration(milliseconds: 140);
+        _blinkController.duration = blinkDuration;
+
         _blinkController.forward(from: 0.0).then((_) {
           if (!mounted) return;
           _blinkController.reverse().then((_) {
             if (!mounted) return;
-            // 20% chance of a double-blink (two quick blinks in succession)
-            if (_random.nextDouble() < 0.20) {
+            // 20% chance of a double-blink in normal idle (never in sleepy)
+            if (!isSleepy && _random.nextDouble() < 0.20) {
               _doubleBlinkTimer?.cancel();
               _doubleBlinkTimer = Timer(const Duration(milliseconds: 120), () {
                 if (!mounted) return;
@@ -416,6 +458,9 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
     _excitedController.dispose();
     _confusedController.dispose();
     _celebrationController.dispose();
+    _sleepyTransitionController.dispose();
+    _sleepyLoopController.dispose();
+    _wakeUpController.dispose();
     super.dispose();
   }
 
@@ -580,6 +625,9 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _happyController,
         _excitedController,
         _confusedController,
+        _sleepyTransitionController,
+        _sleepyLoopController,
+        _wakeUpController,
       ]),
       builder: (context, _) {
         double translateY = 0.0;
@@ -611,8 +659,36 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           final floatVal = _floatingController.value;
           final floatSin = math.sin(floatVal * 2 * math.pi);
 
-          if (state == ChilluState.idle || state == ChilluState.sleepy) {
+          if (state == ChilluState.idle) {
             translateY += -2.0 * floatSin;
+          } else if (state == ChilluState.sleepy) {
+            // SLEEPY (Relaxed, adorable, healthy sleepy posture):
+            // 1. Slow, subtle downward settling movement (+3.5px)
+            // 2. Slow breathing (~4800ms) and occasional gentle sleepy sway (~1.4 deg)
+            // 3. Adorable yawn inhalation & body reaction during initial entrance transition
+            final p = _sleepyTransitionController.isAnimating ? _sleepyTransitionController.value : 1.0;
+            final dropProgress = Curves.easeInOut.transform(p.clamp(0.0, 1.0));
+            final loopVal = _sleepyLoopController.value;
+
+            // Slow subtle body downward settling movement (+3.5px)
+            translateY += 3.5 * dropProgress;
+
+            // Occasional gentle sleepy sway (period 4800ms, ~1.4 deg / 0.024 rad)
+            rotation = math.sin(loopVal * 2 * math.pi) * 0.024;
+
+            // Sleepy breathing: slow, relaxed, soothing
+            final sleepyBreath = Curves.easeInOut.transform((math.sin(loopVal * 2 * math.pi) + 1.0) * 0.5);
+            scaleY = 1.0 + (sleepyBreath * 0.016);
+            scaleX = 1.0 - (sleepyBreath * 0.008);
+
+            // Adorable yawn body reaction during initial entrance transition (p: 0.35 -> 0.75)
+            if (_sleepyTransitionController.isAnimating && p >= 0.35 && p <= 0.75) {
+              final sub = (p - 0.35) / 0.40;
+              final yawnSin = math.sin(sub * math.pi);
+              translateY -= 2.0 * yawnSin;
+              scaleY += 0.025 * yawnSin;
+              scaleX -= 0.012 * yawnSin;
+            }
           } else if (state == ChilluState.attentive) {
             // ATTENTIVE:
             // 1. Initial Curious Perk-Up entrance (p: 0.0 -> 1.0 via _attentivePerkController)
@@ -840,7 +916,38 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           }
         }
 
-        // 6. Independent leaf sprout sway calculation
+        // 6. Wake-Up Reaction: upward stretch (-7.5px, scaleY 1.06), cheerful bounce, and smooth transition
+        if (_wakeUpController.isAnimating) {
+          final w = _wakeUpController.value;
+          final double wakeHop;
+          final double wakeScaleY;
+          final double wakeScaleX;
+
+          if (w < 0.45) {
+            final sub = (w / 0.45).clamp(0.0, 1.0);
+            final tEase = Curves.easeOutCubic.transform(sub);
+            wakeHop = -7.5 * tEase;
+            wakeScaleY = 1.0 + (0.06 * tEase);
+            wakeScaleX = 1.0 - (0.03 * tEase);
+          } else if (w < 0.80) {
+            final sub = ((w - 0.45) / 0.35).clamp(0.0, 1.0);
+            final bouncePhase = math.sin(sub * math.pi);
+            wakeHop = -7.5 * (1.0 - sub) + (2.0 * bouncePhase);
+            wakeScaleY = 1.06 + ((0.97 - 1.06) * sub);
+            wakeScaleX = 0.97 + ((1.02 - 0.97) * sub);
+          } else {
+            final sub = ((w - 0.80) / 0.20).clamp(0.0, 1.0);
+            wakeHop = 2.0 * (1.0 - sub);
+            wakeScaleY = 0.97 + (0.03 * sub);
+            wakeScaleX = 1.02 - (0.02 * sub);
+          }
+
+          translateY += wakeHop;
+          scaleY *= wakeScaleY;
+          scaleX *= wakeScaleX;
+        }
+
+        // 7. Independent leaf sprout sway calculation
         final bool isLayeredState = isInteractiveOrIdle;
         final double leftLeafAngle;
         final double rightLeafAngle;
@@ -926,7 +1033,26 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
             final thinkSway = math.sin(cycle * 2 * math.pi);
             lAngle += (rotation * 0.35) + (thinkSway * 0.025);
             rAngle += (rotation * 0.35) - (thinkSway * 0.020);
+          } else if (state == ChilluState.sleepy) {
+            // Sleepy: both leafy sprouts droop gently (-0.160 rad left, +0.150 rad right) with slow soothing rustle
+            final p = _sleepyTransitionController.isAnimating ? _sleepyTransitionController.value : 1.0;
+            final droopFactor = Curves.easeInOut.transform(p.clamp(0.0, 1.0));
+            final loopVal = _sleepyLoopController.value;
+            final loopRustle = math.sin(loopVal * 2 * math.pi) * 0.020;
+
+            lAngle += (-0.160 * droopFactor) + loopRustle;
+            rAngle += (0.150 * droopFactor) - loopRustle;
           }
+
+          // Wake-Up Reaction: both leaves spring back upright with elastic spring pop
+          if (_wakeUpController.isAnimating) {
+            final w = _wakeUpController.value;
+            final residualDroop = 1.0 - w;
+            final springPop = math.sin(w * 2 * math.pi) * 0.14 * (1.0 - w);
+            lAngle += (-0.160 * residualDroop) + springPop;
+            rAngle += (0.150 * residualDroop) - springPop;
+          }
+
           leftLeafAngle = lAngle;
           rightLeafAngle = rAngle;
         } else {
@@ -934,7 +1060,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           rightLeafAngle = 0.0;
         }
 
-        // 7. Emotional Eye Expressions (Happy, Excited, Confused, Attentive)
+        // 8. Emotional Eye Expressions (Happy, Excited, Confused, Attentive)
         final double happyEyeProgress = state == ChilluState.happy
             ? math.sin(_happyController.value * math.pi)
             : 0.0;
@@ -995,7 +1121,20 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           glanceShift = 0.0;
         }
 
-        // 8. Eye blinking & pensive gaze focus
+        // Yawn reaction progress during sleepy entrance transition
+        final double yawnProgress;
+        if (state == ChilluState.sleepy && _sleepyTransitionController.isAnimating) {
+          final p = _sleepyTransitionController.value;
+          if (p >= 0.35 && p <= 0.75) {
+            yawnProgress = math.sin(((p - 0.35) / 0.40) * math.pi);
+          } else {
+            yawnProgress = 0.0;
+          }
+        } else {
+          yawnProgress = 0.0;
+        }
+
+        // 9. Eye blinking, pensive gaze focus, and sleepy half-closed eyes
         final double gazeEyelid;
         if (state == ChilluState.thinking) {
           final cycle = _thinkingCycleController.value;
@@ -1003,7 +1142,40 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         } else {
           gazeEyelid = 0.0;
         }
-        final double effectiveBlinkProgress = math.max(_blinkController.value, gazeEyelid);
+
+        // Calculate sleepy half-closed eyelid coverage
+        double sleepyEyelid = 0.0;
+        if (state == ChilluState.sleepy) {
+          final p = _sleepyTransitionController.value;
+          if (_sleepyTransitionController.isAnimating) {
+            final baseDroop = 0.52 * Curves.easeInOut.transform(p.clamp(0.0, 1.0));
+            final double yawnPinch;
+            if (p >= 0.35 && p <= 0.75) {
+              final sub = (p - 0.35) / 0.40;
+              yawnPinch = math.sin(sub * math.pi) * 0.16; // squeezes up to 0.68
+            } else {
+              yawnPinch = 0.0;
+            }
+            sleepyEyelid = baseDroop + yawnPinch;
+          } else {
+            sleepyEyelid = 0.52; // Settled half-closed
+          }
+        }
+
+        // Handle natural wake-up eye opening
+        if (_wakeUpController.isAnimating) {
+          final w = _wakeUpController.value;
+          sleepyEyelid = 0.52 * (1.0 - w);
+        }
+
+        final double baseLid = math.max(gazeEyelid, sleepyEyelid);
+        final double effectiveBlinkProgress;
+        if (state == ChilluState.sleepy && baseLid > 0.0) {
+          // Slow blink dips from half-closed base (0.52) to fully closed (1.0) and reopens to base
+          effectiveBlinkProgress = baseLid + ((1.0 - baseLid) * _blinkController.value);
+        } else {
+          effectiveBlinkProgress = math.max(_blinkController.value, baseLid);
+        }
 
         return Transform.translate(
           offset: Offset(translateX, translateY),
@@ -1091,12 +1263,13 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
                         ),
                       ),
 
-                    // 5. Emotional Eyes & Gaze Overlay (Happy, Excited, Confused, and Attentive)
+                    // 5. Emotional Eyes, Gaze, and Sleepy Yawn Overlay (Happy, Excited, Confused, Attentive, Sleepy)
                     if (happyEyeProgress > 0.0 ||
                         excitedEyeProgress > 0.0 ||
                         confusedEyeProgress > 0.0 ||
                         eyeWiden > 0.0 ||
-                        glanceShift > 0.0)
+                        glanceShift > 0.0 ||
+                        yawnProgress > 0.0)
                       CustomPaint(
                         size: Size(widget.size, widget.size),
                         painter: _ChilluEmotionalEyesPainter(
@@ -1105,6 +1278,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
                           confusedProgress: confusedEyeProgress,
                           widenProgress: eyeWiden,
                           glanceProgress: glanceShift,
+                          yawnProgress: yawnProgress,
                         ),
                       ),
                   ],
@@ -1144,6 +1318,9 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _excitedController,
         _confusedController,
         _celebrationController,
+        _sleepyTransitionController,
+        _sleepyLoopController,
+        _wakeUpController,
       ]),
       builder: (context, _) {
         double shadowScale = 1.0;
@@ -1216,6 +1393,14 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
           // Gently reacts to breathing and floating
           shadowScale = 1.0 + (breath * 0.03) - (floatSin * 0.03);
           shadowOpacity = 0.11 + (breath * 0.02) - (floatSin * 0.02);
+        }
+
+        // React to wake-up stretch hop on shadow
+        if (_wakeUpController.isAnimating) {
+          final wVal = _wakeUpController.value;
+          final hop = math.sin(wVal * math.pi);
+          shadowScale = (shadowScale - (0.14 * hop)).clamp(0.25, 1.10);
+          shadowOpacity = (shadowOpacity - (0.04 * hop)).clamp(0.03, 0.15);
         }
 
         return Container(
@@ -1468,13 +1653,14 @@ class _ChilluAudioWavePainter extends CustomPainter {
 }
 
 /// Renders dynamic emotional eye expressions (Happy smiling arcs, Excited sparkles,
-/// Confused quizzical brows, and Attentive widening/glance).
+/// Confused quizzical brows, Attentive widening/glance, and Sleepy yawn reaction).
 class _ChilluEmotionalEyesPainter extends CustomPainter {
   final double happyProgress; // 0.0 to 1.0 (smiling curved eye creases)
   final double excitedProgress; // 0.0 to 1.0 (enlarged star sparkle catchlights & high lifted brows)
   final double confusedProgress; // 0.0 to 1.0 (asymmetrical quizzical cocked eyebrows & curious gaze)
   final double widenProgress; // 0.0 to 1.0 (alert attentive widening)
   final double glanceProgress; // 0.0 to 1.0 (attentive sideways glance)
+  final double yawnProgress; // 0.0 to 1.0 (adorable sleepy yawn mouth and cheek blush)
 
   const _ChilluEmotionalEyesPainter({
     this.happyProgress = 0.0,
@@ -1482,6 +1668,7 @@ class _ChilluEmotionalEyesPainter extends CustomPainter {
     this.confusedProgress = 0.0,
     this.widenProgress = 0.0,
     this.glanceProgress = 0.0,
+    this.yawnProgress = 0.0,
   });
 
   @override
@@ -1490,7 +1677,8 @@ class _ChilluEmotionalEyesPainter extends CustomPainter {
         excitedProgress <= 0.0 &&
         confusedProgress <= 0.0 &&
         widenProgress <= 0.0 &&
-        glanceProgress <= 0.0) {
+        glanceProgress <= 0.0 &&
+        yawnProgress <= 0.0) {
       return;
     }
 
@@ -1737,6 +1925,54 @@ class _ChilluEmotionalEyesPainter extends CustomPainter {
         canvas.restore();
       }
     }
+
+    // 6. SLEEPY: Adorable tiny yawn mouth & cozy cheek blush
+    if (yawnProgress > 0.0) {
+      final yawnAlpha = yawnProgress.clamp(0.0, 1.0);
+      final mouthCenter = Offset(size.width * 0.50, size.height * 0.565);
+      final mouthWidth = size.width * 0.075 * yawnAlpha;
+      final mouthHeight = size.height * 0.085 * yawnAlpha;
+
+      final mouthPaint = Paint()
+        ..color = const Color(0xFF1B4332).withValues(alpha: yawnAlpha * 0.95)
+        ..style = PaintingStyle.fill;
+
+      final mouthRect = Rect.fromCenter(
+        center: mouthCenter,
+        width: mouthWidth,
+        height: mouthHeight,
+      );
+
+      canvas.save();
+      canvas.clipPath(Path()..addOval(mouthRect));
+      canvas.drawOval(mouthRect, mouthPaint);
+
+      // Cute pink tongue at the bottom curve of the yawn mouth
+      final tonguePaint = Paint()
+        ..color = const Color(0xFFFF8B94).withValues(alpha: yawnAlpha * 0.95)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(
+        Offset(mouthCenter.dx, mouthCenter.dy + (mouthHeight * 0.28)),
+        mouthWidth * 0.42,
+        tonguePaint,
+      );
+      canvas.restore();
+
+      // Soft cozy cheek blush
+      final blushPaint = Paint()
+        ..color = const Color(0xFFFF8B94).withValues(alpha: yawnAlpha * 0.32)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(
+        Offset(leftCenter.dx, leftCenter.dy + (eyeHeight * 0.55)),
+        eyeWidth * 0.32,
+        blushPaint,
+      );
+      canvas.drawCircle(
+        Offset(rightCenter.dx, rightCenter.dy + (eyeHeight * 0.55)),
+        eyeWidth * 0.32,
+        blushPaint,
+      );
+    }
   }
 
   @override
@@ -1745,7 +1981,8 @@ class _ChilluEmotionalEyesPainter extends CustomPainter {
         oldDelegate.excitedProgress != excitedProgress ||
         oldDelegate.confusedProgress != confusedProgress ||
         oldDelegate.widenProgress != widenProgress ||
-        oldDelegate.glanceProgress != glanceProgress;
+        oldDelegate.glanceProgress != glanceProgress ||
+        oldDelegate.yawnProgress != yawnProgress;
   }
 }
 
