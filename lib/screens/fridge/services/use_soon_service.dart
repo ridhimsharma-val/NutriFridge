@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/category_item.dart';
@@ -9,6 +10,32 @@ enum UseSoonCategory {
   expiresTomorrow,
   expiresIn2Days,
   expiresIn3Days,
+}
+
+/// Clearly separated lifecycle states for ingredient freshness check
+enum FreshnessStatus {
+  loading,
+  ready,
+  empty,
+  error,
+}
+
+/// Encapsulates the complete result of an ingredient freshness check
+class FreshnessCheckResult {
+  final FreshnessStatus status;
+  final List<CategoryFoodItem> expiringItems;
+  final String? errorMessage;
+
+  const FreshnessCheckResult({
+    required this.status,
+    this.expiringItems = const [],
+    this.errorMessage,
+  });
+
+  bool get isLoading => status == FreshnessStatus.loading;
+  bool get isReady => status == FreshnessStatus.ready;
+  bool get isEmpty => status == FreshnessStatus.empty;
+  bool get isError => status == FreshnessStatus.error;
 }
 
 /// Service providing expiry prioritization logic and item collection for Smart Fridge Intelligence v1 (Use Soon).
@@ -198,5 +225,102 @@ class UseSoonService {
 
   static List<CategoryFoodItem> _getAllFridgeItems() {
     return FridgeCategoryRepository.allItems;
+  }
+
+  /// Optional test handler override to simulate custom responses, delays, or errors in unit tests
+  @visibleForTesting
+  static Future<FreshnessCheckResult> Function({
+    List<CategoryFoodItem>? sourceItems,
+    DateTime? localNow,
+  })? freshnessCheckHandler;
+
+  /// Performs the ingredient freshness check using local saved inventory and expiry dates.
+  /// Never requires an external AI or n8n request.
+  ///
+  /// Lifecycle:
+  /// - If source items are supplied or inventory is already in memory, calculates locally immediately.
+  /// - If inventory is actively loading, waits safely with a timeout and completes without hanging.
+  /// - Returns clearly separated states: Loading, Completed with Items, Completed Empty, or Error.
+  static Future<FreshnessCheckResult> checkFreshness({
+    List<CategoryFoodItem>? sourceItems,
+    DateTime? localNow,
+    bool force = false,
+  }) async {
+    if (freshnessCheckHandler != null) {
+      return await freshnessCheckHandler!(
+        sourceItems: sourceItems,
+        localNow: localNow,
+      );
+    }
+
+    try {
+      // 1. Explicit source items provided: calculate immediately
+      if (sourceItems != null) {
+        final qualifying = getUseSoonItems(sourceItems: sourceItems, localNow: localNow);
+        return FreshnessCheckResult(
+          status: qualifying.isNotEmpty ? FreshnessStatus.ready : FreshnessStatus.empty,
+          expiringItems: qualifying,
+        );
+      }
+
+      // 2. Local inventory already in memory: calculate locally immediately without network request
+      if (FridgeCategoryRepository.totalFridgeItems > 0 ||
+          (FridgeCategoryRepository.isLoadedFromSupabase && !FridgeCategoryRepository.isLoading)) {
+        final qualifying = getUseSoonItems(localNow: localNow);
+        return FreshnessCheckResult(
+          status: qualifying.isNotEmpty ? FreshnessStatus.ready : FreshnessStatus.empty,
+          expiringItems: qualifying,
+        );
+      }
+
+      // 3. Inventory is actively loading: wait safely with a bounded timeout
+      if (FridgeCategoryRepository.isLoading) {
+        await waitForInventoryOrTimeout(timeout: const Duration(seconds: 3));
+      }
+
+      if (FridgeCategoryRepository.loadError != null && FridgeCategoryRepository.totalFridgeItems == 0) {
+        return FreshnessCheckResult(
+          status: FreshnessStatus.error,
+          expiringItems: const [],
+          errorMessage: FridgeCategoryRepository.loadError,
+        );
+      }
+
+      final qualifying = getUseSoonItems(localNow: localNow);
+      return FreshnessCheckResult(
+        status: qualifying.isNotEmpty ? FreshnessStatus.ready : FreshnessStatus.empty,
+        expiringItems: qualifying,
+      );
+    } catch (e) {
+      return FreshnessCheckResult(
+        status: FreshnessStatus.error,
+        expiringItems: const [],
+        errorMessage: 'Unable to check ingredient freshness: $e',
+      );
+    }
+  }
+
+  /// Waits for [FridgeCategoryRepository] to complete loading, bounded by [timeout].
+  /// Guarantees that the freshness check will never hang or remain stuck indefinitely.
+  static Future<void> waitForInventoryOrTimeout({
+    Duration timeout = const Duration(seconds: 3),
+  }) async {
+    if (!FridgeCategoryRepository.isLoading) return;
+
+    final completer = Completer<void>();
+    void listener() {
+      if (!FridgeCategoryRepository.isLoading) {
+        if (!completer.isCompleted) completer.complete();
+      }
+    }
+
+    FridgeCategoryRepository.notifier.addListener(listener);
+    try {
+      await completer.future.timeout(timeout);
+    } catch (_) {
+      // Timeout reached: continue with current state safely
+    } finally {
+      FridgeCategoryRepository.notifier.removeListener(listener);
+    }
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -465,6 +466,258 @@ void main() {
 
       final postSnapshot = FridgeCategoryRepository.allItems.map((it) => '${it.id}:${it.name}:${it.quantity}').toList();
       expect(postSnapshot, equals(initialSnapshot));
+    });
+  });
+
+  group('NutriFridge — Fix Stuck Ingredient Freshness Loading State', () {
+    // 1. Freshness check completes when inventory is loaded.
+    testWidgets('1. Freshness check completes when inventory is loaded', (WidgetTester tester) async {
+      final item = const CategoryFoodItem(
+        id: 'spinach_freshness_1',
+        name: 'Spinach',
+        quantity: '1 bunch',
+        expiryDays: 0,
+        category: 'Vegetables',
+      );
+      await FridgeCategoryRepository.addItemToCategory('Vegetables', item);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: UseSoonSection(),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Freshness check completes immediately from loaded inventory
+      expect(find.byKey(const ValueKey('use_soon_loading_banner')), findsNothing);
+      expect(find.byKey(const ValueKey('use_soon_section_container')), findsOneWidget);
+      expect(find.text('Spinach · 1 bunch', findRichText: true), findsOneWidget);
+    });
+
+    // 2. Loading banner disappears after successful calculation.
+    testWidgets('2. Loading banner disappears after successful calculation', (WidgetTester tester) async {
+      final completer = Completer<FreshnessCheckResult>();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: UseSoonSection(
+              freshnessCheckOverride: () => completer.future,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Initially showing loading banner
+      expect(find.byKey(const ValueKey('use_soon_loading_banner')), findsOneWidget);
+      expect(find.text('Checking ingredient freshness...'), findsOneWidget);
+
+      // Complete the async calculation
+      completer.complete(
+        const FreshnessCheckResult(
+          status: FreshnessStatus.ready,
+          expiringItems: [
+            CategoryFoodItem(
+              id: 'apple_freshness_1',
+              name: 'Apple',
+              quantity: '2 pieces',
+              expiryDays: 1,
+              category: 'Fruits',
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Loading banner has disappeared
+      expect(find.byKey(const ValueKey('use_soon_loading_banner')), findsNothing);
+      expect(find.text('Apple · 2 pieces', findRichText: true), findsOneWidget);
+    });
+
+    // 3. Expiring ingredients appear correctly.
+    testWidgets('3. Expiring ingredients appear correctly', (WidgetTester tester) async {
+      const item1 = CategoryFoodItem(id: 'i1', name: 'Milk', quantity: '1 L', expiryDays: 1, category: 'Dairy Products');
+      const item2 = CategoryFoodItem(id: 'i2', name: 'Paneer', quantity: '200 g', expiryDays: 2, category: 'Dairy Products');
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: UseSoonSection(
+              itemsOverride: [item1, item2],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Milk · 1 L', findRichText: true), findsOneWidget);
+      expect(find.text('Paneer · 200 g', findRichText: true), findsOneWidget);
+      expect(find.text('2'), findsOneWidget); // badge count
+    });
+
+    // 4. No-expiring-items state displays correctly.
+    testWidgets('4. No-expiring-items state displays correctly', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: UseSoonSection(
+              itemsOverride: [],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byKey(const ValueKey('use_soon_loading_banner')), findsNothing);
+      expect(find.byKey(const ValueKey('use_soon_empty_banner')), findsOneWidget);
+      expect(find.text('Your fridge is looking fresh!'), findsOneWidget);
+      expect(find.text('Nothing needs attention right now.'), findsOneWidget);
+    });
+
+    // 5. Missing expiry dates are handled without inventing dates.
+    test('5. Missing expiry dates are handled without inventing dates', () {
+      const itemNoDate = CategoryFoodItem(
+        id: 'item_no_date',
+        name: 'Almonds',
+        quantity: '100 g',
+        expiryDays: null,
+        expiryDate: null,
+        category: 'Dry Fruits',
+      );
+
+      final result = UseSoonService.getEffectiveExpiryDays(itemNoDate);
+      expect(result, isNull);
+
+      final qualifying = UseSoonService.getUseSoonItems(sourceItems: [itemNoDate]);
+      expect(qualifying, isEmpty);
+    });
+
+    // 6. Failed requests clear the loading state.
+    testWidgets('6. Failed requests clear the loading state', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: UseSoonSection(
+              freshnessCheckOverride: () async {
+                throw Exception('Network disconnected');
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Loading state is cleared, error banner is displayed
+      expect(find.byKey(const ValueKey('use_soon_loading_banner')), findsNothing);
+      expect(find.byKey(const ValueKey('use_soon_error_banner')), findsOneWidget);
+      expect(find.byKey(const ValueKey('use_soon_retry_button')), findsOneWidget);
+    });
+
+    // 7. Retry works correctly.
+    testWidgets('7. Retry works correctly', (WidgetTester tester) async {
+      int attempts = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: UseSoonSection(
+              freshnessCheckOverride: () async {
+                attempts++;
+                if (attempts == 1) {
+                  return const FreshnessCheckResult(
+                    status: FreshnessStatus.error,
+                    errorMessage: 'Temporary network failure',
+                  );
+                }
+                return const FreshnessCheckResult(
+                  status: FreshnessStatus.ready,
+                  expiringItems: [
+                    CategoryFoodItem(
+                      id: 'curd_freshness_1',
+                      name: 'Curd',
+                      quantity: '500 g',
+                      expiryDays: 1,
+                      category: 'Dairy Products',
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // First attempt failed
+      expect(find.byKey(const ValueKey('use_soon_error_banner')), findsOneWidget);
+      expect(find.text('Temporary network failure'), findsOneWidget);
+
+      // Tap Retry
+      await tester.tap(find.byKey(const ValueKey('use_soon_retry_button')));
+      await tester.pumpAndSettle();
+
+      // Succeeded after retry
+      expect(find.byKey(const ValueKey('use_soon_error_banner')), findsNothing);
+      expect(find.byKey(const ValueKey('use_soon_loading_banner')), findsNothing);
+      expect(find.text('Curd · 500 g', findRichText: true), findsOneWidget);
+      expect(attempts, 2);
+    });
+
+    // 8. Widget rebuilds do not start duplicate requests.
+    testWidgets('8. Widget rebuilds do not start duplicate requests', (WidgetTester tester) async {
+      int checkCount = 0;
+      final completer = Completer<FreshnessCheckResult>();
+
+      final widget = MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              return Column(
+                children: [
+                  ElevatedButton(
+                    onPressed: () => setState(() {}),
+                    child: const Text('Rebuild'),
+                  ),
+                  UseSoonSection(
+                    freshnessCheckOverride: () {
+                      checkCount++;
+                      return completer.future;
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(widget);
+      await tester.pump();
+      expect(checkCount, 1);
+
+      // Trigger widget rebuild while check is in flight
+      await tester.tap(find.text('Rebuild'));
+      await tester.pump();
+      expect(checkCount, 1); // Does not start duplicate concurrent request
+
+      // Finish check
+      completer.complete(const FreshnessCheckResult(status: FreshnessStatus.empty));
+      await tester.pumpAndSettle();
+      expect(checkCount, 1);
+    });
+
+    // 9. Existing inventory data remains unchanged.
+    test('9. Existing inventory data remains unchanged', () async {
+      FridgeCategoryRepository.seedSampleDataForTesting();
+      final itemsBefore = FridgeCategoryRepository.allItems.map((e) => '${e.id}:${e.name}:${e.decimalAmount}').toList();
+
+      final result = await UseSoonService.checkFreshness();
+      expect(result.status, isIn([FreshnessStatus.ready, FreshnessStatus.empty]));
+
+      final itemsAfter = FridgeCategoryRepository.allItems.map((e) => '${e.id}:${e.name}:${e.decimalAmount}').toList();
+      expect(itemsAfter, equals(itemsBefore));
     });
   });
 }

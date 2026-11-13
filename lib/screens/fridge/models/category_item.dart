@@ -544,8 +544,14 @@ class FridgeCategoryRepository {
   /// Loads all items from public.fridge_items for the authenticated user.
   static Future<void> loadFromSupabase({String? userId, bool force = false}) async {
     final effectiveUserId = userId ?? AuthService.instance.currentUser?.id;
-    if (effectiveUserId == null) return;
-    if (forceInMemoryForTesting) return;
+    if (effectiveUserId == null) {
+      isLoading = false;
+      return;
+    }
+    if (forceInMemoryForTesting) {
+      isLoading = false;
+      return;
+    }
 
     if (!force && isLoadedFromSupabase && currentLoadedUserId == effectiveUserId) {
       return;
@@ -559,6 +565,7 @@ class FridgeCategoryRepository {
       final items = await FridgeInventoryRepository.instance.fetchItems(userId: effectiveUserId);
       if (AuthService.instance.currentUser?.id != effectiveUserId) {
         // Discard stale response if active user switched during network call
+        isLoading = false;
         return;
       }
 
@@ -575,11 +582,13 @@ class FridgeCategoryRepository {
       loadError = null;
       _notify();
     } catch (e) {
+      isLoading = false;
       if (AuthService.instance.currentUser?.id == effectiveUserId) {
-        isLoading = false;
         loadError = e.toString();
         _notify();
       }
+    } finally {
+      isLoading = false;
     }
   }
 

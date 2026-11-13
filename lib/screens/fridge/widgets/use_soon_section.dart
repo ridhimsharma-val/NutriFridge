@@ -20,11 +20,13 @@ import 'food_details_sheet.dart';
 class UseSoonSection extends StatefulWidget {
   final List<CategoryFoodItem>? itemsOverride;
   final VoidCallback? onFindMealsComplete;
+  final Future<FreshnessCheckResult> Function()? freshnessCheckOverride;
 
   const UseSoonSection({
     super.key,
     this.itemsOverride,
     this.onFindMealsComplete,
+    this.freshnessCheckOverride,
   });
 
   @override
@@ -32,7 +34,112 @@ class UseSoonSection extends StatefulWidget {
 }
 
 class _UseSoonSectionState extends State<UseSoonSection> {
+  bool _isLoadingFreshness = false;
+  String? _freshnessError;
+  List<CategoryFoodItem> _expiringItems = [];
   bool _isFindingMeals = false;
+  Future<void>? _activeFreshnessOperation;
+  int _lastRepositoryVersion = -1;
+
+  @override
+  void initState() {
+    super.initState();
+    _lastRepositoryVersion = FridgeCategoryRepository.notifier.value;
+    FridgeCategoryRepository.notifier.addListener(_handleRepositoryChange);
+    _runFreshnessCheck();
+  }
+
+  @override
+  void didUpdateWidget(covariant UseSoonSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.itemsOverride != oldWidget.itemsOverride) {
+      _runFreshnessCheck();
+    }
+  }
+
+  @override
+  void dispose() {
+    FridgeCategoryRepository.notifier.removeListener(_handleRepositoryChange);
+    super.dispose();
+  }
+
+  void _handleRepositoryChange() {
+    if (!mounted) return;
+    if (_lastRepositoryVersion == FridgeCategoryRepository.notifier.value) return;
+    _lastRepositoryVersion = FridgeCategoryRepository.notifier.value;
+    _runFreshnessCheck();
+  }
+
+  void _runFreshnessCheck({bool force = false}) {
+    if (_activeFreshnessOperation != null && !force) return;
+
+    // Fast synchronous path 1: Explicit itemsOverride provided
+    if (widget.itemsOverride != null) {
+      final qualifying = UseSoonService.getUseSoonItems(sourceItems: widget.itemsOverride);
+      setState(() {
+        _isLoadingFreshness = false;
+        _freshnessError = null;
+        _expiringItems = qualifying;
+      });
+      return;
+    }
+
+    // Fast synchronous path 2: Local inventory already in memory and not actively loading
+    if (FridgeCategoryRepository.totalFridgeItems > 0 && !FridgeCategoryRepository.isLoading) {
+      final qualifying = UseSoonService.getUseSoonItems();
+      setState(() {
+        _isLoadingFreshness = false;
+        _freshnessError = null;
+        _expiringItems = qualifying;
+      });
+      return;
+    }
+
+    // Async path: When freshness check override is provided or inventory is actively loading
+    setState(() {
+      _isLoadingFreshness = true;
+      _freshnessError = null;
+    });
+
+    final operation = _executeFreshnessCheck(force: force);
+    _activeFreshnessOperation = operation;
+  }
+
+  Future<void> _executeFreshnessCheck({bool force = false}) async {
+    try {
+      FreshnessCheckResult result;
+      if (widget.freshnessCheckOverride != null) {
+        result = await widget.freshnessCheckOverride!();
+      } else {
+        result = await UseSoonService.checkFreshness(
+          sourceItems: widget.itemsOverride,
+          force: force,
+        );
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _isLoadingFreshness = false;
+        _freshnessError = result.errorMessage;
+        _expiringItems = result.expiringItems;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingFreshness = false;
+        _freshnessError = 'Unable to check freshness: $e';
+      });
+    } finally {
+      _activeFreshnessOperation = null;
+    }
+  }
+
+  void _handleRetry() {
+    if (FridgeCategoryRepository.loadError != null) {
+      FridgeCategoryRepository.loadFromSupabase(force: true);
+    }
+    _runFreshnessCheck(force: true);
+  }
 
   void _handleFindMeals(List<CategoryFoodItem> qualifyingItems) async {
     if (_isFindingMeals) return;
@@ -118,16 +225,10 @@ class _UseSoonSectionState extends State<UseSoonSection> {
 
   @override
   Widget build(BuildContext context) {
-    final qualifyingItems = UseSoonService.getUseSoonItems(
-      sourceItems: widget.itemsOverride,
-    );
-
-    final bool isLoading = FridgeCategoryRepository.isLoading &&
-        FridgeCategoryRepository.totalFridgeItems == 0 &&
-        widget.itemsOverride == null;
-
-    if (isLoading) {
+    // 1. Loading state: checking ingredient freshness
+    if (_isLoadingFreshness) {
       return Container(
+        key: const ValueKey('use_soon_loading_banner'),
         margin: const EdgeInsets.fromLTRB(16, 2, 16, 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
@@ -159,9 +260,51 @@ class _UseSoonSectionState extends State<UseSoonSection> {
       );
     }
 
-    // Empty state: No ingredients approaching expiry
-    if (qualifyingItems.isEmpty) {
+    // 2. Error state: failed freshness check or network failure
+    if (_freshnessError != null && _expiringItems.isEmpty) {
       return Container(
+        key: const ValueKey('use_soon_error_banner'),
+        margin: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFBEBEA),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFF09995)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.error_outline, size: 16, color: Color(0xFFC53929)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _freshnessError!,
+                style: const TextStyle(fontSize: 12, color: Color(0xFFC53929), fontWeight: FontWeight.w500),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            TextButton(
+              key: const ValueKey('use_soon_retry_button'),
+              onPressed: _handleRetry,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'Retry',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFC53929)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 3. Completed state — Nothing expiring soon
+    if (_expiringItems.isEmpty) {
+      return Container(
+        key: const ValueKey('use_soon_empty_banner'),
         margin: const EdgeInsets.fromLTRB(16, 2, 16, 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
@@ -205,6 +348,7 @@ class _UseSoonSectionState extends State<UseSoonSection> {
     }
 
     return Container(
+      key: const ValueKey('use_soon_section_container'),
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -239,7 +383,7 @@ class _UseSoonSectionState extends State<UseSoonSection> {
                             border: Border.all(color: AppColors.peachBorder, width: 0.8),
                           ),
                           child: Text(
-                            '${qualifyingItems.length}',
+                            '${_expiringItems.length}',
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
@@ -269,7 +413,7 @@ class _UseSoonSectionState extends State<UseSoonSection> {
                 color: Colors.transparent,
                 child: InkWell(
                   key: const ValueKey('find_meals_use_soon_btn'),
-                  onTap: _isFindingMeals ? null : () => _handleFindMeals(qualifyingItems),
+                  onTap: _isFindingMeals ? null : () => _handleFindMeals(_expiringItems),
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6.5),
@@ -326,15 +470,15 @@ class _UseSoonSectionState extends State<UseSoonSection> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               clipBehavior: Clip.none,
-              itemCount: qualifyingItems.length + (qualifyingItems.length > 4 ? 1 : 0),
+              itemCount: _expiringItems.length + (_expiringItems.length > 4 ? 1 : 0),
               separatorBuilder: (context, _) => const SizedBox(width: 8),
               itemBuilder: (context, index) {
-                if (index < qualifyingItems.length) {
-                  final item = qualifyingItems[index];
+                if (index < _expiringItems.length) {
+                  final item = _expiringItems[index];
                   return _buildIngredientCard(item);
                 }
                 // "See all" card at the end when there are many items
-                return _buildSeeAllCard(context, qualifyingItems.length);
+                return _buildSeeAllCard(context, _expiringItems.length);
               },
             ),
           ),
