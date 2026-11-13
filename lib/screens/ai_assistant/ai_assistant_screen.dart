@@ -592,6 +592,14 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
         selectedDeductionIngredients: initialSelectedDeductions,
       );
 
+      if (isAiError) {
+        // Trigger persistent Confused state when AI response fails
+        _chilluController.confused(persistent: true);
+      } else {
+        // Transition Chillu from Thinking to Speaking as AI response delivery begins
+        _chilluController.speak();
+      }
+
       setState(() {
         _messages.add(assistantMessage);
       });
@@ -600,19 +608,21 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with WidgetsBindi
           ? ChilluState.attentive
           : ChilluState.idle;
 
-      if (isAiError) {
-        // Trigger persistent Confused state when AI response fails
-        _chilluController.confused(persistent: true);
-      } else if (meal != null ||
-          action == 'meal_recommendation' ||
-          action == 'recipe_ideas' ||
-          (_activeMealContext != null && _isFullRecipeRequest(text)) ||
-          assistantText.contains('Preparation') ||
-          assistantText.contains('Step 1')) {
-        _chilluController.excited(returnState: returnState);
-        ChilluSoundController.instance.playExcited();
-      } else {
-        _chilluController.happy(returnState: returnState);
+      if (!isAiError) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          if (meal != null ||
+              action == 'meal_recommendation' ||
+              action == 'recipe_ideas' ||
+              (_activeMealContext != null && _isFullRecipeRequest(text)) ||
+              assistantText.contains('Preparation') ||
+              assistantText.contains('Step 1')) {
+            _chilluController.excited(returnState: returnState);
+            ChilluSoundController.instance.playExcited();
+          } else {
+            _chilluController.finishSpeaking(returnState: returnState);
+          }
+        });
       }
     } catch (e) {
       debugPrint('[AiAssistantScreen] Error processing send request: $e');

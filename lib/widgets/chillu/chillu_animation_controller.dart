@@ -21,6 +21,9 @@ enum ChilluState {
   /// Subtle head/body tilt while formulating thoughts.
   thinking,
 
+  /// Natural talking animation (rhythmic mouth opening, subtle emphasis, gentle leaf movement) while delivering AI response.
+  speaking,
+
   /// Gentle floating / hovering animation while AI request is in-flight.
   processing,
 
@@ -106,6 +109,7 @@ class ChilluAnimationController extends ChangeNotifier {
       case ChilluState.itemAdded:
         return 5;
       case ChilluState.thinking:
+      case ChilluState.speaking:
       case ChilluState.processing:
         return 4;
       case ChilluState.listening:
@@ -180,6 +184,7 @@ class ChilluAnimationController extends ChangeNotifier {
       case ChilluState.attentive:
       case ChilluState.listening:
       case ChilluState.thinking:
+      case ChilluState.speaking:
       case ChilluState.processing:
       case ChilluState.sleepy:
         // Persistent states driven by actual application state
@@ -233,7 +238,7 @@ class ChilluAnimationController extends ChangeNotifier {
       wakeUp(destinationState: ChilluState.attentive);
       return;
     }
-    triggerState(ChilluState.attentive, duration: duration);
+    triggerState(ChilluState.attentive, duration: duration, force: _state == ChilluState.speaking);
   }
 
   /// Sets Chillu to active listening posture during voice recording.
@@ -242,7 +247,7 @@ class ChilluAnimationController extends ChangeNotifier {
       wakeUp(destinationState: ChilluState.listening);
       return;
     }
-    triggerState(ChilluState.listening, duration: duration);
+    triggerState(ChilluState.listening, duration: duration, force: _state == ChilluState.speaking);
   }
 
   /// Triggers expressive friendly greeting sequence.
@@ -278,6 +283,31 @@ class ChilluAnimationController extends ChangeNotifier {
       return;
     }
     triggerState(ChilluState.thinking, duration: duration);
+  }
+
+  /// Enters speaking state while assistant delivers its response.
+  /// Does not restart the animation if already speaking (e.g. across streamed text chunks).
+  void speak({Duration? duration, ChilluState returnState = ChilluState.idle}) {
+    if (_state == ChilluState.sleepy || _isWakingUp) {
+      wakeUp(destinationState: ChilluState.speaking);
+      return;
+    }
+    // Prevent restarting animation loop on every incoming streamed text chunk
+    if (_state == ChilluState.speaking) {
+      return;
+    }
+    // Speaking must not override a newer user interaction (typing or voice recording)
+    if (_state == ChilluState.attentive || _state == ChilluState.listening) {
+      return;
+    }
+    triggerState(ChilluState.speaking, duration: duration, returnState: returnState);
+  }
+
+  /// Concludes speaking state when response delivery finishes and transitions into [returnState].
+  void finishSpeaking({ChilluState returnState = ChilluState.idle}) {
+    if (_state == ChilluState.speaking) {
+      triggerState(returnState, force: true);
+    }
   }
 
   /// Enters continuous processing floating state while request is active.

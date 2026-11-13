@@ -75,6 +75,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
   late AnimationController _sleepyLoopController;
   late AnimationController _wakeUpController;
   late AnimationController _greetingController;
+  late AnimationController _speakingController;
 
   ChilluState _previousState = ChilluState.idle;
   Timer? _blinkTimer;
@@ -232,6 +233,12 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
       duration: const Duration(milliseconds: 2000),
     );
 
+    // 21. Natural Speaking animation: rhythmic conversational mouth movement (varied amplitudes and micro-pauses), synchronized head emphasis bob, gentle sprout response, and blinking (1400ms)
+    _speakingController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+
     _syncAnimationsWithState(_controller.state);
     _scheduleNextBlink();
   }
@@ -300,6 +307,8 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
     _sleepyLoopController.stop();
     _greetingController.stop();
     _greetingController.reset();
+    _speakingController.stop();
+    _speakingController.reset();
   }
 
   void _syncAnimationsWithState(ChilluState state) {
@@ -418,6 +427,22 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _greetingController.forward(from: 0.0);
         break;
 
+      case ChilluState.speaking:
+        _stopActiveInteractionControllers();
+        if (!_speakingController.isAnimating) {
+          _speakingController.repeat();
+        }
+        if (!_idleBreathingController.isAnimating && widget.size > 48) {
+          _idleBreathingController.repeat(reverse: true);
+        }
+        if (!_leftLeafController.isAnimating && widget.size > 48) {
+          _leftLeafController.repeat();
+        }
+        if (!_rightLeafController.isAnimating && widget.size > 48) {
+          _rightLeafController.repeat();
+        }
+        break;
+
       case ChilluState.processing:
         _stopActiveInteractionControllers();
         _idleBreathingController.stop();
@@ -514,6 +539,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
     _sleepyLoopController.dispose();
     _wakeUpController.dispose();
     _greetingController.dispose();
+    _speakingController.dispose();
     super.dispose();
   }
 
@@ -683,6 +709,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         _sleepyLoopController,
         _wakeUpController,
         _greetingController,
+        _speakingController,
       ]),
       builder: (context, _) {
         double translateY = 0.0;
@@ -696,6 +723,7 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
             state == ChilluState.attentive ||
             state == ChilluState.listening ||
             state == ChilluState.thinking ||
+            state == ChilluState.speaking ||
             state == ChilluState.sleepy ||
             state == ChilluState.happy ||
             state == ChilluState.excited ||
@@ -957,6 +985,32 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
             final thinkFloat = math.sin(cycle * 2 * math.pi);
             translateY += -8.5 + (thinkFloat * 1.5);
             scaleY += 0.020 + (thinkFloat * 0.012);
+          } else if (state == ChilluState.speaking) {
+            // Speaking: conversational emphasis bob synchronized with speech rhythm, gentle body tilt, and subtle syllable squash
+            final double sizeScale = (widget.size / 100.0).clamp(0.46, 1.25);
+            final t = _speakingController.value;
+            final double mouthVal;
+            if (t >= 0.88) {
+              mouthVal = 0.05 * (1.0 - ((t - 0.88) / 0.12));
+            } else {
+              final phase = t / 0.88;
+              final raw = math.sin(phase * 4 * math.pi).abs();
+              final double amp;
+              if (phase < 0.25) {
+                amp = 0.85;
+              } else if (phase < 0.50) {
+                amp = 0.45;
+              } else if (phase < 0.75) {
+                amp = 0.95;
+              } else {
+                amp = 0.60;
+              }
+              mouthVal = (raw * amp).clamp(0.0, 1.0);
+            }
+            translateY += -2.5 * sizeScale * mouthVal;
+            rotation = math.sin(t * 2 * math.pi) * 0.035;
+            scaleY = 1.0 + (mouthVal * 0.020);
+            scaleX = 1.0 - (mouthVal * 0.012);
           }
         }
 
@@ -1250,6 +1304,13 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
             }
           }
 
+          // Speaking: gentle sprout response to conversational cadence
+          if (state == ChilluState.speaking || _speakingController.isAnimating) {
+            final t = _speakingController.value;
+            lAngle += math.sin(t * 4 * math.pi) * 0.045;
+            rAngle -= math.sin((t * 4 * math.pi) + 0.9) * 0.038;
+          }
+
           leftLeafAngle = lAngle;
           rightLeafAngle = rAngle;
         } else {
@@ -1374,6 +1435,34 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
             ? 1.0
             : math.max(_blinkController.value, baseLid);
 
+        // Speaking mouth opening & articulation cadence
+        final double speakingProgress;
+        final double speakingMouthOpening;
+        if (state == ChilluState.speaking || _speakingController.isAnimating) {
+          speakingProgress = 1.0;
+          final t = _speakingController.value;
+          if (t >= 0.88) {
+            speakingMouthOpening = 0.05 * (1.0 - ((t - 0.88) / 0.12));
+          } else {
+            final phase = t / 0.88;
+            final raw = math.sin(phase * 4 * math.pi).abs();
+            final double amp;
+            if (phase < 0.25) {
+              amp = 0.85;
+            } else if (phase < 0.50) {
+              amp = 0.45;
+            } else if (phase < 0.75) {
+              amp = 0.95;
+            } else {
+              amp = 0.60;
+            }
+            speakingMouthOpening = (raw * amp).clamp(0.0, 1.0);
+          }
+        } else {
+          speakingProgress = 0.0;
+          speakingMouthOpening = 0.0;
+        }
+
         // Calculate sleepy expression progress (soft sleeping eyebrows and warm cheek blush)
         final double sleepyProgress;
         if (state == ChilluState.sleepy && !_wakeUpController.isAnimating) {
@@ -1482,14 +1571,15 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
                         ),
                       ),
 
-                    // 5. Emotional Eyes, Gaze, Sleepy Eyebrows & Yawn Overlay (Happy, Excited, Confused, Attentive, Sleepy)
+                    // 5. Emotional Eyes, Gaze, Sleepy Eyebrows, Yawn & Speaking Mouth Overlay (Happy, Excited, Confused, Attentive, Sleepy, Speaking)
                     if (happyEyeProgress > 0.0 ||
                         excitedEyeProgress > 0.0 ||
                         confusedEyeProgress > 0.0 ||
                         eyeWiden > 0.0 ||
                         glanceShift > 0.0 ||
                         yawnProgress > 0.0 ||
-                        sleepyProgress > 0.0)
+                        sleepyProgress > 0.0 ||
+                        speakingProgress > 0.0)
                       CustomPaint(
                         size: Size(widget.size, widget.size),
                         painter: _ChilluEmotionalEyesPainter(
@@ -1500,6 +1590,8 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
                           glanceProgress: glanceShift,
                           yawnProgress: yawnProgress,
                           sleepyProgress: sleepyProgress,
+                          speakingProgress: speakingProgress,
+                          speakingMouthOpening: speakingMouthOpening,
                         ),
                       ),
 
@@ -1739,6 +1831,8 @@ class _ChilluMascotState extends State<ChilluMascot> with TickerProviderStateMix
         return 'waving hello';
       case ChilluState.thinking:
         return 'thinking';
+      case ChilluState.speaking:
+        return 'speaking to you';
       case ChilluState.processing:
         return 'searching for recipes';
       case ChilluState.happy:
@@ -1942,6 +2036,8 @@ class _ChilluEmotionalEyesPainter extends CustomPainter {
   final double glanceProgress; // 0.0 to 1.0 (attentive sideways glance)
   final double yawnProgress; // 0.0 to 1.0 (clearly visible yawn mouth and pink tongue)
   final double sleepyProgress; // 0.0 to 1.0 (relaxed sleepy eyebrows and warm cheek blush)
+  final double speakingProgress; // 0.0 to 1.0 (friendly speaking expression and animated mouth)
+  final double speakingMouthOpening; // 0.0 to 1.0 (rhythmic speech mouth opening)
 
   const _ChilluEmotionalEyesPainter({
     this.happyProgress = 0.0,
@@ -1951,6 +2047,8 @@ class _ChilluEmotionalEyesPainter extends CustomPainter {
     this.glanceProgress = 0.0,
     this.yawnProgress = 0.0,
     this.sleepyProgress = 0.0,
+    this.speakingProgress = 0.0,
+    this.speakingMouthOpening = 0.0,
   });
 
   @override
@@ -1961,7 +2059,8 @@ class _ChilluEmotionalEyesPainter extends CustomPainter {
         widenProgress <= 0.0 &&
         glanceProgress <= 0.0 &&
         yawnProgress <= 0.0 &&
-        sleepyProgress <= 0.0) {
+        sleepyProgress <= 0.0 &&
+        speakingProgress <= 0.0) {
       return;
     }
 
@@ -2285,6 +2384,75 @@ class _ChilluEmotionalEyesPainter extends CustomPainter {
       );
       canvas.restore();
     }
+
+    // 7. SPEAKING: Conversational talking mouth with varied syllable amplitudes, cute pink tongue, and rosy cheeks
+    if (speakingProgress > 0.0) {
+      final speakAlpha = speakingProgress.clamp(0.0, 1.0);
+
+      // Friendly rosy cheek warmth while speaking
+      final blushPaint = Paint()
+        ..color = const Color(0xFFFF8B94).withValues(alpha: 0.30 * speakAlpha)
+        ..style = PaintingStyle.fill;
+      for (final center in [leftCenter, rightCenter]) {
+        canvas.drawCircle(
+          Offset(center.dx, center.dy + (eyeHeight * 0.55)),
+          eyeWidth * 0.32,
+          blushPaint,
+        );
+      }
+
+      final mouthCenter = Offset(size.width * 0.50, size.height * 0.570);
+      final mouthWidth = math.max(8.0, size.width * 0.14) * (0.80 + (speakingMouthOpening * 0.35));
+      final mouthHeight = math.max(2.5, size.height * 0.12) * speakingMouthOpening;
+
+      if (speakingMouthOpening < 0.14) {
+        // Natural resting smile crease when mouth closes between syllables / micro-pause
+        final smilePaint = Paint()
+          ..color = const Color(0xFF1B4332).withValues(alpha: 0.92 * speakAlpha)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(1.8, size.width * 0.022)
+          ..strokeCap = StrokeCap.round;
+        final smileWidth = math.max(8.0, size.width * 0.13);
+        final smilePath = Path();
+        smilePath.moveTo(mouthCenter.dx - smileWidth * 0.5, mouthCenter.dy);
+        smilePath.quadraticBezierTo(mouthCenter.dx, mouthCenter.dy + 1.8, mouthCenter.dx + smileWidth * 0.5, mouthCenter.dy);
+        canvas.drawPath(smilePath, smilePaint);
+      } else {
+        // Open mouth with dark forest cavity (#1B4332) and adorable pink tongue (#FF8B94)
+        final mouthRect = Rect.fromCenter(
+          center: mouthCenter,
+          width: mouthWidth,
+          height: mouthHeight,
+        );
+        // Mint fur mask to cleanly cover the underlying static mouth
+        final furBasePaint = Paint()
+          ..color = const Color(0xFF53C79C).withValues(alpha: speakAlpha)
+          ..style = PaintingStyle.fill;
+        canvas.drawOval(
+          Rect.fromCenter(center: mouthCenter, width: mouthWidth + 1.5, height: mouthHeight + 1.5),
+          furBasePaint,
+        );
+
+        final mouthPaint = Paint()
+          ..color = const Color(0xFF1B4332).withValues(alpha: 0.96 * speakAlpha)
+          ..style = PaintingStyle.fill;
+
+        canvas.save();
+        canvas.clipPath(Path()..addOval(mouthRect));
+        canvas.drawOval(mouthRect, mouthPaint);
+
+        // Cute pink tongue
+        final tonguePaint = Paint()
+          ..color = const Color(0xFFFF8B94).withValues(alpha: 0.95 * speakAlpha)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(
+          Offset(mouthCenter.dx, mouthCenter.dy + (mouthHeight * 0.32)),
+          mouthWidth * 0.40,
+          tonguePaint,
+        );
+        canvas.restore();
+      }
+    }
   }
 
   @override
@@ -2295,7 +2463,9 @@ class _ChilluEmotionalEyesPainter extends CustomPainter {
         oldDelegate.widenProgress != widenProgress ||
         oldDelegate.glanceProgress != glanceProgress ||
         oldDelegate.yawnProgress != yawnProgress ||
-        oldDelegate.sleepyProgress != sleepyProgress;
+        oldDelegate.sleepyProgress != sleepyProgress ||
+        oldDelegate.speakingProgress != speakingProgress ||
+        oldDelegate.speakingMouthOpening != speakingMouthOpening;
   }
 }
 

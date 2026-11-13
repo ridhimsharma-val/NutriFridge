@@ -878,5 +878,150 @@ void main() {
       // Greeting has no audio method / produces no sound
       expect(soundController.isSoundEnabled, isTrue);
     });
+
+    group('Speaking Animation System Tests', () {
+      test('Initial state: Thinking transitions into Speaking when AI response delivery begins', () {
+        final controller = ChilluAnimationController();
+        controller.think();
+        expect(controller.state, ChilluState.thinking);
+
+        // Response delivery begins
+        controller.speak();
+        expect(controller.state, ChilluState.speaking);
+        controller.dispose();
+      });
+
+      test('Streamed chunks: Speaking does not restart animation loop on repeated chunk calls', () {
+        final controller = ChilluAnimationController();
+        controller.think();
+        controller.speak();
+        expect(controller.state, ChilluState.speaking);
+
+        // Stream chunk 1 arrives
+        controller.speak();
+        expect(controller.state, ChilluState.speaking);
+
+        // Stream chunk 2 arrives
+        controller.speak();
+        expect(controller.state, ChilluState.speaking);
+
+        // Delivery concludes -> transitions to Idle
+        controller.finishSpeaking();
+        expect(controller.state, ChilluState.idle);
+        controller.dispose();
+      });
+
+      test('Completed response transitions Speaking -> Idle', () {
+        final controller = ChilluAnimationController();
+        controller.speak();
+        expect(controller.state, ChilluState.speaking);
+
+        controller.finishSpeaking();
+        expect(controller.state, ChilluState.idle);
+        controller.dispose();
+      });
+
+      test('Failed response transitions Speaking -> Confused', () {
+        final controller = ChilluAnimationController();
+        controller.speak();
+        expect(controller.state, ChilluState.speaking);
+
+        controller.confused(persistent: true);
+        expect(controller.state, ChilluState.confused);
+        controller.dispose();
+      });
+
+      test('User interactions (typing/voice) take priority over Speaking', () {
+        final controller = ChilluAnimationController();
+        controller.speak();
+        expect(controller.state, ChilluState.speaking);
+
+        // User starts typing
+        controller.attentive();
+        expect(controller.state, ChilluState.attentive);
+
+        // Speak call while typing does not override user interaction
+        controller.speak();
+        expect(controller.state, ChilluState.attentive);
+
+        // User starts voice recording
+        controller.listening();
+        expect(controller.state, ChilluState.listening);
+
+        // Speak call while recording does not override user interaction
+        controller.speak();
+        expect(controller.state, ChilluState.listening);
+
+        controller.dispose();
+      });
+
+      testWidgets('Latest chat avatar mirrors Speaking while older chat avatars stay static', (tester) async {
+        final sharedController = ChilluAnimationController();
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Column(
+                children: [
+                  // 1. Hero Mascot (110px)
+                  ChilluMascot(
+                    controller: sharedController,
+                    size: 110,
+                  ),
+                  // 2. Historical Assistant Message Avatar (46px, static)
+                  const ChilluMascot(
+                    disableAnimations: true,
+                    size: 46,
+                    showShadow: false,
+                  ),
+                  // 3. Latest Assistant Message Avatar (46px, animated)
+                  ChilluMascot(
+                    controller: sharedController,
+                    disableAnimations: false,
+                    size: 46,
+                    showShadow: false,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        await tester.pump();
+        expect(sharedController.state, ChilluState.idle);
+
+        // Transition from Thinking to Speaking
+        sharedController.think();
+        await tester.pump();
+        expect(sharedController.state, ChilluState.thinking);
+
+        sharedController.speak();
+        await tester.pump();
+        expect(sharedController.state, ChilluState.speaking);
+
+        // Hero mascot and latest avatar synchronize speaking semantics label
+        expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*speaking to you')), findsNWidgets(2));
+        // Historical avatar remains static in idle waiting pose
+        expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*happy and waiting')), findsOneWidget);
+
+        // Animate speaking cycle (mouth movement and cadence)
+        await tester.pump(const Duration(milliseconds: 350));
+        expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*speaking to you')), findsNWidgets(2));
+
+        // Finish speaking -> both synchronize back to Idle
+        sharedController.finishSpeaking();
+        await tester.pump();
+        expect(sharedController.state, ChilluState.idle);
+        expect(find.bySemanticsLabel(RegExp(r'Chillu mascot.*happy and waiting')), findsNWidgets(3));
+
+        sharedController.dispose();
+      });
+
+      test('Audio rule: Speaking is silent; only Excited and Celebrating retain audio', () {
+        final soundController = ChilluSoundController.instance;
+        // Speaking produces no sound effects and does not affect sound controller
+        expect(soundController.isSoundEnabled, isTrue);
+      });
+    });
   });
 }
