@@ -206,6 +206,58 @@ class SavedRecipesService {
     return [];
   }
 
+  /// Formats a [RecipeRecommendation] into the exact column payload for table `public.saved_recipes`.
+  static Map<String, dynamic> toSupabaseRow(RecipeRecommendation recipe, String userId) {
+    final snapshot = recipe.toJson();
+    final cleanId = recipe.id.isNotEmpty
+        ? recipe.id
+        : 'saved_${recipe.title.toLowerCase().replaceAll(RegExp(r'\s+'), '_')}';
+
+    return {
+      'user_id': userId,
+      'recipe_identifier': cleanId,
+      'title': recipe.title,
+      'meal_type': recipe.mealType.isNotEmpty ? recipe.mealType : recipe.tag,
+      'image_url': recipe.imageUrl,
+      'image_key': recipe.imageKey,
+      'calories': recipe.calories,
+      'protein_g': recipe.proteinGrams,
+      'carbs_g': recipe.carbsGrams,
+      'fat_g': recipe.fatGrams,
+      'prep_time_minutes': recipe.prepTimeMinutes,
+      'cooking_time_minutes': recipe.cookingTimeMinutes,
+      'serving_size': recipe.servingSize,
+      'recipe_snapshot': snapshot,
+    };
+  }
+
+  /// Reconstructs a [RecipeRecommendation] from a `public.saved_recipes` database row.
+  static RecipeRecommendation fromSupabaseRow(Map<String, dynamic> row) {
+    final snapshot = row['recipe_snapshot'];
+    if (snapshot is Map<String, dynamic>) {
+      return RecipeRecommendation.fromJson(snapshot);
+    } else if (snapshot is Map) {
+      return RecipeRecommendation.fromJson(Map<String, dynamic>.from(snapshot));
+    }
+    // Fallback: build directly from row columns if snapshot is missing
+    return RecipeRecommendation(
+      id: (row['recipe_identifier'] ?? row['id'] ?? '').toString(),
+      title: (row['title'] ?? '').toString(),
+      calories: (row['calories'] as num?)?.toInt() ?? 0,
+      proteinGrams: (row['protein_g'] as num?)?.toInt() ?? 0,
+      carbsGrams: (row['carbs_g'] as num?)?.toInt() ?? 0,
+      fatGrams: (row['fat_g'] as num?)?.toInt() ?? 0,
+      prepTimeMinutes: (row['prep_time_minutes'] as num?)?.toInt() ?? 0,
+      cookingTimeMinutes: (row['cooking_time_minutes'] as num?)?.toInt(),
+      servingSize: (row['serving_size'] ?? '1 serving').toString(),
+      fridgeItemsUsed: 0,
+      imageUrl: (row['image_url'] ?? '').toString(),
+      imageKey: row['image_key']?.toString(),
+      mealType: (row['meal_type'] ?? '').toString(),
+      tag: (row['meal_type'] ?? 'SAVED').toString(),
+    );
+  }
+
   Future<bool> _persistToStorage(String userId, List<RecipeRecommendation> list) async {
     if (simulateStorageError) {
       return false;

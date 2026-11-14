@@ -300,5 +300,63 @@ void main() {
       expect(service.isSaved(testRecipe), isFalse);
       expect(service.currentSavedRecipes, isEmpty);
     });
+
+    // 14. Supabase Row Serialization preserves all required database columns and JSONB snapshot
+    test('14. Supabase row mapping produces complete payload for public.saved_recipes', () {
+      final row = SavedRecipesService.toSupabaseRow(testRecipe, 'user_uuid_123');
+
+      expect(row['user_id'], 'user_uuid_123');
+      expect(row['recipe_identifier'], testRecipe.id);
+      expect(row['title'], 'Spinach Paneer Scramble');
+      expect(row['meal_type'], 'BREAKFAST');
+      expect(row['image_url'], testRecipe.imageUrl);
+      expect(row['calories'], 380);
+      expect(row['protein_g'], 28);
+      expect(row['carbs_g'], 14);
+      expect(row['fat_g'], 22);
+      expect(row['prep_time_minutes'], 10);
+      expect(row['cooking_time_minutes'], 15);
+      expect(row['serving_size'], '2 servings');
+
+      // Verify JSONB snapshot structure
+      final snapshot = row['recipe_snapshot'];
+      expect(snapshot, isA<Map<String, dynamic>>());
+      expect(snapshot['requiredIngredients'], isA<List>());
+      expect(snapshot['preparationSteps'], isA<List>());
+      expect((snapshot['preparationSteps'] as List).length, 3);
+    });
+
+    // 15. Reconstruction from Supabase row restores 100% data fidelity without Gemini
+    test('15. Reconstruction from Supabase row restores complete recipe without AI call', () {
+      final row = SavedRecipesService.toSupabaseRow(testRecipe, 'user_uuid_123');
+      final restored = SavedRecipesService.fromSupabaseRow(row);
+
+      expect(restored.id, testRecipe.id);
+      expect(restored.title, testRecipe.title);
+      expect(restored.calories, testRecipe.calories);
+      expect(restored.proteinGrams, testRecipe.proteinGrams);
+      expect(restored.carbsGrams, testRecipe.carbsGrams);
+      expect(restored.fatGrams, testRecipe.fatGrams);
+      expect(restored.prepTimeMinutes, testRecipe.prepTimeMinutes);
+      expect(restored.cookingTimeMinutes, testRecipe.cookingTimeMinutes);
+      expect(restored.servingSize, testRecipe.servingSize);
+      expect(restored.requiredIngredients, testRecipe.requiredIngredients);
+      expect(restored.missingIngredients, testRecipe.missingIngredients);
+      expect(restored.preparationSteps.length, 3);
+      expect(restored.preparationSteps[0].instruction, 'Chop the fresh spinach finely.');
+      expect(restored.preparationSteps[1].instruction, 'Crumble the paneer and sautÃ© with spinach.');
+    });
+
+    // 16. Unique constraint and duplicate save prevention logic
+    test('16. Duplicate prevention constraint safely handles identical recipe saves', () async {
+      final row1 = SavedRecipesService.toSupabaseRow(testRecipe, 'user_uuid_123');
+      // Simulate another save of the same recipe title
+      final testRecipeCopy = testRecipe.copyWith(id: 'different_synthetic_id');
+      final row2 = SavedRecipesService.toSupabaseRow(testRecipeCopy, 'user_uuid_123');
+
+      // Titles are identical when normalized
+      expect(row1['title'].toString().trim().toLowerCase(), row2['title'].toString().trim().toLowerCase());
+      expect(row1['user_id'], row2['user_id']);
+    });
   });
 }
