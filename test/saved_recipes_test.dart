@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nutrifridge/models/nutrition_data.dart';
+import 'package:nutrifridge/screens/fridge/models/category_item.dart';
 import 'package:nutrifridge/screens/guided_cooking/screens/guided_cooking_screen.dart';
 import 'package:nutrifridge/screens/meal_detail/meal_detail_screen.dart';
 import 'package:nutrifridge/screens/meal_detail/models/recipe_preparation_step.dart';
 import 'package:nutrifridge/screens/saved_recipes/saved_recipes_screen.dart';
 import 'package:nutrifridge/screens/saved_recipes/widgets/recipe_save_button.dart';
 import 'package:nutrifridge/services/recipe/saved_recipes_service.dart';
+import 'package:nutrifridge/services/sync/user_data_sync_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -30,7 +32,7 @@ void main() {
     missingIngredients: ['Salt'],
     preparationSteps: [
       RecipePreparationStep(stepNumber: 1, instruction: 'Chop the fresh spinach finely.'),
-      RecipePreparationStep(stepNumber: 2, instruction: 'Crumble the paneer and sautÃ© with spinach.'),
+      RecipePreparationStep(stepNumber: 2, instruction: 'Crumble the paneer and sauté with spinach.'),
       RecipePreparationStep(stepNumber: 3, instruction: 'Season lightly and serve hot.'),
     ],
   );
@@ -59,6 +61,8 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
+    FridgeCategoryRepository.forceInMemoryForTesting = true;
+    MockDataRepository.forceInMemoryForTesting = true;
     SavedRecipesService.instance.resetForTesting();
     await SavedRecipesService.instance.init(forceReload: true);
   });
@@ -344,17 +348,15 @@ void main() {
       expect(restored.missingIngredients, testRecipe.missingIngredients);
       expect(restored.preparationSteps.length, 3);
       expect(restored.preparationSteps[0].instruction, 'Chop the fresh spinach finely.');
-      expect(restored.preparationSteps[1].instruction, 'Crumble the paneer and sautÃ© with spinach.');
+      expect(restored.preparationSteps[1].instruction, 'Crumble the paneer and sauté with spinach.');
     });
 
     // 16. Unique constraint and duplicate save prevention logic
     test('16. Duplicate prevention constraint safely handles identical recipe saves', () async {
       final row1 = SavedRecipesService.toSupabaseRow(testRecipe, 'user_uuid_123');
-      // Simulate another save of the same recipe title
       final testRecipeCopy = testRecipe.copyWith(id: 'different_synthetic_id');
       final row2 = SavedRecipesService.toSupabaseRow(testRecipeCopy, 'user_uuid_123');
 
-      // Titles are identical when normalized
       expect(row1['title'].toString().trim().toLowerCase(), row2['title'].toString().trim().toLowerCase());
       expect(row1['user_id'], row2['user_id']);
     });
@@ -362,7 +364,6 @@ void main() {
     // 17. Safe migration of local recipes into Supabase
     test('17. Local recipe migration strategy safely preserves local data until verified upload', () async {
       final service = SavedRecipesService.instance;
-      // Seed recipe in local_user store
       await service.saveRecipe(testRecipe, userId: 'local_user');
       final localBefore = await service.getSavedRecipesForUser('local_user');
       expect(localBefore.length, 1);
@@ -373,6 +374,174 @@ void main() {
       final localAfterUnauth = await service.getSavedRecipesForUser('local_user');
       expect(localAfterUnauth.length, 1);
       expect(localAfterUnauth.first.title, 'Spinach Paneer Scramble');
+    });
+
+    // 18. Saving a recipe creates a Supabase record in public.saved_recipes
+    test('18. Saving a recipe creates a Supabase record', () async {
+      final service = SavedRecipesService.instance;
+      service.mockSupabaseTable = {'saved_recipes': []};
+
+      final saved = await service.saveRecipe(testRecipe, userId: 'user_uuid_456');
+      expect(saved, isTrue);
+
+      final dbRows = service.mockSupabaseTable!['saved_recipes']!;
+      expect(dbRows.length, 1);
+      expect(dbRows.first['user_id'], 'user_uuid_456');
+      expect(dbRows.first['recipe_identifier'], testRecipe.id);
+      expect(dbRows.first['title'], 'Spinach Paneer Scramble');
+      expect(dbRows.first['calories'], 380);
+      expect(dbRows.first['recipe_snapshot'], isNotNull);
+    });
+
+    // 19. Saved recipes load from Supabase after application restart
+    test('19. Saved recipes load from Supabase after application restart', () async {
+      final service = SavedRecipesService.instance;
+      service.mockSupabaseTable = {
+        'saved_recipes': [SavedRecipesService.toSupabaseRow(testDinnerRecipe, 'user_uuid_restart')],
+      };
+
+      // Restart service
+      service.resetForTesting();
+      service.mockSupabaseTable = {
+        'saved_recipes': [SavedRecipesService.toSupabaseRow(testDinnerRecipe, 'user_uuid_restart')],
+      };
+
+      await service.init(userId: 'user_uuid_restart', forceReload: true);
+      expect(service.isSaved(testDinnerRecipe), isTrue);
+      expect(service.currentSavedRecipes.length, 1);
+      expect(service.currentSavedRecipes.first.title, 'Hearty Tomato Lentil Soup');
+    });
+
+    // 20. Unsaving removes the correct database record
+    test('20. Unsaving removes the correct database record', () async {
+      final service = SavedRecipesService.instance;
+      service.mockSupabaseTable = {
+        'saved_recipes': [
+          SavedRecipesService.toSupabaseRow(testRecipe, 'user_uuid_789'),
+          SavedRecipesService.toSupabaseRow(testDinnerRecipe, 'user_uuid_789'),
+        ],
+      };
+
+      await service.init(userId: 'user_uuid_789', forceReload: true);
+      expect(service.currentSavedRecipes.length, 2);
+
+      final removed = await service.removeRecipe(testRecipe.id, userId: 'user_uuid_789');
+      expect(removed, isTrue);
+
+      final remainingRows = service.mockSupabaseTable!['saved_recipes']!;
+      expect(remainingRows.length, 1);
+      expect(remainingRows.first['recipe_identifier'], testDinnerRecipe.id);
+      expect(service.isSaved(testRecipe), isFalse);
+      expect(service.isSaved(testDinnerRecipe), isTrue);
+    });
+
+    // 21. User isolation works correctly through RLS simulation
+    test('21. User isolation works correctly through RLS simulation', () async {
+      final service = SavedRecipesService.instance;
+      service.mockSupabaseTable = {
+        'saved_recipes': [
+          SavedRecipesService.toSupabaseRow(testRecipe, 'user_alice_id'),
+          SavedRecipesService.toSupabaseRow(testDinnerRecipe, 'user_bob_id'),
+        ],
+      };
+
+      // Alice only retrieves Alice's recipes
+      final aliceRecipes = await service.getSavedRecipesForUser('user_alice_id');
+      expect(aliceRecipes.length, 1);
+      expect(aliceRecipes.first.title, 'Spinach Paneer Scramble');
+
+      // Bob only retrieves Bob's recipes
+      final bobRecipes = await service.getSavedRecipesForUser('user_bob_id');
+      expect(bobRecipes.length, 1);
+      expect(bobRecipes.first.title, 'Hearty Tomato Lentil Soup');
+    });
+
+    // 22. Existing SharedPreferences recipes synchronize successfully to Supabase
+    test('22. Existing SharedPreferences recipes synchronize successfully to Supabase', () async {
+      final service = SavedRecipesService.instance;
+      service.mockSupabaseTable = {'saved_recipes': []};
+
+      // User saved recipe before login (stored under local_user)
+      await service.saveRecipe(testRecipe, userId: 'local_user');
+      expect((await service.getSavedRecipesForUser('local_user')).length, 1);
+
+      // Authenticate as target user and sync
+      final syncedCount = await service.syncLocalRecipesToSupabase(targetUserId: 'user_auth_123');
+      expect(syncedCount, 1);
+
+      // Verify recipe exists in Supabase for user_auth_123
+      final dbRows = service.mockSupabaseTable!['saved_recipes']!;
+      expect(dbRows.length, 1);
+      expect(dbRows.first['user_id'], 'user_auth_123');
+      expect(dbRows.first['recipe_identifier'], testRecipe.id);
+
+      // Verify local_user queue was safely cleared
+      final localRemaining = await service.getSavedRecipesForUser('local_user');
+      expect(localRemaining, isEmpty);
+    });
+
+    // 23. Failed synchronization preserves local copies
+    test('23. Failed synchronization preserves local copies', () async {
+      final service = SavedRecipesService.instance;
+      service.mockSupabaseTable = {'saved_recipes': []};
+
+      await service.saveRecipe(testRecipe, userId: 'local_user');
+      expect((await service.getSavedRecipesForUser('local_user')).length, 1);
+
+      // Simulate network failure during sync
+      service.simulateSupabaseError = true;
+      final synced = await service.syncLocalRecipesToSupabase(targetUserId: 'user_auth_123');
+      expect(synced, 0);
+
+      // Local copy must be preserved intact for retry
+      final localRemaining = await service.getSavedRecipesForUser('local_user');
+      expect(localRemaining.length, 1);
+      expect(localRemaining.first.title, 'Spinach Paneer Scramble');
+    });
+
+    // 24. Network and database errors gracefully fallback to local cache
+    test('24. Network and database errors gracefully fallback to local cache', () async {
+      final service = SavedRecipesService.instance;
+      service.mockSupabaseTable = {
+        'saved_recipes': [SavedRecipesService.toSupabaseRow(testRecipe, 'user_cache_test')],
+      };
+
+      // Initial load populates local cache
+      final initial = await service.loadSavedRecipes(userId: 'user_cache_test');
+      expect(initial.length, 1);
+
+      // Network goes down
+      service.simulateSupabaseError = true;
+
+      // Must not throw or crash; falls back to local cache
+      final fallbackList = await service.loadSavedRecipes(userId: 'user_cache_test');
+      expect(fallbackList.length, 1);
+      expect(fallbackList.first.title, 'Spinach Paneer Scramble');
+    });
+
+    // 25. Login, logout and account switching do not expose another user's recipes
+    test('25. Login, logout and account switching do not expose another user\'s recipes', () async {
+      final service = SavedRecipesService.instance;
+      service.mockSupabaseTable = {
+        'saved_recipes': [
+          SavedRecipesService.toSupabaseRow(testRecipe, 'account_a'),
+          SavedRecipesService.toSupabaseRow(testDinnerRecipe, 'account_b'),
+        ],
+      };
+
+      // 1. Account A logs in
+      await UserDataSyncService.syncAllUserData('account_a');
+      expect(service.currentSavedRecipes.length, 1);
+      expect(service.currentSavedRecipes.first.title, 'Spinach Paneer Scramble');
+
+      // 2. Account A logs out
+      UserDataSyncService.clearAllUserDataForLogout();
+      expect(service.currentSavedRecipes, isEmpty);
+
+      // 3. Account B logs in
+      await UserDataSyncService.syncAllUserData('account_b');
+      expect(service.currentSavedRecipes.length, 1);
+      expect(service.currentSavedRecipes.first.title, 'Hearty Tomato Lentil Soup');
     });
   });
 }
