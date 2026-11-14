@@ -146,10 +146,14 @@ class GroceryItem {
     );
   }
 
+  static final RegExp _uuidRegex = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+
   /// Converts item into PostgreSQL row payload for `public.grocery_items`.
   Map<String, dynamic> toSupabaseRow(String userUuid) {
     return {
-      if (id.isNotEmpty && !id.startsWith('temp_') && !id.startsWith('local_')) 'id': id,
+      if (id.isNotEmpty && _uuidRegex.hasMatch(id)) 'id': id,
       'user_id': userUuid,
       'name': name.trim(),
       'quantity': quantity > 0 ? quantity : 1.0,

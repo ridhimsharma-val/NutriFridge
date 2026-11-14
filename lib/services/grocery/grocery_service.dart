@@ -510,16 +510,23 @@ class GroceryService {
     if (client != null && targetUserId != 'local_user') {
       try {
         if (simulateNetworkError) throw StateError('Simulated error');
+        final updatePayload = <String, dynamic>{
+          'name': item.name.trim(),
+          'quantity': item.quantity,
+          'unit': item.unit,
+          'category': item.category,
+          'is_purchased': item.isPurchased,
+          'is_transferred': item.isTransferred,
+          'transferred_at': item.transferredAt?.toIso8601String(),
+          'inventory_item_id': item.inventoryItemId,
+          'expiry_date': item.expiryDate != null
+              ? '${item.expiryDate!.year.toString().padLeft(4, '0')}-${item.expiryDate!.month.toString().padLeft(2, '0')}-${item.expiryDate!.day.toString().padLeft(2, '0')}'
+              : null,
+          'updated_at': DateTime.now().toIso8601String(),
+        };
         await client
             .from('grocery_items')
-            .update({
-              'name': item.name.trim(),
-              'quantity': item.quantity,
-              'unit': item.unit,
-              'category': item.category,
-              'is_purchased': item.isPurchased,
-              'updated_at': DateTime.now().toIso8601String(),
-            })
+            .update(updatePayload)
             .eq('id', item.id)
             .eq('user_id', targetUserId);
 
