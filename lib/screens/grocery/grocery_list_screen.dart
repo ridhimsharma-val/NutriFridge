@@ -31,6 +31,28 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
   bool _manualCategoryOverride = false;
   bool _isAdding = false;
   bool _showCompletedSection = true;
+  final Set<String> _togglingIds = {};
+
+  Future<void> _handleTogglePurchased(String itemId) async {
+    if (_togglingIds.contains(itemId)) return;
+    _togglingIds.add(itemId);
+
+    try {
+      final success = await GroceryService.instance.togglePurchased(itemId);
+      if (!success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to update item. Please check your connection.'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Color(0xFFC53929),
+          ),
+        );
+      }
+    } finally {
+      _togglingIds.remove(itemId);
+    }
+  }
 
   @override
   void initState() {
@@ -454,11 +476,12 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
           builder: (context, items, _) {
             final totalCount = items.length;
             final completedCount = items.where((it) => it.isPurchased).length;
+            final pendingCount = totalCount - completedCount;
             final progress = totalCount > 0 ? (completedCount / totalCount) : 0.0;
 
             return CustomScrollView(
               slivers: [
-                // 1. Progress Header Card
+                // 1. Shopping Progress Header Card
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -481,14 +504,79 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
                     child: _buildEmptyState(),
                   )
                 else ...[
-                  // Pending Items Grouped by Category
-                  ..._buildCategorizedPendingList(items.where((it) => !it.isPurchased).toList()),
+                  // Section: To Buy
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 14, 18, 4),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.shopping_cart_outlined, size: 16, color: AppColors.primaryForest),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'To Buy',
+                            key: Key('grocery_to_buy_header'),
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryForest,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.neutralTrack,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              pendingCount.toString(),
+                              key: const Key('grocery_to_buy_count_badge'),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.darkText,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
-                  // Completed Items Section
+                  // If To Buy has items, render categorized pending list
+                  if (pendingCount > 0)
+                    ..._buildCategorizedPendingList(items.where((it) => !it.isPurchased).toList())
+                  else
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF2F6F3),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            children: const [
+                              Icon(Icons.check_circle_outline, size: 16, color: AppColors.freshGreen),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'All items collected! No items remaining in To Buy.',
+                                  style: TextStyle(fontSize: 12, color: AppColors.mutedText, fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Section: Completed
                   if (completedCount > 0)
                     SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                         child: _buildCompletedSection(items.where((it) => it.isPurchased).toList()),
                       ),
                     ),
@@ -506,16 +594,21 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
   // ===========================================================================
 
   Widget _buildProgressCard(int completed, int total, double progress) {
+    final remaining = total - completed;
+    final isAllCompleted = total > 0 && completed == total;
+
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.pureWhite,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.subtleBorder),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isAllCompleted ? AppColors.freshGreen.withValues(alpha: 0.4) : AppColors.subtleBorder,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 6,
+            blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
@@ -523,41 +616,181 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Row 1: Section Title & Percentage Badge
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                total == 0
-                    ? '0 items on list'
-                    : '$completed of $total items completed',
-                key: const Key('grocery_progress_text'),
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.darkText,
-                ),
+              Row(
+                children: const [
+                  Icon(Icons.shopping_bag_outlined, color: AppColors.primaryForest, size: 18),
+                  SizedBox(width: 6),
+                  Text(
+                    'Shopping Progress',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primaryForest,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                '${(progress * 100).toInt()}%',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: progress == 1.0 ? AppColors.freshGreen : AppColors.mutedText,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isAllCompleted ? AppColors.paleMint : AppColors.neutralTrack,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  total == 0 ? '0%' : '${(progress * 100).toInt()}%',
+                  key: const Key('grocery_percentage_text'),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: isAllCompleted ? AppColors.primaryForest : AppColors.darkText,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              key: const Key('grocery_progress_indicator'),
-              value: progress,
-              minHeight: 8,
-              backgroundColor: AppColors.neutralTrack,
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.freshGreen),
+          const SizedBox(height: 10),
+
+          // Row 2: "X of Y items completed"
+          Text(
+            total == 0
+                ? '0 of 0 items completed'
+                : '$completed of $total items completed',
+            key: const Key('grocery_progress_text'),
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.darkText,
             ),
           ),
+          const SizedBox(height: 10),
+
+          // Row 3: Prominent animated horizontal progress bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0.0, end: progress),
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOutCubic,
+              builder: (context, animatedValue, _) {
+                return LinearProgressIndicator(
+                  key: const Key('grocery_progress_indicator'),
+                  value: animatedValue,
+                  minHeight: 10,
+                  backgroundColor: AppColors.neutralTrack,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    isAllCompleted ? const Color(0xFF22A06B) : AppColors.primaryForest,
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Row 4: Stat Chips: Completed count and Remaining count
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.paleGreenSurface,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.check_circle_outline, size: 13, color: AppColors.freshGreen),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$completed completed',
+                      key: const Key('grocery_completed_count_text'),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primaryForest,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF2F6F3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.pending_actions_outlined, size: 13, color: AppColors.mutedText),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$remaining remaining',
+                      key: const Key('grocery_remaining_count_text'),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.mutedText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          // Row 5: Completion Celebration Banner (when all items completed)
+          if (isAllCompleted) ...[
+            const SizedBox(height: 14),
+            Container(
+              key: const Key('grocery_completion_celebration'),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.paleMint.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.freshGreen.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: AppColors.freshGreen,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.task_alt_rounded, color: Colors.white, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Shopping list completed!',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryForest,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'All items marked as purchased. Ready to transfer to your fridge or clear.',
+                          style: TextStyle(fontSize: 11.5, color: AppColors.mutedText),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -901,74 +1134,60 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
         color: Colors.transparent,
         child: ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-        leading: GestureDetector(
-          key: Key('grocery_item_checkbox_${item.id}'),
-          onTap: () => GroceryService.instance.togglePurchased(item.id),
-          child: Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: item.isPurchased ? AppColors.freshGreen : Colors.transparent,
-              border: Border.all(
-                color: item.isPurchased ? AppColors.freshGreen : const Color(0xFFB4C8BE),
-                width: 1.8,
-              ),
-            ),
-            child: item.isPurchased
-                ? const Icon(Icons.check, size: 16, color: Colors.white)
-                : null,
+          leading: _AnimatedGroceryCheckbox(
+            checkboxKey: Key('grocery_item_checkbox_${item.id}'),
+            isPurchased: item.isPurchased,
+            onTap: () => _handleTogglePurchased(item.id),
           ),
-        ),
-        title: Text(
-          item.name,
-          key: Key('grocery_item_name_${item.id}'),
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: item.isPurchased ? AppColors.mutedText : AppColors.darkText,
-            decoration: item.isPurchased ? TextDecoration.lineThrough : null,
-          ),
-        ),
-        subtitle: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF2F6F3),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                item.displayQuantity,
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryForest),
-              ),
+          title: Text(
+            item.name,
+            key: Key('grocery_item_name_${item.id}'),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: item.isPurchased ? AppColors.mutedText : AppColors.darkText,
+              decoration: item.isPurchased ? TextDecoration.lineThrough : null,
             ),
-            if (item.category.isNotEmpty) ...[
-              const SizedBox(width: 6),
-              Text(
-                '•  ${item.category}',
-                style: const TextStyle(fontSize: 11, color: AppColors.mutedText),
+          ),
+          subtitle: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF2F6F3),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  item.displayQuantity,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryForest),
+                ),
+              ),
+              if (item.category.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                Text(
+                  '•  ${item.category}',
+                  style: const TextStyle(fontSize: 11, color: AppColors.mutedText),
+                ),
+              ],
+            ],
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                key: Key('grocery_item_edit_${item.id}'),
+                icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.mutedText),
+                onPressed: () => _showEditItemSheet(item),
+              ),
+              IconButton(
+                key: Key('grocery_item_delete_${item.id}'),
+                icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFC53929)),
+                onPressed: () => GroceryService.instance.deleteItem(item.id),
               ),
             ],
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              key: Key('grocery_item_edit_${item.id}'),
-              icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.mutedText),
-              onPressed: () => _showEditItemSheet(item),
-            ),
-            IconButton(
-              key: Key('grocery_item_delete_${item.id}'),
-              icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFC53929)),
-              onPressed: () => GroceryService.instance.deleteItem(item.id),
-            ),
-          ],
+          ),
         ),
       ),
-    ),
     );
   }
 
@@ -985,23 +1204,43 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
           Material(
             color: Colors.transparent,
             child: ListTile(
+              key: const Key('grocery_completed_toggle'),
               onTap: () => setState(() => _showCompletedSection = !_showCompletedSection),
               title: Row(
                 children: [
                   const Icon(Icons.check_circle_outline, color: AppColors.freshGreen, size: 18),
                   const SizedBox(width: 8),
-                  Text(
-                    'Purchased (${completedItems.length})',
-                    style: const TextStyle(
+                  const Text(
+                    'Completed',
+                    key: Key('grocery_completed_header'),
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                       color: AppColors.primaryForest,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: AppColors.neutralTrack,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      completedItems.length.toString(),
+                      key: const Key('grocery_completed_count_badge'),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.mutedText,
+                      ),
                     ),
                   ),
                 ],
               ),
               trailing: Icon(
                 _showCompletedSection ? Icons.expand_less : Icons.expand_more,
+                key: const Key('grocery_completed_expand_icon'),
                 color: AppColors.mutedText,
               ),
             ),
@@ -1263,6 +1502,95 @@ class _FridgeTransferSheetState extends State<_FridgeTransferSheet> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Tactile, micro-animated circular checkbox for grocery completion.
+class _AnimatedGroceryCheckbox extends StatefulWidget {
+  final bool isPurchased;
+  final VoidCallback onTap;
+  final Key? checkboxKey;
+
+  const _AnimatedGroceryCheckbox({
+    required this.isPurchased,
+    required this.onTap,
+    this.checkboxKey,
+  });
+
+  @override
+  State<_AnimatedGroceryCheckbox> createState() => _AnimatedGroceryCheckboxState();
+}
+
+class _AnimatedGroceryCheckboxState extends State<_AnimatedGroceryCheckbox>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _scaleController;
+  late final Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _scaleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.0, end: 0.84).chain(CurveTween(curve: Curves.easeOut)),
+        weight: 40,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.84, end: 1.10).chain(CurveTween(curve: Curves.easeOutBack)),
+        weight: 35,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.10, end: 1.0).chain(CurveTween(curve: Curves.easeIn)),
+        weight: 25,
+      ),
+    ]).animate(_scaleController);
+  }
+
+  @override
+  void dispose() {
+    _scaleController.dispose();
+    super.dispose();
+  }
+
+  void _handleTap() {
+    _scaleController.forward(from: 0.0);
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: GestureDetector(
+        key: widget.checkboxKey,
+        onTap: _handleTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: widget.isPurchased ? AppColors.freshGreen : Colors.transparent,
+            border: Border.all(
+              color: widget.isPurchased ? AppColors.freshGreen : const Color(0xFFB4C8BE),
+              width: 1.8,
+            ),
+          ),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
+            child: widget.isPurchased
+                ? const Icon(Icons.check, size: 16, color: Colors.white, key: ValueKey('checked_icon'))
+                : const SizedBox.shrink(key: ValueKey('unchecked_icon')),
+          ),
+        ),
       ),
     );
   }

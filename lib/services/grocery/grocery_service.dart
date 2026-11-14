@@ -429,19 +429,31 @@ class GroceryService {
     return GroceryAddResult(type: GroceryAddResultType.added, item: newItem);
   }
 
-  /// Updates an existing grocery item.
+  /// Updates an existing grocery item with optimistic update and rollback on failure.
   Future<bool> updateItem(GroceryItem item, {String? userId}) async {
     final targetUserId = userId ?? effectiveUserId;
     final userList = await getItemsForUser(targetUserId);
     final index = userList.indexWhere((it) => it.id == item.id);
     if (index == -1) return false;
 
+    final previousList = List<GroceryItem>.from(userList);
     final updatedList = List<GroceryItem>.from(userList);
     updatedList[index] = item.copyWith(updatedAt: DateTime.now());
 
-    // 1. Mock table for tests
+    // 1. Optimistic update to notify UI immediately
+    if (userId != null || targetUserId == effectiveUserId) {
+      _groceryItemsNotifier.value = updatedList;
+    }
+
+    // 2. Mock table for tests
     if (mockSupabaseTable != null && targetUserId != 'local_user') {
-      if (simulateNetworkError) return false;
+      if (simulateNetworkError) {
+        // Roll back optimistic update
+        if (userId != null || targetUserId == effectiveUserId) {
+          _groceryItemsNotifier.value = previousList;
+        }
+        return false;
+      }
       final table = mockSupabaseTable!['grocery_items'] ?? [];
       final rowIdx = table.indexWhere((r) => r['id'] == item.id);
       if (rowIdx != -1) {
@@ -450,13 +462,10 @@ class GroceryService {
           ..['updated_at'] = DateTime.now().toIso8601String();
       }
       await _persistToLocalStorage(targetUserId, updatedList);
-      if (userId != null || targetUserId == effectiveUserId) {
-        _groceryItemsNotifier.value = updatedList;
-      }
       return true;
     }
 
-    // 2. Production Supabase client
+    // 3. Production Supabase client
     final client = _client;
     if (client != null && targetUserId != 'local_user') {
       try {
@@ -475,22 +484,26 @@ class GroceryService {
             .eq('user_id', targetUserId);
 
         await _persistToLocalStorage(targetUserId, updatedList);
-        if (userId != null || targetUserId == effectiveUserId) {
-          _groceryItemsNotifier.value = updatedList;
-        }
         return true;
       } catch (e) {
         debugPrint('[GroceryService] Supabase update error: $e');
+        // Roll back optimistic update on network / database failure
+        if (userId != null || targetUserId == effectiveUserId) {
+          _groceryItemsNotifier.value = previousList;
+        }
         return false;
       }
     }
 
-    // 3. Fallback to local storage
+    // 4. Fallback to local storage
     final success = await _persistToLocalStorage(targetUserId, updatedList);
-    if (success && (userId != null || targetUserId == effectiveUserId)) {
-      _groceryItemsNotifier.value = updatedList;
+    if (!success) {
+      if (userId != null || targetUserId == effectiveUserId) {
+        _groceryItemsNotifier.value = previousList;
+      }
+      return false;
     }
-    return success;
+    return true;
   }
 
   /// Toggles an item's purchased status.

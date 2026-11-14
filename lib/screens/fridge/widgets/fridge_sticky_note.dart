@@ -89,8 +89,11 @@ class _FridgeStickyNoteState extends State<FridgeStickyNote>
       child: ValueListenableBuilder<List<GroceryItem>>(
         valueListenable: GroceryService.instance.groceryItemsNotifier,
         builder: (context, items, _) {
+          final totalCount = items.length;
+          final completedCount = items.where((it) => it.isPurchased).length;
           final pending = items.where((it) => !it.isPurchased).toList();
           final pendingCount = pending.length;
+          final isAllCompleted = totalCount > 0 && pendingCount == 0;
 
           return Transform.rotate(
             angle: 0.044, // ~2.5 degrees natural clockwise tilt
@@ -148,7 +151,7 @@ class _FridgeStickyNoteState extends State<FridgeStickyNote>
 
                             // Note Content
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(7.0, 10.0, 6.0, 6.0),
+                              padding: const EdgeInsets.fromLTRB(7.0, 9.0, 6.0, 5.0),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
@@ -186,17 +189,37 @@ class _FridgeStickyNoteState extends State<FridgeStickyNote>
                                               color: Color(0xFF1E4620),
                                             ),
                                           ),
+                                        )
+                                      else if (isAllCompleted)
+                                        const Icon(
+                                          Icons.check_circle,
+                                          size: 11.0,
+                                          color: Color(0xFF22A06B),
                                         ),
                                     ],
                                   ),
 
-                                  const SizedBox(height: 4.0),
+                                  const SizedBox(height: 3.0),
 
-                                  // Preview Items or Empty Prompt
+                                  // Preview Items or Completed State or Empty Prompt
                                   if (pending.isNotEmpty) ...[
+                                    // Pending items count indicator
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 2.0),
+                                      child: Text(
+                                        pendingCount == 1 ? '1 item remaining' : '$pendingCount items remaining',
+                                        key: const ValueKey('sticky_note_remaining_text'),
+                                        style: const TextStyle(
+                                          fontSize: 7.8,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF5B7E58),
+                                        ),
+                                        maxLines: 1,
+                                      ),
+                                    ),
                                     for (int i = 0; i < math.min(3, pending.length); i++)
                                       Padding(
-                                        padding: const EdgeInsets.only(bottom: 2.0),
+                                        padding: const EdgeInsets.only(bottom: 1.5),
                                         child: Row(
                                           children: [
                                             Container(
@@ -212,7 +235,7 @@ class _FridgeStickyNoteState extends State<FridgeStickyNote>
                                               child: Text(
                                                 pending[i].name,
                                                 style: const TextStyle(
-                                                  fontSize: 9.0,
+                                                  fontSize: 8.5,
                                                   fontWeight: FontWeight.w600,
                                                   color: Color(0xFF333333),
                                                   height: 1.15,
@@ -228,12 +251,77 @@ class _FridgeStickyNoteState extends State<FridgeStickyNote>
                                       Text(
                                         '+${pending.length - 3} more',
                                         style: TextStyle(
-                                          fontSize: 8.0,
+                                          fontSize: 7.5,
                                           fontWeight: FontWeight.w700,
                                           color: const Color(0xFF4A7C59).withValues(alpha: 0.85),
                                         ),
                                       ),
+                                    // Compact completion progress line
+                                    if (completedCount > 0) ...[
+                                      const SizedBox(height: 2.5),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: ClipRRect(
+                                              borderRadius: BorderRadius.circular(2.0),
+                                              child: LinearProgressIndicator(
+                                                value: totalCount > 0 ? (completedCount / totalCount) : 0.0,
+                                                minHeight: 2.2,
+                                                backgroundColor: const Color(0xFFE2D6A9),
+                                                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2C5E3B)),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 3.0),
+                                          Text(
+                                            '$completedCount/$totalCount',
+                                            style: const TextStyle(
+                                              fontSize: 7.0,
+                                              fontWeight: FontWeight.w700,
+                                              color: Color(0xFF1E4620),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ] else if (isAllCompleted) ...[
+                                    // Completed state on sticky note
+                                    const Spacer(),
+                                    Center(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.check_circle_rounded,
+                                            size: 17.0,
+                                            color: Color(0xFF22A06B),
+                                          ),
+                                          const SizedBox(height: 1.5),
+                                          const Text(
+                                            'Shopping complete!',
+                                            textAlign: TextAlign.center,
+                                            key: ValueKey('sticky_note_completed_text'),
+                                            style: TextStyle(
+                                              fontSize: 8.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFF1E4620),
+                                            ),
+                                          ),
+                                          Text(
+                                            'All $totalCount items bought',
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(
+                                              fontSize: 7.2,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF5B7E58),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Spacer(),
                                   ] else ...[
+                                    // Truly empty list
                                     const Spacer(),
                                     const Center(
                                       child: Column(
