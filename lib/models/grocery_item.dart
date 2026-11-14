@@ -7,6 +7,10 @@ class GroceryItem {
   final String unit;
   final String category;
   final bool isPurchased;
+  final bool isTransferred;
+  final DateTime? transferredAt;
+  final String? inventoryItemId;
+  final DateTime? expiryDate;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -18,6 +22,10 @@ class GroceryItem {
     this.unit = 'pieces',
     this.category = 'Others',
     this.isPurchased = false,
+    this.isTransferred = false,
+    this.transferredAt,
+    this.inventoryItemId,
+    this.expiryDate,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -55,6 +63,10 @@ class GroceryItem {
     String? unit,
     String? category,
     bool? isPurchased,
+    bool? isTransferred,
+    DateTime? transferredAt,
+    String? inventoryItemId,
+    DateTime? expiryDate,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -66,6 +78,10 @@ class GroceryItem {
       unit: unit ?? this.unit,
       category: category ?? this.category,
       isPurchased: isPurchased ?? this.isPurchased,
+      isTransferred: isTransferred ?? this.isTransferred,
+      transferredAt: transferredAt ?? this.transferredAt,
+      inventoryItemId: inventoryItemId ?? this.inventoryItemId,
+      expiryDate: expiryDate ?? this.expiryDate,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -87,6 +103,10 @@ class GroceryItem {
       'unit': unit,
       'category': category,
       'isPurchased': isPurchased,
+      'isTransferred': isTransferred,
+      'transferredAt': transferredAt?.toIso8601String(),
+      'inventoryItemId': inventoryItemId,
+      'expiryDate': expiryDate?.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -101,6 +121,18 @@ class GroceryItem {
       unit: (json['unit'] ?? 'pieces').toString(),
       category: (json['category'] ?? 'Others').toString(),
       isPurchased: json['isPurchased'] == true || json['is_purchased'] == true,
+      isTransferred: json['isTransferred'] == true || json['is_transferred'] == true,
+      transferredAt: json['transferredAt'] != null
+          ? DateTime.tryParse(json['transferredAt'].toString())
+          : (json['transferred_at'] != null
+              ? DateTime.tryParse(json['transferred_at'].toString())
+              : null),
+      inventoryItemId: (json['inventoryItemId'] ?? json['inventory_item_id'])?.toString(),
+      expiryDate: json['expiryDate'] != null
+          ? DateTime.tryParse(json['expiryDate'].toString())
+          : (json['expiry_date'] != null
+              ? DateTime.tryParse(json['expiry_date'].toString())
+              : null),
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
           : (json['created_at'] != null
@@ -124,6 +156,12 @@ class GroceryItem {
       'unit': unit.trim().isNotEmpty ? unit.trim() : 'pieces',
       'category': category,
       'is_purchased': isPurchased,
+      'is_transferred': isTransferred,
+      if (transferredAt != null) 'transferred_at': transferredAt!.toIso8601String(),
+      if (inventoryItemId != null) 'inventory_item_id': inventoryItemId,
+      if (expiryDate != null)
+        'expiry_date':
+            '${expiryDate!.year.toString().padLeft(4, '0')}-${expiryDate!.month.toString().padLeft(2, '0')}-${expiryDate!.day.toString().padLeft(2, '0')}',
     };
   }
 
@@ -137,6 +175,14 @@ class GroceryItem {
       unit: (row['unit'] ?? 'pieces').toString(),
       category: (row['category'] ?? 'Others').toString(),
       isPurchased: row['is_purchased'] == true,
+      isTransferred: row['is_transferred'] == true,
+      transferredAt: row['transferred_at'] != null
+          ? DateTime.tryParse(row['transferred_at'].toString())
+          : null,
+      inventoryItemId: row['inventory_item_id']?.toString(),
+      expiryDate: row['expiry_date'] != null
+          ? DateTime.tryParse(row['expiry_date'].toString())
+          : null,
       createdAt: row['created_at'] != null
           ? DateTime.tryParse(row['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
@@ -205,7 +251,11 @@ class GroceryCategoryResolver {
     final lowerName = itemName.toLowerCase();
     switch (groceryCategory) {
       case 'Fruits & Vegetables':
-        const fruits = ['apple', 'banana', 'orange', 'mango', 'grape', 'strawberry', 'watermelon', 'papaya', 'pineapple', 'lemon', 'lime', 'berry', 'avocado'];
+        const fruits = [
+          'apple', 'banana', 'orange', 'mango', 'grape', 'strawberry', 'strawberries',
+          'watermelon', 'papaya', 'pineapple', 'lemon', 'lime', 'berry', 'berries',
+          'avocado', 'blueberry', 'blueberries', 'raspberry', 'raspberries', 'peach', 'plum', 'pear', 'kiwi', 'cherry', 'cherries'
+        ];
         for (final f in fruits) {
           if (lowerName.contains(f)) return 'Fruits';
         }

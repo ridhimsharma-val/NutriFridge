@@ -31,7 +31,66 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
   bool _manualCategoryOverride = false;
   bool _isAdding = false;
   bool _showCompletedSection = true;
+  bool _isTransferring = false;
   final Set<String> _togglingIds = {};
+
+  Future<void> _handleOneTapTransfer(List<GroceryItem> eligibleItems) async {
+    if (_isTransferring) return;
+    if (eligibleItems.isEmpty) return;
+
+    setState(() => _isTransferring = true);
+
+    try {
+      final result = await GroceryService.instance.transferPurchasedToFridge(
+        itemsToTransfer: eligibleItems,
+        defaultExpiryDays: 7,
+      );
+
+      if (!mounted) return;
+
+      if (result.isFullSuccess) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            key: const Key('grocery_transfer_success_snackbar'),
+            content: Text(
+              result.transferredCount == 1
+                  ? '1 grocery added to your fridge!'
+                  : '${result.transferredCount} groceries added to your fridge!',
+            ),
+            backgroundColor: AppColors.primaryForest,
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else if (result.isPartialSuccess) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            key: const Key('grocery_transfer_partial_snackbar'),
+            content: Text(
+              'Added ${result.transferredCount} to fridge. ${result.failedCount} failed.',
+            ),
+            backgroundColor: const Color(0xFFD97706),
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            key: Key('grocery_transfer_error_snackbar'),
+            content: Text('Failed to transfer items to fridge. Please try again.'),
+            backgroundColor: Color(0xFFC53929),
+            duration: Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isTransferring = false);
+      }
+    }
+  }
 
   Future<void> _handleTogglePurchased(String itemId) async {
     if (_togglingIds.contains(itemId)) return;
@@ -1169,6 +1228,32 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
                   style: const TextStyle(fontSize: 11, color: AppColors.mutedText),
                 ),
               ],
+              if (item.isTransferred) ...[
+                const SizedBox(width: 6),
+                Container(
+                  key: Key('transferred_badge_${item.id}'),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: AppColors.paleMint,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.kitchen, size: 10, color: AppColors.primaryForest),
+                      SizedBox(width: 3),
+                      Text(
+                        'In Fridge',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryForest,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
           trailing: Row(
@@ -1192,6 +1277,9 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
   }
 
   Widget _buildCompletedSection(List<GroceryItem> completedItems) {
+    final eligible = completedItems.where((it) => it.isPurchased && !it.isTransferred).toList();
+    final eligibleCount = eligible.length;
+
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFF2F6F3),
@@ -1256,16 +1344,34 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
               padding: const EdgeInsets.all(12),
               child: SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
+                child: KeyedSubtree(
                   key: const Key('grocery_transfer_completed_footer_btn'),
-                  onPressed: () => _openTransferToFridgeSheet(completedItems),
-                  icon: const Icon(Icons.kitchen_outlined, size: 18),
-                  label: Text('Add ${completedItems.length} Purchased Items to Fridge'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryForest,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  child: ElevatedButton.icon(
+                    key: const Key('add_purchased_to_fridge_btn'),
+                    onPressed: eligibleCount == 0 || _isTransferring
+                        ? null
+                        : () => _handleOneTapTransfer(eligible),
+                    icon: _isTransferring
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.kitchen_outlined, size: 18),
+                    label: Text(
+                      _isTransferring
+                          ? 'Adding to Fridge...'
+                          : 'Add $eligibleCount Purchased ${eligibleCount == 1 ? 'Item' : 'Items'} to Fridge',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryForest,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: AppColors.neutralTrack,
+                      disabledForegroundColor: AppColors.mutedText,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
                   ),
                 ),
               ),
@@ -1322,7 +1428,10 @@ class _FridgeTransferSheetState extends State<_FridgeTransferSheet> {
   @override
   void initState() {
     super.initState();
-    _selectedIds = widget.completedItems.map((it) => it.id).toSet();
+    final untransferred = widget.completedItems.where((it) => !it.isTransferred).toList();
+    _selectedIds = (untransferred.isNotEmpty ? untransferred : widget.completedItems)
+        .map((it) => it.id)
+        .toSet();
   }
 
   Future<void> _handleConfirmTransfer() async {
@@ -1339,7 +1448,7 @@ class _FridgeTransferSheetState extends State<_FridgeTransferSheet> {
     setState(() => _isTransferring = true);
 
     try {
-      final transferredCount = await GroceryService.instance.addPurchasedItemsToFridge(
+      final result = await GroceryService.instance.transferPurchasedToFridge(
         itemsToTransfer: candidates,
         defaultExpiryDays: _selectedExpiryDays > 0 ? _selectedExpiryDays : null,
       );
@@ -1349,12 +1458,15 @@ class _FridgeTransferSheetState extends State<_FridgeTransferSheet> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          key: const Key('grocery_transfer_success_snackbar'),
           content: Text(
-            transferredCount > 0
-                ? 'Added $transferredCount items to your fridge!'
+            result.transferredCount > 0
+                ? (result.transferredCount == 1
+                    ? '1 grocery added to your fridge!'
+                    : '${result.transferredCount} groceries added to your fridge!')
                 : 'Failed to transfer items to fridge.',
           ),
-          backgroundColor: transferredCount > 0 ? AppColors.primaryForest : const Color(0xFFC53929),
+          backgroundColor: result.transferredCount > 0 ? AppColors.primaryForest : const Color(0xFFC53929),
           behavior: SnackBarBehavior.floating,
         ),
       );

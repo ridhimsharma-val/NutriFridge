@@ -41,6 +41,29 @@ class GroceryAddResult {
   bool get isPurchased => item?.isPurchased ?? false;
 }
 
+/// Result of transferring purchased grocery items to active fridge inventory.
+class GroceryTransferResult {
+  final int totalRequested;
+  final int transferredCount;
+  final int failedCount;
+  final List<GroceryItem> transferredItems;
+  final List<GroceryItem> failedItems;
+  final String? errorMessage;
+
+  const GroceryTransferResult({
+    required this.totalRequested,
+    required this.transferredCount,
+    required this.failedCount,
+    this.transferredItems = const [],
+    this.failedItems = const [],
+    this.errorMessage,
+  });
+
+  bool get isFullSuccess => failedCount == 0 && transferredCount > 0;
+  bool get isPartialSuccess => transferredCount > 0 && failedCount > 0;
+  bool get isFailure => transferredCount == 0;
+}
+
 /// Central database service for managing the user's Grocery Shopping List.
 ///
 /// Features:
@@ -94,18 +117,31 @@ class GroceryService {
   List<GroceryItem> get pendingItems =>
       _groceryItemsNotifier.value.where((item) => !item.isPurchased).toList();
 
-  /// All completed/purchased items.
+  /// Completed items that have not yet been transferred into the fridge (eligible for transfer).
   List<GroceryItem> get completedItems =>
+      _groceryItemsNotifier.value.where((item) => item.isPurchased && !item.isTransferred).toList();
+
+  /// All completed items preserving shopping completion history.
+  List<GroceryItem> get allCompletedItems =>
       _groceryItemsNotifier.value.where((item) => item.isPurchased).toList();
+
+  /// Items that have already been transferred into the fridge.
+  List<GroceryItem> get transferredItems =>
+      _groceryItemsNotifier.value.where((item) => item.isTransferred).toList();
+
+  /// Items currently eligible to be transferred to fridge inventory.
+  List<GroceryItem> get eligibleForTransfer => completedItems;
 
   int get pendingCount => pendingItems.length;
   int get completedCount => completedItems.length;
+  int get allCompletedCount => allCompletedItems.length;
+  int get eligibleTransferCount => eligibleForTransfer.length;
   int get totalCount => _groceryItemsNotifier.value.length;
 
-  /// Overall completion progress between 0.0 and 1.0.
+  /// Overall completion progress between 0.0 and 1.0 based on total shopping completion.
   double get progress {
     if (totalCount == 0) return 0.0;
-    return (completedCount / totalCount).clamp(0.0, 1.0);
+    return (allCompletedItems.length / totalCount).clamp(0.0, 1.0);
   }
 
   bool _initialized = false;
@@ -116,6 +152,9 @@ class GroceryService {
   bool simulateNetworkError = false;
 
   @visibleForTesting
+  bool simulateFridgeInventoryError = false;
+
+  @visibleForTesting
   Map<String, List<Map<String, dynamic>>>? mockSupabaseTable;
 
   @visibleForTesting
@@ -124,6 +163,7 @@ class GroceryService {
   @visibleForTesting
   void resetTestingState() {
     simulateNetworkError = false;
+    simulateFridgeInventoryError = false;
     mockSupabaseTable = null;
     testUserIdOverride = null;
     _inMemoryStore.clear();
@@ -621,13 +661,16 @@ class GroceryService {
     return success ? completed.length : 0;
   }
 
-  /// Transfers selected purchased items to the user's active Fridge Inventory.
+  /// Transfers eligible purchased items to the user's active Fridge Inventory.
   ///
   /// Safe transfer rules:
   /// - Concurrency guard prevents duplicate simultaneous button taps.
-  /// - Only removes or marks transferred in the grocery list AFTER confirmed inventory persistence.
-  /// - If inventory addition fails, grocery items are safely preserved.
-  Future<int> addPurchasedItemsToFridge({
+  /// - Only un-transferred purchased items are eligible; pending items are NEVER transferred.
+  /// - Idempotent transfer strategy tied to item IDs.
+  /// - If inventory addition fails, grocery items remain un-transferred for safe retry.
+  /// - Successfully transferred items are marked with isTransferred: true and linked to the created inventory record.
+  /// - Preserves shopping completion history and updates fridge inventory.
+  Future<GroceryTransferResult> transferPurchasedToFridge({
     List<GroceryItem>? itemsToTransfer,
     int? defaultExpiryDays,
     DateTime? customExpiryDate,
@@ -635,34 +678,61 @@ class GroceryService {
   }) async {
     if (_isTransferringToFridge) {
       debugPrint('[GroceryService] Transfer already in progress; skipping duplicate call.');
-      return 0;
+      return const GroceryTransferResult(
+        totalRequested: 0,
+        transferredCount: 0,
+        failedCount: 0,
+        errorMessage: 'Transfer already in progress.',
+      );
     }
 
     final targetUserId = userId ?? effectiveUserId;
-    final candidates = itemsToTransfer ?? completedItems;
-    if (candidates.isEmpty) return 0;
+    final candidates = (itemsToTransfer ?? eligibleForTransfer)
+        .where((it) => it.isPurchased && !it.isTransferred)
+        .toList();
+
+    if (candidates.isEmpty) {
+      return const GroceryTransferResult(
+        totalRequested: 0,
+        transferredCount: 0,
+        failedCount: 0,
+      );
+    }
 
     _isTransferringToFridge = true;
-    final List<String> successfullyAddedIds = [];
+    final List<GroceryItem> successfullyTransferred = [];
+    final List<GroceryItem> failedTransfers = [];
 
     try {
       final now = DateTime.now();
-      final effectiveExpiry = customExpiryDate ??
-          (defaultExpiryDays != null
-              ? DateTime(now.year, now.month, now.day).add(Duration(days: defaultExpiryDays))
-              : null);
 
       for (final item in candidates) {
+        // Idempotency: verify item has not already been transferred
+        if (item.isTransferred) continue;
+
         try {
+          if (simulateFridgeInventoryError) {
+            throw StateError('Simulated fridge inventory error');
+          }
+
           final fridgeCategory = GroceryCategoryResolver.mapToFridgeCategory(
             item.category,
             item.name,
           );
 
+          // Preserve item's existing expiryDate if available, or custom date, or default preset
+          final effectiveExpiry = item.expiryDate ??
+              customExpiryDate ??
+              (defaultExpiryDays != null && defaultExpiryDays > 0
+                  ? DateTime(now.year, now.month, now.day).add(Duration(days: defaultExpiryDays))
+                  : null);
+
+          String? createdInventoryId;
+
           if (FridgeCategoryRepository.forceInMemoryForTesting) {
-            // In-memory testing path
+            createdInventoryId = 'fridge_transferred_${DateTime.now().microsecondsSinceEpoch}_${_idCounter++}';
             final categoryItem = CategoryFoodItem(
-              id: 'fridge_transferred_${DateTime.now().microsecondsSinceEpoch}',
+              id: createdInventoryId,
               name: item.name,
               quantity: item.displayQuantity,
               category: fridgeCategory,
@@ -670,10 +740,22 @@ class GroceryService {
               expiryDays: defaultExpiryDays,
             );
             await FridgeCategoryRepository.addItemToCategory(fridgeCategory, categoryItem);
-            successfullyAddedIds.add(item.id);
+          } else if (mockSupabaseTable != null && targetUserId != 'local_user') {
+            if (simulateNetworkError) throw StateError('Simulated network error');
+            createdInventoryId = 'inv_${DateTime.now().microsecondsSinceEpoch}_${_idCounter++}';
+            final fridgeTable = mockSupabaseTable!['fridge_items'] ??= [];
+            fridgeTable.add({
+              'id': createdInventoryId,
+              'user_id': targetUserId,
+              'name': item.name,
+              'category': fridgeCategory,
+              'quantity': item.quantity,
+              'unit': item.unit,
+              'expiry_date': effectiveExpiry != null ? FridgeInventoryRepository.formatDate(effectiveExpiry) : null,
+              'created_at': now.toIso8601String(),
+            });
           } else {
-            // Production Supabase path
-            await FridgeInventoryRepository.instance.insertItem(
+            final inserted = await FridgeInventoryRepository.instance.insertItem(
               name: item.name,
               category: fridgeCategory,
               quantity: item.quantity,
@@ -682,24 +764,65 @@ class GroceryService {
               expiryDays: defaultExpiryDays,
               userId: targetUserId != 'local_user' ? targetUserId : null,
             );
-            successfullyAddedIds.add(item.id);
+            createdInventoryId = inserted.id;
+          }
+
+          // Mark item as transferred in grocery list with reference to created inventory record
+          final updated = item.copyWith(
+            isTransferred: true,
+            transferredAt: now,
+            inventoryItemId: createdInventoryId,
+            expiryDate: effectiveExpiry,
+          );
+          final updatedSuccess = await updateItem(updated, userId: targetUserId);
+          if (updatedSuccess) {
+            successfullyTransferred.add(updated);
+          } else {
+            failedTransfers.add(item);
           }
         } catch (itemErr) {
           debugPrint('[GroceryService] Failed to add ${item.name} to fridge: $itemErr');
+          failedTransfers.add(item);
         }
       }
 
-      // Remove only successfully transferred items from the grocery list
-      if (successfullyAddedIds.isNotEmpty) {
-        for (final id in successfullyAddedIds) {
-          await deleteItem(id, userId: targetUserId);
+      // Refresh Fridge inventory from Supabase if not in-memory testing
+      if (!FridgeCategoryRepository.forceInMemoryForTesting &&
+          targetUserId != 'local_user' &&
+          mockSupabaseTable == null) {
+        try {
+          await FridgeCategoryRepository.loadFromSupabase(userId: targetUserId, force: true);
+        } catch (refreshErr) {
+          debugPrint('[GroceryService] Error refreshing fridge repository: $refreshErr');
         }
       }
 
-      return successfullyAddedIds.length;
+      return GroceryTransferResult(
+        totalRequested: candidates.length,
+        transferredCount: successfullyTransferred.length,
+        failedCount: failedTransfers.length,
+        transferredItems: successfullyTransferred,
+        failedItems: failedTransfers,
+      );
     } finally {
       _isTransferringToFridge = false;
     }
+  }
+
+  /// Backward-compatible alias returning transferred count as int.
+  Future<int> addPurchasedItemsToFridge({
+    List<GroceryItem>? itemsToTransfer,
+    int? defaultExpiryDays,
+    DateTime? customExpiryDate,
+    String? userId,
+  }) async {
+    final result = await transferPurchasedToFridge(
+      itemsToTransfer: itemsToTransfer,
+      defaultExpiryDays: defaultExpiryDays,
+      customExpiryDate: customExpiryDate,
+      userId: userId,
+    );
+    return result.transferredCount;
   }
 
   Future<List<GroceryItem>> _loadFromLocalStorage(String userId) async {
