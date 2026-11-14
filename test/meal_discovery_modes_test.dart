@@ -698,8 +698,8 @@ void main() {
       expect(find.text('Spinach & Herb Omelette'), findsOneWidget);
       // Badge displays "YOUR INGREDIENTS"
       expect(find.text('YOUR INGREDIENTS'), findsOneWidget);
-      // Custom action label
-      expect(find.text('Generated from your ingredients'), findsOneWidget);
+      // "Generated from your ingredients" removed from custom meal card
+      expect(find.text('Generated from your ingredients'), findsNothing);
       expect(find.text('Tap to view recipe'), findsOneWidget);
       // "Change suggestion" (AI Suggestion button) must NOT be present
       expect(find.byKey(const ValueKey('change_suggestion_button')), findsNothing);

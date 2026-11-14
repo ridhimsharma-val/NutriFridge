@@ -913,29 +913,10 @@ class RecommendationCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   if (isCustom)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.soup_kitchen_rounded,
-                              size: 14,
-                              color: Color(0xFFC85A32),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Generated from your ingredients',
-                              style: AppTypography.subtitle.copyWith(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFFC85A32),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Text(
+                        Text(
                           'Tap to view recipe',
                           style: TextStyle(
                             fontSize: 12,
