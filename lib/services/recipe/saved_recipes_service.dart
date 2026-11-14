@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/supabase/supabase_client.dart';
 import '../../models/nutrition_data.dart';
 import '../auth/auth_service.dart';
 
@@ -256,6 +258,65 @@ class SavedRecipesService {
       mealType: (row['meal_type'] ?? '').toString(),
       tag: (row['meal_type'] ?? 'SAVED').toString(),
     );
+  }
+
+  /// Safely synchronizes recipes saved locally under 'local_user' to the authenticated Supabase user.
+  ///
+  /// Safe migration rules:
+  /// - Only removes local items after confirmed persistence to Supabase.
+  /// - Partial uploads keep un-synced items locally for retry on next session.
+  /// - Idempotent upserts prevent duplicate database rows.
+  Future<int> syncLocalRecipesToSupabase({
+    String? targetUserId,
+    SupabaseClient? customClient,
+  }) async {
+    final effectiveTarget = targetUserId ?? effectiveUserId;
+    if (effectiveTarget == 'local_user') {
+      return 0; // Not authenticated yet
+    }
+
+    final localRecipes = await getSavedRecipesForUser('local_user');
+    if (localRecipes.isEmpty) return 0;
+
+    SupabaseClient? client = customClient;
+    if (client == null) {
+      try {
+        client = SupabaseManager.client;
+      } catch (_) {
+        return 0;
+      }
+    }
+
+    final List<String> successfullySyncedIds = [];
+
+    for (final recipe in localRecipes) {
+      try {
+        final row = toSupabaseRow(recipe, effectiveTarget);
+        await client.from('saved_recipes').upsert(
+          row,
+          onConflict: 'user_id,recipe_identifier',
+          ignoreDuplicates: true,
+        );
+        successfullySyncedIds.add(recipe.id.isNotEmpty ? recipe.id : recipe.title);
+      } catch (e) {
+        debugPrint('[SavedRecipesService] Sync failed for recipe ${recipe.title}: $e');
+      }
+    }
+
+    // Only remove successfully synced recipes from local_user storage
+    if (successfullySyncedIds.isNotEmpty) {
+      final remainingLocal = localRecipes.where((r) {
+        final key = r.id.isNotEmpty ? r.id : r.title;
+        return !successfullySyncedIds.contains(key);
+      }).toList();
+
+      await _persistToStorage('local_user', remainingLocal);
+
+      // Reload current user recipes including newly synced ones
+      await loadSavedRecipes(userId: effectiveTarget);
+    }
+
+    return successfullySyncedIds.length;
   }
 
   Future<bool> _persistToStorage(String userId, List<RecipeRecommendation> list) async {

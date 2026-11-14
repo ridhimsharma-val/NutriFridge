@@ -358,5 +358,21 @@ void main() {
       expect(row1['title'].toString().trim().toLowerCase(), row2['title'].toString().trim().toLowerCase());
       expect(row1['user_id'], row2['user_id']);
     });
+
+    // 17. Safe migration of local recipes into Supabase
+    test('17. Local recipe migration strategy safely preserves local data until verified upload', () async {
+      final service = SavedRecipesService.instance;
+      // Seed recipe in local_user store
+      await service.saveRecipe(testRecipe, userId: 'local_user');
+      final localBefore = await service.getSavedRecipesForUser('local_user');
+      expect(localBefore.length, 1);
+
+      // Attempt sync while unauthenticated: must safely return 0 without losing local items
+      final unauthCount = await service.syncLocalRecipesToSupabase(targetUserId: 'local_user');
+      expect(unauthCount, 0);
+      final localAfterUnauth = await service.getSavedRecipesForUser('local_user');
+      expect(localAfterUnauth.length, 1);
+      expect(localAfterUnauth.first.title, 'Spinach Paneer Scramble');
+    });
   });
 }
