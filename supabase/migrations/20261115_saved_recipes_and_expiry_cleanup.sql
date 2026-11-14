@@ -234,16 +234,17 @@ BEGIN
         SELECT 1 FROM pg_extension WHERE extname = 'pg_cron'
     ) THEN
         -- Remove existing schedule if already registered to prevent duplicates
-        PERFORM cron.unschedule('nutrifridge-hourly-expiry-cleanup')
-        WHERE EXISTS (
+        IF EXISTS (
             SELECT 1 FROM cron.job WHERE jobname = 'nutrifridge-hourly-expiry-cleanup'
-        );
+        ) THEN
+            PERFORM cron.unschedule('nutrifridge-hourly-expiry-cleanup');
+        END IF;
 
         -- Schedule hourly cleanup at the top of every hour
         PERFORM cron.schedule(
             'nutrifridge-hourly-expiry-cleanup',
             '0 * * * *',
-            $$SELECT public.cleanup_expired_fridge_items();$$
+            'SELECT public.cleanup_expired_fridge_items();'
         );
     END IF;
 EXCEPTION WHEN OTHERS THEN
