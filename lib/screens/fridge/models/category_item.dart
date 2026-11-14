@@ -52,6 +52,17 @@ class CategoryFoodItem {
     return null;
   }
 
+  /// Calculates effective days remaining relative to a specific local date reference.
+  int? calculateEffectiveDays([DateTime? localNow]) {
+    if (expiryDate != null) {
+      final now = localNow ?? DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final target = DateTime(expiryDate!.year, expiryDate!.month, expiryDate!.day);
+      return target.difference(today).inDays;
+    }
+    return _expiryDays;
+  }
+
   bool get isExpired => expiryDays != null && expiryDays! < 0;
   bool get isExpiringSoon => expiryDays != null && expiryDays! >= 0 && expiryDays! <= 3;
   bool get isFresh => expiryDays != null && expiryDays! > 3;
@@ -570,9 +581,20 @@ class FridgeCategoryRepository {
       }
 
       final newStore = _buildInitialStore();
+      bool foundExpired = false;
       for (final item in items) {
+        if (item.isExpired) {
+          foundExpired = true;
+          continue;
+        }
         final cat = _canonicalizeCategory(item.category ?? 'Others');
         newStore.putIfAbsent(cat, () => []).add(item);
+      }
+
+      if (foundExpired) {
+        FridgeInventoryRepository.instance
+            .deleteExpiredItems(userId: effectiveUserId)
+            .catchError((_) => 0);
       }
 
       _categoryStore = newStore;
@@ -1471,6 +1493,35 @@ class FridgeCategoryRepository {
       l.removeWhere((it) => it.id == itemId);
     }
     _notify();
+  }
+
+  /// Purges expired items from active inventory memory (e.g. following database cleanup or local refresh).
+  ///
+  /// Criteria:
+  /// - Only removes items where [CategoryFoodItem.isExpired] is true (effective expiry < 0 relative to localNow/today).
+  /// - Items expiring today (0 days), upcoming (1-3 days), fresh (> 3 days), or unknown (null) are strictly retained.
+  /// - Supports multiple batches: deletes only the expired batch while preserving unexpired batches of the same food.
+  /// - Updates listeners via [_notify()] if any item was removed.
+  static int purgeExpiredItems([DateTime? localNow]) {
+    int purgedCount = 0;
+    for (final list in _categoryStore.values) {
+      final beforeLen = list.length;
+      list.removeWhere((item) {
+        final days = item.calculateEffectiveDays(localNow);
+        return days != null && days < 0;
+      });
+      purgedCount += (beforeLen - list.length);
+    }
+    if (purgedCount > 0) {
+      _notify();
+    }
+    return purgedCount;
+  }
+
+  /// Returns unmodifiable list of items for a specific category.
+  static List<CategoryFoodItem> getItemsForCategory(String categoryName) {
+    final canonicalName = _canonicalizeCategory(categoryName);
+    return List.unmodifiable(_categoryStore[canonicalName] ?? []);
   }
 
   /// Remove an item by its name (exact/plural match first, then substring) across all categories

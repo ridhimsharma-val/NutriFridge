@@ -93,10 +93,10 @@ class DashboardHeader extends StatelessWidget {
                       MaterialPageRoute(builder: (_) => const SavedRecipesScreen()),
                     );
                   },
-                  borderRadius: BorderRadius.circular(22),
+                  borderRadius: BorderRadius.circular(20),
                   child: Container(
-                    width: 44,
-                    height: 44,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: AppColors.cardWhite,
                       shape: BoxShape.circle,
@@ -109,24 +109,24 @@ class DashboardHeader extends StatelessWidget {
                     child: const Center(
                       child: Icon(
                         Icons.bookmark_outline_rounded,
-                        size: 21,
+                        size: 20,
                         color: AppColors.primaryForest,
                       ),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
 
               // Notification Bell in a soft rounded circular container
               Material(
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: onNotificationTap,
-                  borderRadius: BorderRadius.circular(22),
+                  borderRadius: BorderRadius.circular(20),
                   child: Container(
-                    width: 44,
-                    height: 44,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: AppColors.cardWhite,
                       shape: BoxShape.circle,
@@ -141,17 +141,17 @@ class DashboardHeader extends StatelessWidget {
                       children: [
                         const Icon(
                           Icons.notifications_outlined,
-                          size: 22,
+                          size: 21,
                           color: AppColors.primaryForest,
                         ),
                         // Small subtle notification badge dot (visible when unread notifications exist)
                         if (hasUnread)
                           Positioned(
-                            top: 9,
-                            right: 10,
+                            top: 8,
+                            right: 9,
                             child: Container(
-                              width: 9,
-                              height: 9,
+                              width: 8,
+                              height: 8,
                               decoration: BoxDecoration(
                                 color: AppColors.peachPrimary,
                                 shape: BoxShape.circle,

@@ -267,6 +267,33 @@ class FridgeInventoryRepository {
         .eq('user_id', effectiveUserId);
   }
 
+  /// Deletes all expired inventory items belonging to the authenticated user from `public.fridge_items`.
+  ///
+  /// Criteria:
+  /// - Only items where `expiry_date < local_today_date` are deleted.
+  /// - Items expiring today, in the future, or with missing expiry are safely preserved.
+  /// - Respects user boundaries and multi-batch inventory records.
+  Future<int> deleteExpiredItems({String? userId, DateTime? localNow}) async {
+    final effectiveUserId = userId ?? _currentUserId;
+    if (effectiveUserId == null) {
+      throw StateError('Cannot delete expired inventory: User is not authenticated.');
+    }
+
+    final today = localNow ?? DateTime.now();
+    final todayDateStr = formatDate(today);
+    if (todayDateStr == null) return 0;
+
+    final response = await _client
+        .from('fridge_items')
+        .delete()
+        .eq('user_id', effectiveUserId)
+        .lt('expiry_date', todayDateStr)
+        .select('id');
+
+    final List<dynamic> deleted = response as List<dynamic>;
+    return deleted.length;
+  }
+
   /// Maps a PostgreSQL database row map into [CategoryFoodItem].
   static CategoryFoodItem mapRowToItem(Map<String, dynamic> row) {
     final id = row['id']?.toString() ?? '';
