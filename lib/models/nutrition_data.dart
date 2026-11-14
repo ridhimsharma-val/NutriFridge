@@ -286,8 +286,9 @@ class RecipeRecommendation {
     int availableCount =
         (json['availableIngredientCount'] as num? ?? json['fridgeItemsUsed'] as num? ?? 0).toInt();
 
-    if (json['ingredients'] is List) {
-      for (final item in json['ingredients'] as List) {
+    final rawIngredients = json['ingredients'] ?? json['requiredIngredients'];
+    if (rawIngredients is List) {
+      for (final item in rawIngredients) {
         if (item is Map) {
           final name = (item['name'] ?? '').toString().trim();
           final rawQty = item['quantity'] ?? item['amount'];
@@ -405,7 +406,9 @@ class RecipeRecommendation {
       prepTimeMinutes: prepTime,
       fridgeItemsUsed: availableCount > 0 ? availableCount : requiredIngs.length,
       mealType: mealType.isNotEmpty ? mealType.toUpperCase() : '',
-      tag: mealType.isNotEmpty ? mealType.toUpperCase() : 'Picked for your fridge',
+      tag: (json['tag'] != null && json['tag'].toString().trim().isNotEmpty)
+          ? json['tag'].toString().trim()
+          : (mealType.isNotEmpty ? mealType.toUpperCase() : 'Picked for your fridge'),
       imageUrl: imageUrl,
       imageKey: imageKey,
       nutritionIsEstimate: json['nutritionIsEstimate'] as bool? ?? true,
@@ -459,15 +462,22 @@ class RecipeRecommendation {
     return {
       'id': id,
       'name': title,
+      'title': title,
       'mealType': mealType,
+      'tag': tag,
       'imageUrl': imageUrl,
       'imageKey': imageKey,
       'calories': calories,
       'proteinG': proteinGrams,
+      'proteinGrams': proteinGrams,
       'carbsG': carbsGrams,
+      'carbsGrams': carbsGrams,
       'fatG': fatGrams,
+      'fatGrams': fatGrams,
       'preparationTimeMinutes': prepTimeMinutes,
+      'prepTimeMinutes': prepTimeMinutes,
       'fridgeItemsUsed': fridgeItemsUsed,
+      'ingredients': requiredIngredients,
       'requiredIngredients': requiredIngredients,
       'missingIngredients': missingIngredients,
       'matchReasons': matchReasons,

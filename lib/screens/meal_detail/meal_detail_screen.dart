@@ -20,6 +20,7 @@ import '../../services/chillu/chillu_sound_controller.dart';
 import '../log_meal/models/cinematic_meal_data.dart';
 import '../log_meal/widgets/cinematic_meal_logging_reveal_screen.dart';
 import '../guided_cooking/screens/guided_cooking_screen.dart';
+import '../saved_recipes/widgets/recipe_save_button.dart';
 
 /// Comprehensive, Data-Driven Recipe Experience — Meal Detail Page.
 /// Features authentic food photography, per-serving nutrition with transparent provenance,
@@ -413,71 +414,84 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
           ),
         ),
 
-        // Duration badge on hero (symmetrical to back button)
-        if (meal.totalTimeMinutes != null && meal.totalTimeMinutes! > 0)
-          Positioned(
-            top: topPadding > 0 ? topPadding + 8 : 20,
-            right: 18,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.42),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.timer_outlined,
-                    color: Colors.white,
-                    size: 14,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${meal.totalTimeMinutes} min',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-        // Change Recipe Photo Button
+        // Top Right Controls: Photo selector, Duration badge & Heart Save Button
         Positioned(
           top: topPadding > 0 ? topPadding + 8 : 20,
-          right: (meal.totalTimeMinutes != null && meal.totalTimeMinutes! > 0) ? 104 : 18,
-          child: GestureDetector(
-            onTap: _handleChangeRecipePhoto,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.42),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.photo_library_outlined,
-                    color: Colors.white,
-                    size: 14,
+          right: 18,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Change Recipe Photo Button
+              GestureDetector(
+                onTap: _handleChangeRecipePhoto,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.42),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  SizedBox(width: 4),
-                  Text(
-                    'Photo',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.photo_library_outlined,
+                        color: Colors.white,
+                        size: 14,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'Photo',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+
+              // Duration badge on hero
+              if (meal.totalTimeMinutes != null && meal.totalTimeMinutes! > 0) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.42),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.timer_outlined,
+                        color: Colors.white,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${meal.totalTimeMinutes} min',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+
+              // Symmetrical Heart Save / Favourite Button
+              RecipeSaveButton(
+                recipe: widget.recommendation,
+                size: 20,
+                padding: const EdgeInsets.all(9),
+                backgroundColor: Colors.white.withValues(alpha: 0.95),
+              ),
+            ],
           ),
         ),
 

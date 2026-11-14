@@ -6,6 +6,7 @@ import '../../../services/food_image/food_image_model.dart';
 import '../../food_image/widgets/food_image_view.dart';
 import '../../fridge/models/category_item.dart';
 import '../services/meal_recommendation_service.dart';
+import '../../saved_recipes/widgets/recipe_save_button.dart';
 
 class RecommendationCard extends StatelessWidget {
   final RecipeRecommendation? recommendation;
@@ -741,30 +742,44 @@ class RecommendationCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Total cooking/prep duration badge if available
-                if (recommendation.totalTimeMinutes != null && recommendation.totalTimeMinutes! > 0)
-                  Positioned(
-                    top: 12,
-                    right: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.42),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '${recommendation.totalTimeMinutes} min',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
+                // Top Right: Duration badge & Heart Save Button
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (recommendation.totalTimeMinutes != null &&
+                          recommendation.totalTimeMinutes! > 0) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.42),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${recommendation.totalTimeMinutes} min',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
+                        const SizedBox(width: 6),
+                      ],
+                      RecipeSaveButton(
+                        recipe: recommendation,
+                        size: 18,
+                        padding: const EdgeInsets.all(7),
+                        backgroundColor: Colors.white.withValues(alpha: 0.92),
                       ),
-                    ),
+                    ],
                   ),
+                ),
               ],
             ),
 

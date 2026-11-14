@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'core/supabase/supabase_client.dart';
 import 'core/theme/app_colors.dart';
 import 'screens/splash/magic_fridge_splash.dart';
+import 'services/recipe/saved_recipes_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +19,9 @@ Future<void> main() async {
 
   // Initialize Supabase backend client
   await SupabaseManager.initialize();
+
+  // Initialize Saved Recipes repository
+  await SavedRecipesService.instance.init();
 
   runApp(const NutriFridgeApp());
 }

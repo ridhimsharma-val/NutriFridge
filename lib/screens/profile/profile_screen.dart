@@ -9,6 +9,8 @@ import 'widgets/dietary_restrictions_card.dart';
 import 'widgets/edit_profile_dialog.dart';
 import 'widgets/nutrition_preferences_card.dart';
 import 'widgets/profile_header_card.dart';
+import '../saved_recipes/saved_recipes_screen.dart';
+import '../../services/recipe/saved_recipes_service.dart';
 
 /// Complete, polished, and functional NutriFridge Profile Screen.
 /// Manages user profile, nutrition preferences, dietary restrictions, app toggles, and privacy info.
@@ -102,6 +104,11 @@ class ProfileScreen extends StatelessWidget {
 
                   const SizedBox(height: 18),
 
+                  // 2b. Saved Recipes & Favourites Quick Tile
+                  _buildSavedRecipesTile(context),
+
+                  const SizedBox(height: 18),
+
                   // 3. Nutrition Preferences (Dietary pref, Goal, Calorie target)
                   NutritionPreferencesCard(
                     profile: profile,
@@ -170,6 +177,88 @@ class ProfileScreen extends StatelessWidget {
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSavedRecipesTile(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.pureWhite,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.cardBorder, width: 1),
+        boxShadow: const [AppColors.cardShadow],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: const ValueKey('profile_saved_recipes_tile'),
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SavedRecipesScreen()),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F7F2),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.favorite_rounded,
+                      color: Color(0xFFE53935),
+                      size: 22,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Saved Recipes',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.darkText,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      ValueListenableBuilder<List<RecipeRecommendation>>(
+                        valueListenable: SavedRecipesService.instance.savedRecipesNotifier,
+                        builder: (context, saved, _) {
+                          return Text(
+                            saved.isEmpty
+                                ? 'No favourites saved yet'
+                                : '${saved.length} favourite ${saved.length == 1 ? 'recipe' : 'recipes'}',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: AppColors.mutedText,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: AppColors.mutedText,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
