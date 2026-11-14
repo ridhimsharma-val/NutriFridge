@@ -10,6 +10,7 @@ import 'widgets/cooking_pan_widget.dart';
 import 'widgets/expiring_soon_bottom_sheet.dart';
 import 'widgets/fridge_header.dart';
 import 'widgets/fridge_preferences_sheet.dart';
+import 'widgets/fridge_sticky_note.dart';
 import 'widgets/top_freezer_refrigerator.dart';
 import 'widgets/use_soon_section.dart';
 
@@ -242,14 +243,26 @@ class _FridgePageState extends State<FridgePage> with WidgetsBindingObserver {
                             child: SizedBox(
                               width: 292.0,
                               height: 588.0,
-                              child: TopFreezerRefrigerator(
-                                isFreezerOpen: _isFreezerOpen,
-                                isFridgeOpen: _isFridgeOpen,
-                                onFreezerToggle: _toggleFreezer,
-                                onFridgeToggle: _toggleFridge,
-                                onCategoryTap: _onCategoryTap,
-                                preferences: FridgePreferencesRepository.current,
-                                highlightedCategory: _highlightedCategory,
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  TopFreezerRefrigerator(
+                                    isFreezerOpen: _isFreezerOpen,
+                                    isFridgeOpen: _isFridgeOpen,
+                                    onFreezerToggle: _toggleFreezer,
+                                    onFridgeToggle: _toggleFridge,
+                                    onCategoryTap: _onCategoryTap,
+                                    preferences: FridgePreferencesRepository.current,
+                                    highlightedCategory: _highlightedCategory,
+                                  ),
+                                  // Physical paper sticky note mounted to upper-right refrigerator exterior
+                                  if (!widget.isSelectionMode)
+                                    const Positioned(
+                                      top: 14.0,
+                                      right: 4.0,
+                                      child: FridgeStickyNote(),
+                                    ),
+                                ],
                               ),
                             ),
                           ),

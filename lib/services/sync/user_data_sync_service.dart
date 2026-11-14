@@ -1,6 +1,7 @@
 import '../../models/nutrition_data.dart';
 import '../../screens/fridge/models/category_item.dart';
 import '../../screens/fridge/models/fridge_preferences.dart';
+import '../grocery/grocery_service.dart';
 import '../recipe/saved_recipes_service.dart';
 
 /// Central coordinator to load or clear user-scoped state upon login,
@@ -12,7 +13,7 @@ class UserDataSyncService {
 
   static String? get activeUserId => _activeUserId;
 
-  /// Loads all user-scoped data (inventory, preferences, profile, nutrition goals, saved recipes)
+  /// Loads all user-scoped data (inventory, preferences, profile, nutrition goals, saved recipes, grocery list)
   /// for the authenticated user.
   static Future<void> syncAllUserData(String userId, {bool force = false}) async {
     _activeUserId = userId;
@@ -22,6 +23,7 @@ class UserDataSyncService {
       FridgePreferencesRepository.loadFromSupabase(userId: userId),
       MockDataRepository.loadFromSupabase(userId: userId),
       SavedRecipesService.instance.init(userId: userId, forceReload: force),
+      GroceryService.instance.init(userId: userId, forceReload: force),
     ]);
 
     // Automatically and safely synchronize any recipes bookmarked while offline or prior to auth
@@ -35,6 +37,7 @@ class UserDataSyncService {
     FridgePreferencesRepository.reset();
     MockDataRepository.reset();
     SavedRecipesService.instance.clearForLogout();
+    GroceryService.instance.clearForLogout();
   }
 
   /// Instance forwarding for convenience and compatibility
