@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase/supabase_client.dart';
 import '../../screens/fridge/models/category_item.dart';
@@ -25,6 +26,36 @@ class FridgeInventoryRepository {
 
   String? get _currentUserId => _authService.currentUser?.id;
 
+  bool _isCleaningUp = false;
+  DateTime? _lastCleanupTime;
+  RealtimeChannel? _inventoryChannel;
+
+  @visibleForTesting
+  static int cleanupInvocationCount = 0;
+
+  @visibleForTesting
+  static Future<int> Function(String userId)? mockCleanupHandler;
+
+  @visibleForTesting
+  static Future<List<CategoryFoodItem>> Function(String userId)? mockFetchHandler;
+
+  @visibleForTesting
+  static bool simulateRpcError = false;
+
+  @visibleForTesting
+  static List<String> operationTrace = [];
+
+  @visibleForTesting
+  static void resetTestingState() {
+    cleanupInvocationCount = 0;
+    mockCleanupHandler = null;
+    mockFetchHandler = null;
+    simulateRpcError = false;
+    operationTrace.clear();
+    instance._isCleaningUp = false;
+    instance._lastCleanupTime = null;
+  }
+
   /// Formats DateTime as PostgreSQL DATE string (YYYY-MM-DD).
   static String? formatDate(DateTime? date) {
     if (date == null) return null;
@@ -43,11 +74,103 @@ class FridgeInventoryRepository {
     return DateTime.tryParse(str);
   }
 
+  /// Invokes the server-side PostgreSQL RPC `public.cleanup_my_expired_fridge_items()`.
+  ///
+  /// Criteria & Safety:
+  /// - Concurrency guard prevents duplicate simultaneous RPC requests.
+  /// - Throttles consecutive calls within 5 seconds unless [force] is true.
+  /// - Executes and awaits completion before returning deleted item count.
+  /// - Catches RPC errors and rethrows so callers can handle gracefully without falsely reporting success.
+  Future<int> cleanupMyExpiredItems({String? userId, bool force = false}) async {
+    final effectiveUserId = userId ?? _currentUserId;
+    if (effectiveUserId == null) return 0;
+
+    if (_isCleaningUp) {
+      debugPrint('[FridgeInventoryRepository] Cleanup already in progress; skipping concurrent duplicate.');
+      return 0;
+    }
+
+    final now = DateTime.now();
+    if (!force && _lastCleanupTime != null && now.difference(_lastCleanupTime!).inSeconds < 5) {
+      debugPrint('[FridgeInventoryRepository] Cleanup throttled within 5-second window.');
+      return 0;
+    }
+
+    _isCleaningUp = true;
+    cleanupInvocationCount++;
+    operationTrace.add('cleanup');
+
+    try {
+      if (simulateRpcError) {
+        throw StateError('Simulated RPC error in cleanup_my_expired_fridge_items');
+      }
+
+      if (mockCleanupHandler != null) {
+        final count = await mockCleanupHandler!(effectiveUserId);
+        _lastCleanupTime = DateTime.now();
+        return count;
+      }
+
+      final response = await _client.rpc('cleanup_my_expired_fridge_items');
+      final deletedCount = (response as num?)?.toInt() ?? 0;
+      _lastCleanupTime = DateTime.now();
+      return deletedCount;
+    } catch (e) {
+      debugPrint('[FridgeInventoryRepository] cleanup_my_expired_fridge_items RPC failed: $e');
+      rethrow;
+    } finally {
+      _isCleaningUp = false;
+    }
+  }
+
+  /// Subscribes to Realtime database events on `public.fridge_items`.
+  void subscribeToInventoryChanges({
+    void Function(String eventType, Map<String, dynamic> record)? onEvent,
+  }) {
+    if (_inventoryChannel != null) return;
+    if (!SupabaseManager.isInitialized && _customClient == null) return;
+
+    try {
+      _inventoryChannel = _client.channel('public:fridge_items')
+        ..onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'fridge_items',
+          callback: (payload) {
+            final eventType = payload.eventType.name.toUpperCase();
+            final record = payload.eventType == PostgresChangeEvent.delete
+                ? (payload.oldRecord.isNotEmpty ? payload.oldRecord : payload.newRecord)
+                : payload.newRecord;
+            onEvent?.call(eventType, record);
+          },
+        )
+        ..subscribe();
+    } catch (e) {
+      debugPrint('[FridgeInventoryRepository] Realtime subscription error: $e');
+    }
+  }
+
+  /// Disposes active Realtime inventory channel subscription.
+  void unsubscribeFromInventoryChanges() {
+    if (_inventoryChannel != null) {
+      try {
+        _client.removeChannel(_inventoryChannel!);
+      } catch (_) {}
+      _inventoryChannel = null;
+    }
+  }
+
   /// Fetches all inventory items belonging to the authenticated user.
   Future<List<CategoryFoodItem>> fetchItems({String? userId}) async {
     final effectiveUserId = userId ?? _currentUserId;
     if (effectiveUserId == null) {
       throw StateError('Cannot fetch inventory: User is not authenticated.');
+    }
+
+    operationTrace.add('fetch');
+
+    if (mockFetchHandler != null) {
+      return await mockFetchHandler!(effectiveUserId);
     }
 
     final response = await _client
@@ -265,33 +388,6 @@ class FridgeInventoryRepository {
         .delete()
         .eq('id', id)
         .eq('user_id', effectiveUserId);
-  }
-
-  /// Deletes all expired inventory items belonging to the authenticated user from `public.fridge_items`.
-  ///
-  /// Criteria:
-  /// - Only items where `expiry_date < local_today_date` are deleted.
-  /// - Items expiring today, in the future, or with missing expiry are safely preserved.
-  /// - Respects user boundaries and multi-batch inventory records.
-  Future<int> deleteExpiredItems({String? userId, DateTime? localNow}) async {
-    final effectiveUserId = userId ?? _currentUserId;
-    if (effectiveUserId == null) {
-      throw StateError('Cannot delete expired inventory: User is not authenticated.');
-    }
-
-    final today = localNow ?? DateTime.now();
-    final todayDateStr = formatDate(today);
-    if (todayDateStr == null) return 0;
-
-    final response = await _client
-        .from('fridge_items')
-        .delete()
-        .eq('user_id', effectiveUserId)
-        .lt('expiry_date', todayDateStr)
-        .select('id');
-
-    final List<dynamic> deleted = response as List<dynamic>;
-    return deleted.length;
   }
 
   /// Maps a PostgreSQL database row map into [CategoryFoodItem].

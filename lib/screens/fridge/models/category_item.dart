@@ -552,9 +552,12 @@ class FridgeCategoryRepository {
   static String categoryEmoji(String key) => _categoryEmoji(key);
   static String categoryImage(String key) => _categoryImage(key);
 
+  @visibleForTesting
+  static String? testUserIdOverride;
+
   /// Loads all items from public.fridge_items for the authenticated user.
   static Future<void> loadFromSupabase({String? userId, bool force = false}) async {
-    final effectiveUserId = userId ?? AuthService.instance.currentUser?.id;
+    final effectiveUserId = userId ?? testUserIdOverride ?? AuthService.instance.currentUser?.id;
     if (effectiveUserId == null) {
       isLoading = false;
       return;
@@ -573,28 +576,32 @@ class FridgeCategoryRepository {
     _notify();
 
     try {
+      // 1. Invoke server-side user-scoped cleanup RPC first to guarantee expired items are purged before fetching
+      try {
+        await FridgeInventoryRepository.instance.cleanupMyExpiredItems(
+          userId: effectiveUserId,
+          force: force,
+        );
+      } catch (rpcError) {
+        debugPrint('[FridgeCategoryRepository] Expiry cleanup RPC skipped or failed gracefully: $rpcError');
+      }
+
+      // 2. Fetch updated active inventory
       final items = await FridgeInventoryRepository.instance.fetchItems(userId: effectiveUserId);
-      if (AuthService.instance.currentUser?.id != effectiveUserId) {
+      final currentAuthId = AuthService.instance.currentUser?.id;
+      if (currentAuthId != null && userId == null && currentAuthId != effectiveUserId) {
         // Discard stale response if active user switched during network call
         isLoading = false;
         return;
       }
 
       final newStore = _buildInitialStore();
-      bool foundExpired = false;
       for (final item in items) {
         if (item.isExpired) {
-          foundExpired = true;
           continue;
         }
         final cat = _canonicalizeCategory(item.category ?? 'Others');
         newStore.putIfAbsent(cat, () => []).add(item);
-      }
-
-      if (foundExpired) {
-        FridgeInventoryRepository.instance
-            .deleteExpiredItems(userId: effectiveUserId)
-            .catchError((_) => 0);
       }
 
       _categoryStore = newStore;
@@ -605,7 +612,8 @@ class FridgeCategoryRepository {
       _notify();
     } catch (e) {
       isLoading = false;
-      if (AuthService.instance.currentUser?.id == effectiveUserId) {
+      final currentAuthId = AuthService.instance.currentUser?.id;
+      if (currentAuthId == null || userId != null || currentAuthId == effectiveUserId) {
         loadError = e.toString();
         _notify();
       }
@@ -1466,6 +1474,50 @@ class FridgeCategoryRepository {
         return;
       }
     }
+  }
+
+  /// Starts listening to Supabase Realtime changes on `public.fridge_items`.
+  static void startRealtimeSync() {
+    if (forceInMemoryForTesting) return;
+    FridgeInventoryRepository.instance.subscribeToInventoryChanges(
+      onEvent: (eventType, record) {
+        handleRealtimeEvent(eventType, record);
+      },
+    );
+  }
+
+  /// Stops Realtime subscription.
+  static void stopRealtimeSync() {
+    FridgeInventoryRepository.instance.unsubscribeFromInventoryChanges();
+  }
+
+  /// Handles Realtime inventory change events.
+  static void handleRealtimeEvent(String eventType, Map<String, dynamic> record) {
+    if (eventType.toUpperCase() == 'DELETE') {
+      final id = record['id']?.toString();
+      if (id != null && id.isNotEmpty) {
+        removeItemById(id);
+      }
+    } else if (eventType.toUpperCase() == 'INSERT' || eventType.toUpperCase() == 'UPDATE') {
+      loadFromSupabase(force: true);
+    }
+  }
+
+  /// Removes an inventory item by ID across all categories and notifies listeners.
+  static bool removeItemById(String itemId) {
+    if (itemId.trim().isEmpty) return false;
+    bool removed = false;
+    for (final list in _categoryStore.values) {
+      final beforeLen = list.length;
+      list.removeWhere((it) => it.id == itemId);
+      if (list.length < beforeLen) {
+        removed = true;
+      }
+    }
+    if (removed) {
+      _notify();
+    }
+    return removed;
   }
 
   /// Remove item from repository

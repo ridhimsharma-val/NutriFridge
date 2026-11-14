@@ -25,7 +25,7 @@ class FridgePage extends StatefulWidget {
   State<FridgePage> createState() => _FridgePageState();
 }
 
-class _FridgePageState extends State<FridgePage> {
+class _FridgePageState extends State<FridgePage> with WidgetsBindingObserver {
   final GlobalKey _mainPanKey = GlobalKey();
 
   // Independent door states: Top Freezer and Lower Refrigerator.
@@ -37,20 +37,28 @@ class _FridgePageState extends State<FridgePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _isFreezerOpen = widget.isSelectionMode;
     _isFridgeOpen = widget.isSelectionMode;
     if (widget.isSelectionMode) {
       CookingPanCoordinator.mainPanKey = _mainPanKey;
       CookingPanCoordinator.activeTargetKey = _mainPanKey;
     }
-    if (!FridgeCategoryRepository.isLoadedFromSupabase &&
-        !FridgeCategoryRepository.isLoading) {
-      FridgeCategoryRepository.loadFromSupabase();
+    FridgeCategoryRepository.startRealtimeSync();
+    FridgeCategoryRepository.loadFromSupabase(force: true);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      FridgeCategoryRepository.loadFromSupabase(force: true);
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    FridgeCategoryRepository.stopRealtimeSync();
     if (CookingPanCoordinator.mainPanKey == _mainPanKey) {
       CookingPanCoordinator.mainPanKey = null;
     }
