@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/grocery_item.dart';
 import '../../services/grocery/grocery_service.dart';
+import '../fridge/models/category_item.dart';
 
 /// Full interactive Grocery Shopping List screen.
 ///
@@ -478,7 +479,23 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
                   items: GroceryItem.canonicalCategories.map((c) {
                     return DropdownMenuItem(
                       value: c,
-                      child: Text(c, overflow: TextOverflow.ellipsis),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            FridgeCategoryRepository.categoryEmoji(c),
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              c,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
                     );
                   }).toList(),
                   onChanged: (val) {
@@ -1121,7 +1138,26 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
                   });
                 },
                 itemBuilder: (ctx) => GroceryItem.canonicalCategories.map((c) {
-                  return PopupMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)));
+                  return PopupMenuItem(
+                    value: c,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          FridgeCategoryRepository.categoryEmoji(c),
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            c,
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
                 }).toList(),
                 child: Container(
                   height: 38,
@@ -1135,6 +1171,11 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      Text(
+                        FridgeCategoryRepository.categoryEmoji(_selectedCategory),
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      const SizedBox(width: 4),
                       Flexible(
                         child: Text(
                           _selectedCategory,
@@ -1254,12 +1295,12 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
       }
     }
 
-    // Handle any items with custom category outside canonical
-    final remainingItems = pendingItems
-        .where((it) => !GroceryItem.canonicalCategories.contains(it.category))
-        .toList();
-    if (remainingItems.isNotEmpty) {
-      grouped['Others'] = [...(grouped['Others'] ?? []), ...remainingItems];
+    // Preserve any custom or legacy categories present on pending items
+    for (final it in pendingItems) {
+      if (!GroceryItem.canonicalCategories.contains(it.category)) {
+        final cat = it.category.isNotEmpty ? it.category : 'Others';
+        grouped.putIfAbsent(cat, () => []).add(it);
+      }
     }
 
     final List<Widget> slivers = [];
@@ -1271,6 +1312,11 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
             padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
             child: Row(
               children: [
+                Text(
+                  FridgeCategoryRepository.categoryEmoji(category),
+                  style: const TextStyle(fontSize: 14),
+                ),
+                const SizedBox(width: 6),
                 Text(
                   category,
                   style: const TextStyle(

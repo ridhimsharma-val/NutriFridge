@@ -191,7 +191,7 @@ void main() {
       // Change category
       await tester.tap(find.byKey(const Key('grocery_category_pill')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Beverages').last);
+      await tester.tap(find.text('Drinks & Juices').last);
       await tester.pumpAndSettle();
 
       // Verify quantity is preserved as 750
@@ -219,8 +219,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Category names are displayed
-      expect(find.text('Dairy & Eggs'), findsOneWidget);
-      expect(find.text('Fruits & Vegetables'), findsOneWidget);
+      expect(find.text('Dairy Products'), findsOneWidget);
+      expect(find.text('Fruits'), findsOneWidget);
 
       // Item count badges are displayed
       expect(find.text('1'), findsWidgets);

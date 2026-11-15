@@ -1,3 +1,5 @@
+import '../screens/fridge/models/category_item.dart';
+
 /// Represents an individual item on the user's Grocery Shopping List.
 class GroceryItem {
   final String id;
@@ -30,16 +32,8 @@ class GroceryItem {
     required this.updatedAt,
   });
 
-  /// Canonical grocery category groupings.
-  static const List<String> canonicalCategories = [
-    'Fruits & Vegetables',
-    'Dairy & Eggs',
-    'Bakery',
-    'Meat & Seafood',
-    'Grains & Staples',
-    'Beverages',
-    'Others',
-  ];
+  /// Canonical grocery category groupings (aligned with My Fridge categories).
+  static const List<String> canonicalCategories = FridgeCategoryRepository.canonicalCategories;
 
   /// Common measurement units for grocery items.
   static const List<String> commonUnits = [
@@ -119,7 +113,10 @@ class GroceryItem {
       name: (json['name'] ?? '').toString(),
       quantity: (json['quantity'] as num?)?.toDouble() ?? 1.0,
       unit: (json['unit'] ?? 'pieces').toString(),
-      category: (json['category'] ?? 'Others').toString(),
+      category: GroceryCategoryResolver.normalizeCategory(
+        (json['category'] ?? 'Others').toString(),
+        (json['name'] ?? '').toString(),
+      ),
       isPurchased: json['isPurchased'] == true || json['is_purchased'] == true,
       isTransferred: json['isTransferred'] == true || json['is_transferred'] == true,
       transferredAt: json['transferredAt'] != null
@@ -177,7 +174,10 @@ class GroceryItem {
       name: (row['name'] ?? '').toString(),
       quantity: (row['quantity'] as num?)?.toDouble() ?? 1.0,
       unit: (row['unit'] ?? 'pieces').toString(),
-      category: (row['category'] ?? 'Others').toString(),
+      category: GroceryCategoryResolver.normalizeCategory(
+        (row['category'] ?? 'Others').toString(),
+        (row['name'] ?? '').toString(),
+      ),
       isPurchased: row['is_purchased'] == true,
       isTransferred: row['is_transferred'] == true,
       transferredAt: row['transferred_at'] != null
@@ -197,44 +197,111 @@ class GroceryItem {
   }
 }
 
-/// Automatic category classifier for grocery shopping items.
+/// Automatic category classifier for grocery shopping items aligned with My Fridge categories.
 class GroceryCategoryResolver {
   static const Map<String, List<String>> _keywords = {
-    'Beverages': [
+    'Drinks & Juices': [
+      'orange juice', 'apple juice', 'fruit juice', 'lemon juice',
       'coffee', 'tea', 'juice', 'soda', 'water', 'sparkling water', 'beer',
       'wine', 'smoothie', 'kombucha', 'coke', 'drink', 'beverage', 'lemonade',
-      'espresso', 'latte', 'cider',
+      'espresso', 'latte', 'cider', 'shake', 'cold drink',
     ],
-    'Fruits & Vegetables': [
-      'apple', 'banana', 'spinach', 'tomato', 'potato', 'onion', 'carrot',
-      'garlic', 'ginger', 'lettuce', 'cucumber', 'broccoli', 'pepper', 'capsicum',
-      'lemon', 'lime', 'orange', 'strawberry', 'berry', 'avocado', 'cilantro',
-      'mint', 'coriander', 'basil', 'mushroom', 'cauliflower', 'cabbage', 'peas',
-      'corn', 'mango', 'grape', 'watermelon', 'papaya', 'pineapple', 'brinjal',
+    'Dairy Products': [
+      'milk', 'curd', 'yogurt', 'yoghurt', 'paneer', 'cheese', 'butter', 'cream',
+      'ghee', 'cheddar', 'mozzarella', 'parmesan', 'tofu', 'dairy',
+    ],
+    'Vegetables': [
+      'spinach', 'tomato', 'potato', 'onion', 'carrot', 'garlic', 'ginger', 'lettuce',
+      'cucumber', 'broccoli', 'pepper', 'capsicum', 'cilantro', 'mint', 'coriander',
+      'basil', 'mushroom', 'cauliflower', 'cabbage', 'peas', 'corn', 'brinjal',
       'eggplant', 'zucchini', 'beetroot', 'pumpkin', 'chilli', 'chili', 'beans',
+      'vegetable', 'veggie', 'kale', 'celery', 'radish', 'okra', 'ladyfinger',
     ],
-    'Dairy & Eggs': [
-      'milk', 'curd', 'yogurt', 'yoghurt', 'paneer', 'cheese', 'butter', 'egg',
-      'eggs', 'cream', 'ghee', 'cheddar', 'mozzarella', 'parmesan', 'tofu',
-      'mayo', 'mayonnaise',
+    'Fruits': [
+      'apple', 'banana', 'orange', 'mango', 'grape', 'grapes', 'strawberry', 'strawberries',
+      'watermelon', 'papaya', 'pineapple', 'lemon', 'lime', 'berry', 'berries', 'avocado',
+      'blueberry', 'blueberries', 'raspberry', 'raspberries', 'peach', 'plum', 'pear',
+      'kiwi', 'cherry', 'cherries', 'fruit', 'guava', 'pomegranate', 'melon', 'apricot',
     ],
-    'Bakery': [
+    'Non-Veg': [
+      'chicken', 'fish', 'beef', 'mutton', 'pork', 'shrimp', 'salmon', 'tuna',
+      'bacon', 'turkey', 'lamb', 'prawn', 'prawns', 'meat', 'sausage', 'egg', 'eggs',
+      'crab', 'lobster', 'ham',
+    ],
+    'Meals & Leftovers': [
+      'leftover', 'leftovers', 'curry', 'soup', 'salad', 'sabji', 'stew', 'gravy',
+      'meal', 'pasta bake', 'casserole', 'cooked',
+    ],
+    'Packaged Food': [
       'bread', 'bagel', 'croissant', 'bun', 'buns', 'pita', 'tortilla',
       'muffin', 'toast', 'baguette', 'loaf', 'cake', 'biscuit', 'cookie', 'cookies',
-    ],
-    'Meat & Seafood': [
-      'chicken', 'fish', 'beef', 'mutton', 'pork', 'shrimp', 'salmon',
-      'tuna', 'bacon', 'turkey', 'lamb', 'prawn', 'prawns', 'meat', 'sausage',
-    ],
-    'Grains & Staples': [
       'rice', 'flour', 'atta', 'wheat', 'oats', 'pasta', 'noodle', 'noodles',
       'quinoa', 'lentil', 'lentils', 'dal', 'chickpea', 'chickpeas', 'oil',
       'olive oil', 'salt', 'sugar', 'spice', 'spices', 'turmeric', 'cumin',
-      'pepper', 'cereal',
+      'cereal', 'chip', 'chips', 'snack', 'canned', 'sauce', 'ketchup', 'mayo', 'mayonnaise',
+      'jam', 'peanut butter', 'honey', 'vinegar',
+    ],
+    'Ice Cream': [
+      'ice cream', 'icecream', 'gelato', 'sorbet', 'popsicle', 'sundae',
+    ],
+    'Frozen Food': [
+      'frozen', 'frozen peas', 'frozen corn', 'frozen fries', 'nuggets',
+    ],
+    'Dry Fruits': [
+      'almond', 'almonds', 'cashew', 'cashews', 'walnut', 'walnuts', 'raisin', 'raisins',
+      'pistachio', 'pistachios', 'dates', 'dry fruit', 'nuts', 'peanut', 'peanuts',
     ],
   };
 
-  /// Resolves the canonical category based on item name keywords.
+  /// Normalizes any category string (including legacy ones) to canonical Fridge categories.
+  static String normalizeCategory(String category, [String itemName = '']) {
+    final trimmed = category.trim();
+    if (trimmed.isEmpty) return 'Others';
+
+    // Direct match with canonical categories
+    for (final canonical in FridgeCategoryRepository.canonicalCategories) {
+      if (canonical.toLowerCase() == trimmed.toLowerCase()) {
+        return canonical;
+      }
+    }
+
+    final lowerName = itemName.toLowerCase();
+    final lowerCat = trimmed.toLowerCase();
+
+    // Legacy Grocery List category migration
+    if (lowerCat.contains('fruit') && lowerCat.contains('veg')) {
+      const fruits = [
+        'apple', 'banana', 'orange', 'mango', 'grape', 'strawberry', 'strawberries',
+        'watermelon', 'papaya', 'pineapple', 'lemon', 'lime', 'berry', 'berries',
+        'avocado', 'blueberry', 'blueberries', 'raspberry', 'raspberries', 'peach',
+        'plum', 'pear', 'kiwi', 'cherry', 'cherries', 'guava', 'melon'
+      ];
+      for (final f in fruits) {
+        if (lowerName.contains(f)) return 'Fruits';
+      }
+      return 'Vegetables';
+    }
+
+    if (lowerCat.contains('dairy') && lowerCat.contains('egg')) {
+      return 'Dairy Products';
+    }
+
+    if (lowerCat.contains('meat') || lowerCat.contains('seafood')) {
+      return 'Non-Veg';
+    }
+
+    if (lowerCat.contains('beverage') || lowerCat.contains('drink') || lowerCat.contains('juice')) {
+      return 'Drinks & Juices';
+    }
+
+    if (lowerCat.contains('bakery') || lowerCat.contains('grain') || lowerCat.contains('staple')) {
+      return 'Packaged Food';
+    }
+
+    return FridgeCategoryRepository.canonicalizeCategory(trimmed);
+  }
+
+  /// Resolves the canonical category based on item name keywords using word-boundary matching.
   /// Defaults cleanly to 'Others' if uncertain.
   static String resolveCategory(String itemName) {
     final lower = itemName.trim().toLowerCase();
@@ -242,7 +309,8 @@ class GroceryCategoryResolver {
 
     for (final entry in _keywords.entries) {
       for (final keyword in entry.value) {
-        if (lower.contains(keyword) || keyword.contains(lower)) {
+        final regex = RegExp(r'\b' + RegExp.escape(keyword) + r'\b');
+        if (regex.hasMatch(lower)) {
           return entry.key;
         }
       }
@@ -252,29 +320,6 @@ class GroceryCategoryResolver {
 
   /// Maps a grocery category to the corresponding Fridge category in `FridgeCategoryRepository`.
   static String mapToFridgeCategory(String groceryCategory, String itemName) {
-    final lowerName = itemName.toLowerCase();
-    switch (groceryCategory) {
-      case 'Fruits & Vegetables':
-        const fruits = [
-          'apple', 'banana', 'orange', 'mango', 'grape', 'strawberry', 'strawberries',
-          'watermelon', 'papaya', 'pineapple', 'lemon', 'lime', 'berry', 'berries',
-          'avocado', 'blueberry', 'blueberries', 'raspberry', 'raspberries', 'peach', 'plum', 'pear', 'kiwi', 'cherry', 'cherries'
-        ];
-        for (final f in fruits) {
-          if (lowerName.contains(f)) return 'Fruits';
-        }
-        return 'Vegetables';
-      case 'Dairy & Eggs':
-        return 'Dairy Products';
-      case 'Meat & Seafood':
-        return 'Non-Veg';
-      case 'Beverages':
-        return 'Drinks & Juices';
-      case 'Bakery':
-      case 'Grains & Staples':
-        return 'Packaged Food';
-      default:
-        return 'Others';
-    }
+    return normalizeCategory(groceryCategory, itemName);
   }
 }
