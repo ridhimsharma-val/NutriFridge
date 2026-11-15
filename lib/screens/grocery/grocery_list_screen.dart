@@ -124,6 +124,11 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
   }
 
   Future<void> _handleTogglePurchased(String itemId) async {
+    final item = GroceryService.instance.currentItems.cast<GroceryItem?>().firstWhere(
+      (it) => it?.id == itemId,
+      orElse: () => null,
+    );
+    if (item != null && item.isTransferred) return;
     if (_togglingIds.contains(itemId)) return;
     _togglingIds.add(itemId);
 
@@ -315,6 +320,7 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
   }
 
   void _showEditItemSheet(GroceryItem item) {
+    if (item.isTransferred) return;
     final editNameController = TextEditingController(text: item.name);
     final editQtyController = TextEditingController(
       text: item.quantity % 1 == 0 ? item.quantity.toInt().toString() : item.quantity.toStringAsFixed(1),
@@ -434,13 +440,17 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
                       flex: 3,
                       child: DropdownButtonFormField<String>(
                         initialValue: editUnit,
+                        isExpanded: true,
                         decoration: InputDecoration(
                           labelText: 'Unit',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                         ),
                         items: GroceryItem.commonUnits.map((u) {
-                          return DropdownMenuItem(value: u, child: Text(u));
+                          return DropdownMenuItem(
+                            value: u,
+                            child: Text(u, overflow: TextOverflow.ellipsis),
+                          );
                         }).toList(),
                         onChanged: (val) {
                           if (val != null) setModalState(() => editUnit = val);
@@ -452,13 +462,17 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
                   initialValue: editCat,
+                  isExpanded: true,
                   decoration: InputDecoration(
                     labelText: 'Category',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                   items: GroceryItem.canonicalCategories.map((c) {
-                    return DropdownMenuItem(value: c, child: Text(c));
+                    return DropdownMenuItem(
+                      value: c,
+                      child: Text(c, overflow: TextOverflow.ellipsis),
+                    );
                   }).toList(),
                   onChanged: (val) {
                     if (val != null) setModalState(() => editCat = val);
@@ -1006,7 +1020,7 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
           // Row 2: Quantity Stepper, Unit Selector, Category Pill, and Add Button
           LayoutBuilder(
             builder: (context, constraints) {
-              final isCompact = constraints.maxWidth < 360;
+              final isCompact = constraints.maxWidth < 480;
 
               final qtyStepper = Container(
                 height: 38,
@@ -1315,87 +1329,114 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
                 ),
               ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-          leading: _AnimatedGroceryCheckbox(
-            checkboxKey: Key('grocery_item_checkbox_${item.id}'),
-            isPurchased: item.isPurchased,
-            onTap: () => _handleTogglePurchased(item.id),
-          ),
-          title: Text(
-            item.name,
-            key: Key('grocery_item_name_${item.id}'),
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: item.isPurchased ? AppColors.mutedText : AppColors.darkText,
-              decoration: item.isPurchased ? TextDecoration.lineThrough : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            _AnimatedGroceryCheckbox(
+              checkboxKey: Key('grocery_item_checkbox_${item.id}'),
+              isPurchased: item.isPurchased,
+              enabled: !item.isTransferred,
+              onTap: item.isTransferred ? null : () => _handleTogglePurchased(item.id),
             ),
-          ),
-          subtitle: Wrap(
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 6,
-            runSpacing: 2,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF2F6F3),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  item.displayQuantity,
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryForest),
-                ),
-              ),
-              if (item.category.isNotEmpty)
-                Text(
-                  '•  ${item.category}',
-                  style: const TextStyle(fontSize: 11, color: AppColors.mutedText),
-                ),
-              if (item.isTransferred)
-                Container(
-                  key: Key('transferred_badge_${item.id}'),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                  decoration: BoxDecoration(
-                    color: AppColors.paleMint,
-                    borderRadius: BorderRadius.circular(4),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    item.name,
+                    key: Key('grocery_item_name_${item.id}'),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: item.isPurchased ? AppColors.mutedText : AppColors.darkText,
+                      decoration: item.isPurchased ? TextDecoration.lineThrough : null,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.kitchen, size: 10, color: AppColors.primaryForest),
-                      SizedBox(width: 3),
-                      Text(
-                        'In Fridge',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primaryForest,
+                  const SizedBox(height: 3),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF2F6F3),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          item.displayQuantity,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryForest,
+                          ),
                         ),
                       ),
+                      if (item.category.isNotEmpty)
+                        Text(
+                          '•  ${item.category}',
+                          style: const TextStyle(fontSize: 11, color: AppColors.mutedText),
+                        ),
+                      if (item.isTransferred)
+                        Container(
+                          key: Key('transferred_badge_${item.id}'),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: AppColors.paleMint,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.kitchen, size: 10, color: AppColors.primaryForest),
+                              SizedBox(width: 3),
+                              Text(
+                                'In Fridge',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primaryForest,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!item.isTransferred)
+                  IconButton(
+                    key: Key('grocery_item_edit_${item.id}'),
+                    icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.mutedText),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    splashRadius: 18,
+                    onPressed: () => _showEditItemSheet(item),
+                  ),
+                IconButton(
+                  key: Key('grocery_item_delete_${item.id}'),
+                  icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFC53929)),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  splashRadius: 18,
+                  onPressed: () => GroceryService.instance.deleteItem(item.id),
                 ),
-            ],
-          ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                key: Key('grocery_item_edit_${item.id}'),
-                icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.mutedText),
-                onPressed: () => _showEditItemSheet(item),
-              ),
-              IconButton(
-                key: Key('grocery_item_delete_${item.id}'),
-                icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFC53929)),
-                onPressed: () => GroceryService.instance.deleteItem(item.id),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -1467,41 +1508,77 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
             ),
             Padding(
               padding: const EdgeInsets.all(12),
-              child: SizedBox(
-                width: double.infinity,
-                child: KeyedSubtree(
-                  key: const Key('grocery_transfer_completed_footer_btn'),
-                  child: ElevatedButton.icon(
-                    key: const Key('add_purchased_to_fridge_btn'),
-                    onPressed: eligibleCount == 0 || _isTransferring
-                        ? null
-                        : () => _handleOneTapTransfer(eligible),
-                    icon: _isTransferring
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Icon(Icons.kitchen_outlined, size: 18),
-                    label: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        _isTransferring
-                            ? 'Adding to Fridge...'
-                            : 'Add $eligibleCount Purchased ${eligibleCount == 1 ? 'Item' : 'Items'} to Fridge',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: KeyedSubtree(
+                      key: const Key('grocery_transfer_completed_footer_btn'),
+                      child: ElevatedButton.icon(
+                        key: const Key('add_purchased_to_fridge_btn'),
+                        onPressed: eligibleCount == 0 || _isTransferring
+                            ? null
+                            : () => _handleOneTapTransfer(eligible),
+                        icon: _isTransferring
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Icon(Icons.kitchen_outlined, size: 18),
+                        label: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            _isTransferring
+                                ? 'Adding to Fridge...'
+                                : 'Add $eligibleCount Purchased ${eligibleCount == 1 ? 'Item' : 'Items'} to Fridge',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryForest,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: AppColors.neutralTrack,
+                          disabledForegroundColor: AppColors.mutedText,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
                       ),
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryForest,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: AppColors.neutralTrack,
-                      disabledForegroundColor: AppColors.mutedText,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
                   ),
-                ),
+                  if (eligibleCount == 0 && completedItems.isNotEmpty && completedItems.every((it) => it.isTransferred)) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      key: const Key('grocery_all_transferred_message'),
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.paleMint.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.freshGreen.withValues(alpha: 0.25)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.check_circle_rounded, size: 16, color: AppColors.primaryForest),
+                          SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'All purchased items are in your fridge.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primaryForest,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
@@ -1596,19 +1673,24 @@ class _FridgeTransferSheetState extends State<_FridgeTransferSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: const [
-                  Icon(Icons.kitchen_outlined, color: AppColors.primaryForest, size: 24),
-                  SizedBox(width: 8),
-                  Text(
-                    'Add Items to Fridge',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.darkText,
+              Expanded(
+                child: Row(
+                  children: const [
+                    Icon(Icons.kitchen_outlined, color: AppColors.primaryForest, size: 24),
+                    SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Add Items to Fridge',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.darkText,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               IconButton(
                 icon: const Icon(Icons.close, color: AppColors.mutedText),
@@ -1723,11 +1805,13 @@ class _FridgeTransferSheetState extends State<_FridgeTransferSheet> {
 /// Tactile, micro-animated circular checkbox for grocery completion.
 class _AnimatedGroceryCheckbox extends StatefulWidget {
   final bool isPurchased;
-  final VoidCallback onTap;
+  final bool enabled;
+  final VoidCallback? onTap;
   final Key? checkboxKey;
 
   const _AnimatedGroceryCheckbox({
     required this.isPurchased,
+    this.enabled = true,
     required this.onTap,
     this.checkboxKey,
   });
@@ -1771,8 +1855,9 @@ class _AnimatedGroceryCheckboxState extends State<_AnimatedGroceryCheckbox>
   }
 
   void _handleTap() {
+    if (!widget.enabled || widget.onTap == null) return;
     _scaleController.forward(from: 0.0);
-    widget.onTap();
+    widget.onTap!();
   }
 
   @override
@@ -1781,7 +1866,7 @@ class _AnimatedGroceryCheckboxState extends State<_AnimatedGroceryCheckbox>
       scale: _scaleAnimation,
       child: GestureDetector(
         key: widget.checkboxKey,
-        onTap: _handleTap,
+        onTap: widget.enabled ? _handleTap : null,
         behavior: HitTestBehavior.opaque,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 240),

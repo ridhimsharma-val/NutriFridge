@@ -262,6 +262,7 @@ class GroceryService {
     final index = userList.indexWhere((it) => it.id == itemId);
     if (index == -1) return false;
     final existing = userList[index];
+    if (existing.isTransferred) return false;
     final updated = existing.copyWith(
       quantity: existing.quantity + additionalQty,
       updatedAt: DateTime.now(),
@@ -562,6 +563,8 @@ class GroceryService {
           orElse: () => null,
         );
     if (item == null) return false;
+    // Transferred items are permanently locked into fridge inventory and cannot be un-purchased or toggled
+    if (item.isTransferred) return false;
 
     return await updateItem(
       item.copyWith(isPurchased: !item.isPurchased),
