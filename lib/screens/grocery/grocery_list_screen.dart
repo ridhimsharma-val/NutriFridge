@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/grocery_item.dart';
@@ -712,17 +713,18 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
         ],
       ),
       body: SafeArea(
-        child: ValueListenableBuilder<List<GroceryItem>>(
-          valueListenable: GroceryService.instance.groceryItemsNotifier,
-          builder: (context, items, _) {
-            final totalCount = items.length;
-            final completedCount = items.where((it) => it.isPurchased).length;
-            final pendingCount = totalCount - completedCount;
-            final progress = totalCount > 0 ? (completedCount / totalCount) : 0.0;
+        child: _RealisticPaperBackground(
+          child: ValueListenableBuilder<List<GroceryItem>>(
+            valueListenable: GroceryService.instance.groceryItemsNotifier,
+            builder: (context, items, _) {
+              final totalCount = items.length;
+              final completedCount = items.where((it) => it.isPurchased).length;
+              final pendingCount = totalCount - completedCount;
+              final progress = totalCount > 0 ? (completedCount / totalCount) : 0.0;
 
-            return CustomScrollView(
-              slivers: [
-                // 1. Shopping Progress Header Card
+              return CustomScrollView(
+                slivers: [
+                  // 1. Shopping Progress Header Card
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
@@ -838,8 +840,9 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
           },
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   // ===========================================================================
   // WIDGET BUILDERS
@@ -2054,4 +2057,106 @@ class _AnimatedGroceryCheckboxState extends State<_AnimatedGroceryCheckbox>
       ),
     );
   }
+}
+
+/// Renders a subtle, authentic tactile paper background with natural grain,
+/// warm cream tonal variations, delicate writing-line details, and soft surface shading.
+class _RealisticPaperBackground extends StatelessWidget {
+  final Widget child;
+
+  const _RealisticPaperBackground({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: const _PaperSurfacePainter(),
+      child: child,
+    );
+  }
+}
+
+class _PaperSurfacePainter extends CustomPainter {
+  const _PaperSurfacePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+
+    final Rect rect = Offset.zero & size;
+
+    // 1. Natural Paper Tone Variation (Gentle ambient illumination across warm cream)
+    final Paint baseGradientPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color(0xFFFCFAF4), // Very soft highlight at top-left
+          Color(0xFFFAF7EF), // Canonical warm cream paper body
+          Color(0xFFF7F3E7), // Very subtle natural warmth toward bottom-right
+        ],
+        stops: [0.0, 0.45, 1.0],
+      ).createShader(rect);
+    canvas.drawRect(rect, baseGradientPaint);
+
+    // 2. Soft Natural Paper Header Vignette (Subtle depth beneath app bar)
+    final Paint vignettePaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          const Color(0xFF3D3222).withValues(alpha: 0.024),
+          const Color(0xFF3D3222).withValues(alpha: 0.008),
+          Colors.transparent,
+        ],
+        stops: const [0.0, 0.45, 1.0],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, 16));
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, 16), vignettePaint);
+
+    // 3. Delicate Horizontal Writing-Line Details (Notebook ruling watermark)
+    // Spaced at 30px intervals for natural stationery rhythm
+    final Paint linePaint = Paint()
+      ..color = const Color(0xFF5C4B32).withValues(alpha: 0.028)
+      ..strokeWidth = 0.6;
+
+    const double lineSpacing = 30.0;
+    for (double y = lineSpacing; y < size.height; y += lineSpacing) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
+    }
+
+    // 4. Subtle Micro-Paper Grain / Natural Fiber Tooth
+    // Deterministic pseudo-random distribution so no re-allocations or jitter
+    final Paint grainDark = Paint()
+      ..color = const Color(0xFF4A3E2C).withValues(alpha: 0.020)
+      ..strokeWidth = 0.8
+      ..strokeCap = StrokeCap.round;
+
+    final Paint grainLight = Paint()
+      ..color = Colors.white.withValues(alpha: 0.035)
+      ..strokeWidth = 0.8
+      ..strokeCap = StrokeCap.round;
+
+    const double step = 14.0;
+    for (double x = 4.0; x < size.width; x += step) {
+      for (double y = 6.0; y < size.height; y += step) {
+        final int hash = ((x.toInt() * 73856093) ^ (y.toInt() * 19349663) ^ 83492791);
+        final double offsetX = (hash % 11).toDouble() - 5.0;
+        final double offsetY = ((hash >> 4) % 11).toDouble() - 5.0;
+        final bool isLight = (hash & 1) == 0;
+
+        final target = Offset(
+          (x + offsetX).clamp(0.0, size.width),
+          (y + offsetY).clamp(0.0, size.height),
+        );
+
+        canvas.drawPoints(
+          ui.PointMode.points,
+          [target],
+          isLight ? grainLight : grainDark,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PaperSurfacePainter oldDelegate) => false;
 }
