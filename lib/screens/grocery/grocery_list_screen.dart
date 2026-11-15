@@ -34,6 +34,7 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
   bool _isAdding = false;
   bool _showCompletedSection = true;
   bool _isTransferring = false;
+  int? _recentTransferredCount;
   final Set<String> _togglingIds = {};
 
   void _decrementQuantity() {
@@ -78,6 +79,12 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
       );
 
       if (!mounted) return;
+
+      if (result.transferredCount > 0) {
+        setState(() {
+          _recentTransferredCount = result.transferredCount;
+        });
+      }
 
       if (result.isFullSuccess) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1445,6 +1452,12 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
   Widget _buildCompletedSection(List<GroceryItem> completedItems) {
     final eligible = completedItems.where((it) => it.isPurchased && !it.isTransferred).toList();
     final eligibleCount = eligible.length;
+    final transferredDisplayCount = _recentTransferredCount ?? GroceryService.instance.sessionTransferredCount;
+    final bool showConfirmation = eligibleCount == 0 &&
+        completedItems.isNotEmpty &&
+        completedItems.every((it) => it.isTransferred) &&
+        transferredDisplayCount != null &&
+        transferredDisplayCount > 0;
 
     return Container(
       decoration: BoxDecoration(
@@ -1506,81 +1519,78 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
                 children: completedItems.map((item) => _buildGroceryItemCard(item)).toList(),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: KeyedSubtree(
-                      key: const Key('grocery_transfer_completed_footer_btn'),
-                      child: ElevatedButton.icon(
-                        key: const Key('add_purchased_to_fridge_btn'),
-                        onPressed: eligibleCount == 0 || _isTransferring
-                            ? null
-                            : () => _handleOneTapTransfer(eligible),
-                        icon: _isTransferring
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            : const Icon(Icons.kitchen_outlined, size: 18),
-                        label: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            _isTransferring
-                                ? 'Adding to Fridge...'
-                                : 'Add $eligibleCount Purchased ${eligibleCount == 1 ? 'Item' : 'Items'} to Fridge',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                          ),
+            if (eligibleCount > 0)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: KeyedSubtree(
+                    key: const Key('grocery_transfer_completed_footer_btn'),
+                    child: ElevatedButton.icon(
+                      key: const Key('add_purchased_to_fridge_btn'),
+                      onPressed: _isTransferring ? null : () => _handleOneTapTransfer(eligible),
+                      icon: _isTransferring
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(Icons.kitchen_outlined, size: 18),
+                      label: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          _isTransferring
+                              ? 'Adding to Fridge...'
+                              : 'Add $eligibleCount Purchased ${eligibleCount == 1 ? 'Item' : 'Items'} to Fridge',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryForest,
-                          foregroundColor: Colors.white,
-                          disabledBackgroundColor: AppColors.neutralTrack,
-                          disabledForegroundColor: AppColors.mutedText,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryForest,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: AppColors.neutralTrack,
+                        disabledForegroundColor: AppColors.mutedText,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
                   ),
-                  if (eligibleCount == 0 && completedItems.isNotEmpty && completedItems.every((it) => it.isTransferred)) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      key: const Key('grocery_all_transferred_message'),
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: AppColors.paleMint.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.freshGreen.withValues(alpha: 0.25)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.check_circle_rounded, size: 16, color: AppColors.primaryForest),
-                          SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              'All purchased items are in your fridge.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primaryForest,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                ),
+              )
+            else if (showConfirmation)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                child: Container(
+                  key: const Key('grocery_all_transferred_message'),
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.paleMint.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.freshGreen.withValues(alpha: 0.25)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.check_circle_rounded, size: 16, color: AppColors.primaryForest),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          '$transferredDisplayCount ${transferredDisplayCount == 1 ? 'item' : 'items'} added to Fridge',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primaryForest,
                           ),
-                        ],
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              const SizedBox(height: 12),
           ],
         ],
       ),

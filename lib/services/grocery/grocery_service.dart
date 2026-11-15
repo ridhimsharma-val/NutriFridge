@@ -160,6 +160,15 @@ class GroceryService {
   @visibleForTesting
   String? testUserIdOverride;
 
+  int? _sessionTransferredCount;
+
+  /// Count of grocery items successfully transferred to fridge during this active session.
+  /// Null if no transfer has occurred during this session.
+  int? get sessionTransferredCount => _sessionTransferredCount;
+
+  @visibleForTesting
+  set sessionTransferredCount(int? value) => _sessionTransferredCount = value;
+
   @visibleForTesting
   void resetTestingState() {
     simulateNetworkError = false;
@@ -171,6 +180,7 @@ class GroceryService {
     _initialized = false;
     _lastLoadedUserId = null;
     _isTransferringToFridge = false;
+    _sessionTransferredCount = null;
   }
 
   final Map<String, List<GroceryItem>> _inMemoryStore = {};
@@ -805,6 +815,10 @@ class GroceryService {
         } catch (refreshErr) {
           debugPrint('[GroceryService] Error refreshing fridge repository: $refreshErr');
         }
+      }
+
+      if (successfullyTransferred.isNotEmpty) {
+        _sessionTransferredCount = successfullyTransferred.length;
       }
 
       return GroceryTransferResult(

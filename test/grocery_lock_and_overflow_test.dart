@@ -338,9 +338,10 @@ void main() {
       await tester.pumpWidget(buildTestApp(const GroceryListScreen(), tester));
       await tester.pumpAndSettle();
 
-      // All items transferred: transfer button disabled, subtle message shown
+      // All items transferred: transfer button removed, subtle confirmation message shown
+      expect(find.byKey(const Key('add_purchased_to_fridge_btn')), findsNothing);
       expect(find.byKey(const Key('grocery_all_transferred_message')), findsOneWidget);
-      expect(find.text('All purchased items are in your fridge.'), findsOneWidget);
+      expect(find.text('1 item added to Fridge'), findsOneWidget);
     });
 
     // -------------------------------------------------------------------------

@@ -411,13 +411,14 @@ void main() {
       expect(res2.transferredCount, 0);
       expect(res2.totalRequested, 0);
 
-      // In UI, button displays 0 eligible and is disabled
+      // In UI, transfer button is removed when 0 eligible items remain, confirmation shown
       await tester.pumpWidget(buildTestApp(const GroceryListScreen()));
       await tester.pumpAndSettle();
 
-      final transferBtn = tester.widget<ElevatedButton>(find.byKey(const Key('add_purchased_to_fridge_btn')));
-      expect(transferBtn.onPressed, isNull);
-      expect(find.text('Add 0 Purchased Items to Fridge'), findsOneWidget);
+      expect(find.byKey(const Key('add_purchased_to_fridge_btn')), findsNothing);
+      expect(find.text('Add 0 Purchased Items to Fridge'), findsNothing);
+      expect(find.byKey(const Key('grocery_all_transferred_message')), findsOneWidget);
+      expect(find.text('1 item added to Fridge'), findsOneWidget);
 
       // Verify no duplicate in fridge (Beverages maps to Drinks & Juices)
       final drinkCount = FridgeCategoryRepository.getCategoryData('Drinks & Juices')
