@@ -428,36 +428,43 @@ class _UseSoonSectionState extends State<UseSoonSection> {
                         ),
                       ],
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_isFindingMeals)
-                          const SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
+                    alignment: Alignment.center,
+                    child: _isFindingMeals
+                        ? const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'Finding...',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                  letterSpacing: -0.1,
+                                ),
+                              ),
+                            ],
                           )
-                        else
-                          const Icon(
-                            Icons.auto_awesome,
-                            size: 13,
-                            color: Colors.white,
+                        : const Text(
+                            'Find Meals',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: -0.1,
+                            ),
                           ),
-                        const SizedBox(width: 5),
-                        Text(
-                          _isFindingMeals ? 'Finding...' : 'Find Meals',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            letterSpacing: -0.1,
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
                 ),
               ),
