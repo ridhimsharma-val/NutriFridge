@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/nutrition_data.dart';
+import '../../models/grocery_item.dart';
 import '../../services/auth/auth_service.dart';
+import '../../services/grocery/grocery_service.dart';
+import '../grocery/grocery_list_screen.dart';
 import 'models/user_profile_data.dart';
 import 'widgets/app_preferences_card.dart';
 import 'widgets/dietary_restrictions_card.dart';
@@ -106,6 +109,11 @@ class ProfileScreen extends StatelessWidget {
 
                   // 2b. Saved Recipes & Favourites Quick Tile
                   _buildSavedRecipesTile(context),
+
+                  const SizedBox(height: 14),
+
+                  // 2c. Grocery List Quick Tile
+                  _buildGroceryListTile(context),
 
                   const SizedBox(height: 18),
 
@@ -240,6 +248,95 @@ class ProfileScreen extends StatelessWidget {
                             saved.isEmpty
                                 ? 'No favourites saved yet'
                                 : '${saved.length} favourite ${saved.length == 1 ? 'recipe' : 'recipes'}',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: AppColors.mutedText,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: AppColors.mutedText,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGroceryListTile(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.pureWhite,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.cardBorder, width: 1),
+        boxShadow: const [AppColors.cardShadow],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: const ValueKey('profile_grocery_list_tile'),
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const GroceryListScreen()),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEAF4EE),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.shopping_bag_outlined,
+                      color: AppColors.primaryForest,
+                      size: 22,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Grocery List',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.darkText,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      ValueListenableBuilder<List<GroceryItem>>(
+                        valueListenable: GroceryService.instance.groceryItemsNotifier,
+                        builder: (context, items, _) {
+                          final pending = items.where((it) => !it.isPurchased).length;
+                          String subtitle;
+                          if (items.isEmpty) {
+                            subtitle = 'No items on your list';
+                          } else if (pending > 0) {
+                            subtitle = '$pending ${pending == 1 ? 'item' : 'items'} to buy';
+                          } else {
+                            subtitle = 'All items collected';
+                          }
+                          return Text(
+                            subtitle,
                             style: const TextStyle(
                               fontSize: 12.5,
                               color: AppColors.mutedText,
